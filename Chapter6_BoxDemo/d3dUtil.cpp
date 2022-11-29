@@ -1,7 +1,12 @@
-﻿#include "d3dUtil.h"
+#include "d3dUtil.h"
 
 template<class T>
 using ComPtr = Microsoft::WRL::ComPtr<T>;
+
+ComPtr<ID3D12Resource> d3dUtil::CreateDefaultBuffer(ID3D12Device* device, ID3D12GraphicsCommandList* cmdList, const void* initData, UINT64 byteSize, ComPtr<ID3D12Resource>& uploadBuffer)
+{
+	return ComPtr<ID3D12Resource>();
+}
 
 ComPtr<ID3DBlob> d3dUtil::LoadBinary(const std::wstring& filename)
 {

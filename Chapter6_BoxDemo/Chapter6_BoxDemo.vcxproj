@@ -146,6 +146,8 @@
     <ClCompile Include="DXTrace.cpp" />
     <ClCompile Include="GameTimer.cpp" />
     <ClCompile Include="Main.cpp" />
+    <ClCompile Include="MathHelper.cpp" />
+    <ClCompile Include="Mesh.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="BoxApp.h" />
@@ -154,6 +156,9 @@
     <ClInclude Include="d3dx12.h" />
     <ClInclude Include="DXTrace.h" />
     <ClInclude Include="GameTimer.h" />
+    <ClInclude Include="MathHelper.h" />
+    <ClInclude Include="Mesh.h" />
+    <ClInclude Include="UploadBuffer.h" />
     <ClInclude Include="WinMin.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
