@@ -19,13 +19,43 @@ public:
 		// UINT64 OffsetInBytes; // multiple of 256
 		// UINT   SizeInBytes;   // multiple of 256
 		// } D3D12_CONSTANT_BUFFER_VIEW_DESC;
-
 		if (isConstantBuffer)
-			m_ElementByteSize = d3dUtil;
+			m_ElementByteSize = d3dUtil::CalcConstantBufferByteSize(sizeof(T));
 	
-		//TODO
+		CD3DX12_HEAP_PROPERTIES uploadHeapProperties(D3D12_HEAP_TYPE_UPLOAD);
+		CD3DX12_RESOURCE_DESC uploadResourceDesc = CD3DX12_RESOURCE_DESC::Buffer(m_ElementByteSize * elementCount);
+		HR(device->CreateCommittedResource(
+			&uploadHeapProperties,
+			D3D12_HEAP_FLAG_NONE,
+			&uploadResourceDesc,
+			D3D12_RESOURCE_STATE_GENERIC_READ,
+			nullptr,
+			IID_PPV_ARGS(&m_UploadBuffer)));
+
+		HR(m_UploadBuffer->Map(0, nullptr, reinterpret_cast<void**>(&m_MappedData)));
 	}
 
+	UploadBuffer(const UploadBuffer& rhs) = delete;
+	UploadBuffer& operator= (const UploadBuffer& rhs) = delete;
+	~UploadBuffer() 
+	{
+		if (m_UploadBuffer != nullptr) 
+		{
+			m_UploadBuffer->Unmap(0, nullptr);
+		}
+
+		m_MappedData = nullptr;
+	}
+
+	ID3D12Resource* Resource()const
+	{
+		return m_UploadBuffer.Get();
+	}
+
+	void CopyData(int elementIndex, const T& data) 
+	{
+		memcpy(&m_MappedData[elementIndex * m_ElementByteSize], &data, sizeof(T));
+	}
 
 private:
 	Microsoft::WRL::ComPtr<ID3D12Resource> m_UploadBuffer;

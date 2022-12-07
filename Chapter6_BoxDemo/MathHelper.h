@@ -9,6 +9,7 @@
 
 class MathHelper
 {
+public:
 	static float RandF()
 	{
 		return (float)(rand()) / (float)RAND_MAX;
@@ -43,7 +44,7 @@ class MathHelper
 	}
 
 	template<class T>
-	static T CLamp(const T& x, const T& low, const T& high)
+	static T Clamp(const T& x, const T& low, const T& high)
 	{
 		return x < low ? low : (x > high ? high : x);
 	}
