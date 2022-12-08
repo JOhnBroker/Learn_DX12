@@ -1,4 +1,4 @@
-﻿#include "d3dApp.h"
+#include "d3dApp.h"
 
 LRESULT CALLBACK
 MainWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
@@ -61,7 +61,7 @@ HWND D3DApp::MainWnd() const
 
 float D3DApp::AspectRatio() const
 {
-	return static_cast<float>(m_ClientWidth / m_ClientHeight);
+	return static_cast<float>(m_ClientWidth) / m_ClientHeight;
 }
 
 bool D3DApp::Get4xMsaaState() const
