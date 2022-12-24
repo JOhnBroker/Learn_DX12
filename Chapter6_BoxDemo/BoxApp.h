@@ -20,6 +20,8 @@ struct ObjectConstants
 class BoxApp :public D3DApp
 {
 public:
+	enum class ShowMode { Box, Pyramid};
+public:
 	BoxApp(HINSTANCE hInstance);
 	BoxApp(HINSTANCE hInstance, int witdh, int height);
 	BoxApp(const BoxApp& rhs) = delete;
@@ -50,6 +52,7 @@ private:
 
 	std::unique_ptr<UploadBuffer<ObjectConstants>> m_ObjectCB = nullptr;
 	std::unique_ptr<MeshGeometry> m_BoxGeo = nullptr;
+	std::unique_ptr<MeshGeometry> m_PyramidGeo = nullptr;
 
 	ComPtr<ID3D12RootSignature> m_RootSignature = nullptr;
 	ComPtr<ID3D12DescriptorHeap> m_CBVHeap = nullptr;
@@ -69,6 +72,9 @@ private:
 	float m_Phi = XM_PIDIV4;
 	float m_Radius = 5.0f;
 
+	ShowMode m_CurrMode = ShowMode::Box;
+	bool m_LineMode = false;
+	bool m_FrontMode = false;
 	POINT m_LastMousePos;
 };
 

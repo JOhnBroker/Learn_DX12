@@ -1,5 +1,7 @@
 #include "d3dApp.h"
 
+extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
+
 LRESULT CALLBACK
 MainWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 {
@@ -100,6 +102,12 @@ int D3DApp::Run()
 			if (!m_AppPaused)
 			{
 				CalculateFrameStats();
+
+				// 开启 ImGui帧
+				ImGui_ImplDX12_NewFrame();
+				ImGui_ImplWin32_NewFrame();
+				ImGui::NewFrame();
+
 				Update(m_Timer);
 				Draw(m_Timer);
 			}
@@ -117,6 +125,8 @@ bool D3DApp::Initialize()
 	if (!InitMainWindow())
 		return false;
 	if (!InitDirect3D())
+		return false;
+	if (!InitImGui())
 		return false;
 
 	OnResize();
@@ -141,6 +151,15 @@ void D3DApp::CreateRTVAndDSVDescriptorHeaps()
 	dsvHeapDesc.NodeMask = 0;
 	HR(m_pd3dDevice->CreateDescriptorHeap(
 		&dsvHeapDesc, IID_PPV_ARGS(m_DSVHeap.GetAddressOf())));
+
+	// 为ImGui创建SRV堆
+	D3D12_DESCRIPTOR_HEAP_DESC srvHeapDesc;
+	srvHeapDesc.NumDescriptors = 1;
+	srvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+	srvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+	srvHeapDesc.NodeMask = 0;
+	HR(m_pd3dDevice->CreateDescriptorHeap(
+		&srvHeapDesc, IID_PPV_ARGS(m_SRVHeap.GetAddressOf())));
 }
 
 void D3DApp::OnResize()
@@ -235,6 +254,10 @@ void D3DApp::OnResize()
 
 LRESULT D3DApp::MsgProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 {
+	if (ImGui_ImplWin32_WndProcHandler(m_hMainWnd, msg, wParam, lParam))
+		return true;
+
+	const ImGuiIO imio = ImGui::GetIO();
 	switch (msg)
 	{
 	case WM_ACTIVATE:
@@ -332,6 +355,11 @@ LRESULT D3DApp::MsgProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 		OnMouseUp(wParam, (int)(short)LOWORD(lParam), (int)(short)HIWORD(lParam));
 		goto Exit0;
 	case WM_MOUSEMOVE:
+		if (imio.WantCaptureMouse) 
+		{
+			// 非imgui控制
+			break;
+		}
 		OnMouseMove(wParam, (int)(short)LOWORD(lParam), (int)(short)HIWORD(lParam));
 		goto Exit0;
 	case WM_KEYUP:
@@ -456,6 +484,18 @@ bool D3DApp::InitDirect3D()
 	CreateCommandObjects();
 	CreateSwapChain();
 	CreateRTVAndDSVDescriptorHeaps();
+
+	return true;
+}
+
+bool D3DApp::InitImGui()
+{
+	// 设置平台/渲染器后端
+	ImGui_ImplWin32_Init(m_hMainWnd);
+	ImGui_ImplDX12_Init(m_pd3dDevice.Get(), SwapChainBufferCount,
+		m_BackBufferFormat, m_SRVHeap.Get(),
+		m_SRVHeap.Get()->GetCPUDescriptorHandleForHeapStart(),
+		m_SRVHeap.Get()->GetGPUDescriptorHandleForHeapStart());
 
 	return true;
 }

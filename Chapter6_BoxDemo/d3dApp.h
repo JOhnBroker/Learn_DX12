@@ -1,4 +1,4 @@
-﻿//***************************************************************************************
+//***************************************************************************************
 // d3dApp.h by Frank Luna (C) 2015 All Rights Reserved.
 //***************************************************************************************
 
@@ -12,6 +12,7 @@
 
 #include "d3dUtil.h"
 #include "GameTimer.h"
+#include "ImguiManager.h"
 
 #pragma comment(lib,"d3dcompiler.lib")
 #pragma comment(lib,"D3D12.lib")
@@ -54,6 +55,7 @@ protected:
 protected:
 	bool InitMainWindow();
 	bool InitDirect3D();
+	bool InitImGui();
 	void CreateCommandObjects();										// 创建命令队列、命令列表分配器和命令列表
 	void CreateSwapChain();												// 创建交换链
 	void FlushCommandQueue();											// 强制CPU等待GPU，直到GPU处理完队列中的所有命令
@@ -83,6 +85,7 @@ protected:
 	UINT m_4xMsaaQuality;									// MSAA支持的质量等级
 
 	GameTimer m_Timer;										// 计时器
+	ImguiManager m_ImGuiManager;
 
 	template <class T>
 	using ComPtr = Microsoft::WRL::ComPtr<T>;				//简化类型名
@@ -103,6 +106,7 @@ protected:
 	ComPtr<ID3D12Resource>m_DepthStencilBuffer;				// 深度/模板缓冲区
 	ComPtr<ID3D12DescriptorHeap>m_RTVHeap;					// RTV的堆描述符
 	ComPtr<ID3D12DescriptorHeap>m_DSVHeap;					// DSV的堆描述符
+	ComPtr<ID3D12DescriptorHeap>m_SRVHeap;					// 着色器资源的堆描述符
 
 	D3D12_VIEWPORT m_ScreenViewPort;						// 视口
 	D3D12_RECT m_ScissorRect;								// 裁剪矩阵
