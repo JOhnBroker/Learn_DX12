@@ -9,6 +9,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Chapter6_BoxDemo", "..\Chap
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ImGui", "..\ImGui\ImGui.vcxproj", "{67E2D694-0543-4EF1-8896-521E4CB80A48}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Chapter7_Shapes", "..\Chapter7_Shapes\Chapter7_Shapes.vcxproj", "{9E5DC54D-1103-4E95-A98A-E752072D71BD}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -39,6 +41,14 @@ Global
 		{67E2D694-0543-4EF1-8896-521E4CB80A48}.Release|x64.ActiveCfg = Release|x64
 		{67E2D694-0543-4EF1-8896-521E4CB80A48}.Release|x64.Build.0 = Release|x64
 		{67E2D694-0543-4EF1-8896-521E4CB80A48}.Release|x86.ActiveCfg = Release|x64
+		{9E5DC54D-1103-4E95-A98A-E752072D71BD}.Debug|x64.ActiveCfg = Debug|x64
+		{9E5DC54D-1103-4E95-A98A-E752072D71BD}.Debug|x64.Build.0 = Debug|x64
+		{9E5DC54D-1103-4E95-A98A-E752072D71BD}.Debug|x86.ActiveCfg = Debug|Win32
+		{9E5DC54D-1103-4E95-A98A-E752072D71BD}.Debug|x86.Build.0 = Debug|Win32
+		{9E5DC54D-1103-4E95-A98A-E752072D71BD}.Release|x64.ActiveCfg = Release|x64
+		{9E5DC54D-1103-4E95-A98A-E752072D71BD}.Release|x64.Build.0 = Release|x64
+		{9E5DC54D-1103-4E95-A98A-E752072D71BD}.Release|x86.ActiveCfg = Release|Win32
+		{9E5DC54D-1103-4E95-A98A-E752072D71BD}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
