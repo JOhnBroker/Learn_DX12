@@ -491,6 +491,7 @@ bool D3DApp::InitDirect3D()
 bool D3DApp::InitImGui()
 {
 	// 设置平台/渲染器后端
+	ImGui::CreateContext();
 	ImGui_ImplWin32_Init(m_hMainWnd);
 	ImGui_ImplDX12_Init(m_pd3dDevice.Get(), SwapChainBufferCount,
 		m_BackBufferFormat, m_SRVHeap.Get(),

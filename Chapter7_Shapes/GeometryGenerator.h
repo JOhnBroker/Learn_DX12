@@ -51,6 +51,7 @@ public:
 					m_Indices16[i] = static_cast<uint16>(Indices32[i]);
 				}
 			}
+			return m_Indices16;
 		}
 	private:
 		std::vector<uint16> m_Indices16;

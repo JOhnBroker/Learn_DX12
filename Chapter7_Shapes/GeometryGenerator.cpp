@@ -80,10 +80,10 @@ GeometryGenerator::MeshData GeometryGenerator::CreateBox(float width, float heig
 
     numSubdivisions = std::min<uint32>(numSubdivisions, 6u);
 
-    for (uint32 time = 0; time < numSubdivisions; ++time) 
-    {
-        Subdivide(meshData);
-    }
+	for (uint32 time = 0; time < numSubdivisions; ++time)
+	{
+		Subdivide(meshData);
+	}
 
     return meshData;
 }
@@ -181,10 +181,10 @@ GeometryGenerator::MeshData GeometryGenerator::CreateGeosphere(float radius, uin
 {
     MeshData meshData;
 
-    // È·¶¨Ï¸·ÖµÄ´ÎÊı 
+    // ç¡®å®šç»†åˆ†çš„æ¬¡æ•° 
     numSubdivisions = std::min<uint32>(numSubdivisions, 6u);
 
-    // Í¨¹ı¶ÔÕı¶şÊ®ÃæÌå½øĞĞÇúÃæÏ¸·Ö ±Æ½ü ÇòÌå
+    // é€šè¿‡å¯¹æ­£äºŒåé¢ä½“è¿›è¡Œæ›²é¢ç»†åˆ† é€¼è¿‘ çƒä½“
     const float X = 0.525731f;
     const float Z = 0.850651f;
 
@@ -219,19 +219,19 @@ GeometryGenerator::MeshData GeometryGenerator::CreateGeosphere(float radius, uin
         Subdivide(meshData);
     }
 
-    // ½«ÈıÎ¬¶¥µãÍ¶Ó°µ½ÎÆÀí×ø±ê
+    // å°†ä¸‰ç»´é¡¶ç‚¹æŠ•å½±åˆ°çº¹ç†åæ ‡
     for (uint32 i = 0; i < meshData.Vertices.size(); ++i) 
     {
-        // Ó³Éäµ½µ¥Î»ÇòÉÏ
+        // æ˜ å°„åˆ°å•ä½çƒä¸Š
         XMVECTOR n = XMVector3Normalize(XMLoadFloat3(&meshData.Vertices[i].Position));
 
-        // Í¶Éäµ½ÇòÃæÉÏ
+        // æŠ•å°„åˆ°çƒé¢ä¸Š
         XMVECTOR p = radius * n;
 
         XMStoreFloat3(&meshData.Vertices[i].Position, p);
         XMStoreFloat3(&meshData.Vertices[i].Normal, n);
 
-        // ¸ù¾İÇòÃæ×ø±êÍÆµ¼ÎÆÀí×ø±ê
+        // æ ¹æ®çƒé¢åæ ‡æ¨å¯¼çº¹ç†åæ ‡
         float theta = atan2f(meshData.Vertices[i].Position.z, meshData.Vertices[i].Position.x);
 
         if (theta < 0.0f) 
@@ -258,14 +258,14 @@ GeometryGenerator::MeshData GeometryGenerator::CreateCylinder(float bottomRadius
 {
     MeshData meshData;
 
-    // ²ã¸ß
+    // å±‚é«˜
     float stackHeight = height / stackCount;
-    // Ã¿²ãµÄ°ë¾¶
+    // æ¯å±‚çš„åŠå¾„
     float radiusStep = (topRadius - bottomRadius) / stackCount;
     uint32 ringCount = stackCount + 1;
     uint32 ringVertexCount = sliceCount + 1;
 
-    // ´Óµ×²¿¿ªÊ¼£¬¼¼Êõ¶Ñµş²ã»·µÄ¶¥µã×ø±ê
+    // ä»åº•éƒ¨å¼€å§‹ï¼ŒæŠ€æœ¯å †å å±‚ç¯çš„é¡¶ç‚¹åæ ‡
     for (uint32 i = 0; i < ringCount; ++i) 
     {
         float y = -0.5f * height + i * stackHeight;
@@ -521,7 +521,7 @@ GeometryGenerator::Vertex GeometryGenerator::MidPoint(const Vertex& v0, const Ve
 
 void GeometryGenerator::BuildCylinderTopCap(float bottomRadius, float topRadius, float height, uint32 sliceCount, uint32 stackCount, MeshData& meshData)
 {
-    // ³õÊ¼¶¥µãÊıÁ¿
+    // åˆå§‹é¡¶ç‚¹æ•°é‡
     uint32 baseIndex = (uint32)meshData.Vertices.size();
 
     float y = 0.5f * height;

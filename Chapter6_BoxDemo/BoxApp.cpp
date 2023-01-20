@@ -173,14 +173,15 @@ void BoxApp::Draw(const GameTimer& timer)
 	{
 		m_CommandList->DrawIndexedInstanced(m_PyramidGeo->DrawArgs["pyramid"].IndexCount, 1, 0, 0, 0);
 	}
-	CD3DX12_RESOURCE_BARRIER render2present = CD3DX12_RESOURCE_BARRIER::Transition(
-		CurrentBackBuffer(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT);
-	m_CommandList->ResourceBarrier(1, &render2present);
 
 	// 设置ImGui的SRV描述符堆
 	m_CommandList->SetDescriptorHeaps(1, m_SRVHeap.GetAddressOf());
 	// ImGui在Direct3D的绘制
 	ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), m_CommandList.Get());
+	
+	CD3DX12_RESOURCE_BARRIER render2present = CD3DX12_RESOURCE_BARRIER::Transition(
+		CurrentBackBuffer(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT);
+	m_CommandList->ResourceBarrier(1, &render2present);
 
 	HR(m_CommandList->Close());
 
