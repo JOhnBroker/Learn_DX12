@@ -267,16 +267,11 @@ void LandAndWaveApp::UpdateWaves(const GameTimer& gt)
 void LandAndWaveApp::BuildRootSignature()
 {
 	HRESULT hReturn = E_FAIL;
-	CD3DX12_DESCRIPTOR_RANGE cbvTable0;
-	CD3DX12_DESCRIPTOR_RANGE cbvTable1;
 	CD3DX12_ROOT_PARAMETER slotRootParameter[2];
 
-	cbvTable0.Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 0);
-	cbvTable1.Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 1);
-
 	// 创建根描述符表
-	slotRootParameter[0].InitAsDescriptorTable(1, &cbvTable0);
-	slotRootParameter[1].InitAsDescriptorTable(1, &cbvTable1);
+	slotRootParameter[0].InitAsConstantBufferView(0);
+	slotRootParameter[1].InitAsConstantBufferView(1);
 
 	// 一个根签名由一组根参数组成
 	CD3DX12_ROOT_SIGNATURE_DESC rootSigDesc(2, slotRootParameter, 0, nullptr,
@@ -307,6 +302,48 @@ void LandAndWaveApp::BuildShadersAndInputLayout()
 
 void LandAndWaveApp::BuildLandGeometry()
 {
+	GeometryGenerator geoGen;
+	GeometryGenerator::MeshData grid = geoGen.CreateGrid(160.0f, 160.0f, 50, 50);
+
+	std::vector<Vertex> vertices(grid.Vertices.size());
+	for (size_t i = 0; i < grid.Vertices.size(); ++i) 
+	{
+		auto& p = grid.Vertices[i].Position;
+		vertices[i].Pos = p;
+		vertices[i].Pos.y = GetHillsHeight(p.x, p.z);
+
+		if (vertices[i].Pos.y < -10.0f) 
+		{
+			vertices[i].Color = XMFLOAT4(1.0f, 0.96f, 0.62f, 1.0f);
+		}
+		else if (vertices[i].Pos.y < 5.0f)
+		{
+			vertices[i].Color = XMFLOAT4(0.48f, 0.77f, 0.46f, 1.0f);
+		}
+		else if (vertices[i].Pos.y < 12.0f)
+		{
+			vertices[i].Color = XMFLOAT4(0.1f, 0.48f, 0.19f, 1.0f);
+		}
+		else if (vertices[i].Pos.y < 20.0f)
+		{
+			vertices[i].Color = XMFLOAT4(0.45f, 0.39f, 0.34f, 1.0f);
+		}
+		else 
+		{
+			vertices[i].Color = XMFLOAT4(1.0f, 0.96f, 0.62f, 1.0f);
+		}
+	}
+	const UINT vbByteSize = (UINT)vertices.size() * sizeof(Vertex);
+
+	std::vector<std::uint16_t>indices = grid.GetIndices16();
+	const UINT ibByteSize = (UINT)indices.size() * sizeof(std::uint16_t);
+
+	auto geo = std::make_unique<MeshGeometry>();
+	geo->Name = "landGeo";
+
+	HR(D3DCreateBlob(vbByteSize, &geo->VertexBufferCPU));
+	CopyMemory(geo->VertexBufferCPU->GetBufferPointer(), vertices.data(), vbByteSize);
+
 }
 
 void LandAndWaveApp::BuildWavesGeometryBuffers()
@@ -479,4 +516,21 @@ void LandAndWaveApp::DrawRenderItems(ID3D12GraphicsCommandList* cmdList, const s
 
 		cmdList->DrawIndexedInstanced(ri->IndexCount, 1, ri->StartIndexLocation, ri->BaseVertexLocation, 0);
 	}
+}
+
+float LandAndWaveApp::GetHillsHeight(float x, float z) const
+{
+	return 0.3f * (z * sinf(0.1f * x) + x * cosf(0.1f * z));
+}
+
+XMFLOAT3 LandAndWaveApp::GetHillsNormal(float x, float z) const
+{
+	XMFLOAT3 N(
+		-0.03f * z * cosf(0.1f * x) - 0.3f * cosf(0.1f * z),
+		1.0f,
+		-0.3f * sinf(0.1f * x) + 0.03f * x * sinf(0.1f * z));
+
+	XMVECTOR unitNormal = XMVector3Normalize(XMLoadFloat3(&N));
+	XMStoreFloat3(&N, unitNormal);
+	return N;
 }

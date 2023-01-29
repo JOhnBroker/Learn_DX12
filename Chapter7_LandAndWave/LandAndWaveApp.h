@@ -75,6 +75,9 @@ public:
 	void BuildRenderItems();
 	void DrawRenderItems(ID3D12GraphicsCommandList* cmdList, const std::vector<RenderItem*>& ritems);
 
+	float GetHillsHeight(float x, float z)const;
+	XMFLOAT3 GetHillsNormal(float x, float z)const;
+
 private:
 	template<class T>
 	using ComPtr = Microsoft::WRL::ComPtr<T>;
