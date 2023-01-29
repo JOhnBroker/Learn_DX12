@@ -1,11 +1,12 @@
-#ifndef SHAOESAPP
-#define SHAOESAPP
+#ifndef LANDANDWAVEAPP
+#define LANDANDWAVEAPP
 
 #include <d3dApp.h>
 #include "MathHelper.h"
 #include "UploadBuffer.h"
 #include "GeometryGenerator.h"
 #include "FrameResource.h"
+#include "Waves.h"
 
 using namespace DirectX;
 using namespace DirectX::PackedVector;
@@ -33,15 +34,20 @@ struct RenderItem
 	int BaseVertexLocation = 0;
 };
 
+enum class RenderLayer :int
+{
+	Opaque = 0,
+	Count
+};
 
-class ShapesApp : public D3DApp
+class LandAndWaveApp : public D3DApp
 {
 public:
-	ShapesApp(HINSTANCE hInstance);
-	ShapesApp(HINSTANCE hInstance, int width, int height);
-	ShapesApp(const ShapesApp& rhs) = delete;
-	ShapesApp& operator=(const ShapesApp& rhs) = delete;
-	~ShapesApp();
+	LandAndWaveApp(HINSTANCE hInstance);
+	LandAndWaveApp(HINSTANCE hInstance, int width, int height);
+	LandAndWaveApp(const LandAndWaveApp& rhs) = delete;
+	LandAndWaveApp& operator=(const LandAndWaveApp& rhs) = delete;
+	~LandAndWaveApp();
 
 	virtual bool Initialize()override;
 	bool InitResource();
@@ -58,12 +64,12 @@ public:
 	void UpdateCamera(const GameTimer& gt);
 	void UpdateObjectCBs(const GameTimer& gt);
 	void UpdateMainPassCB(const GameTimer& gt);
+	void UpdateWaves(const GameTimer& gt);
 
-	void BuildDescriptorHeaps();
-	void BuildConstantBuffersViews();
 	void BuildRootSignature();
-	void BuildShaderAndInputLayout();
-	void BuildShapeGeometry();
+	void BuildShadersAndInputLayout();
+	void BuildLandGeometry();
+	void BuildWavesGeometryBuffers();
 	void BuildPSOs();
 	void BuildFrameResources();
 	void BuildRenderItems();
@@ -76,11 +82,9 @@ private:
 	std::vector<std::unique_ptr<FrameResource>> m_FrameResources;
 	FrameResource* m_CurrFrameResource = nullptr;
 	int m_CurrFrameResourceIndex = 0;
+	UINT m_CbvSrvDescriptorSize = 0;
 
 	ComPtr<ID3D12RootSignature> m_RootSignature = nullptr;
-	ComPtr<ID3D12DescriptorHeap> m_CBVHeap = nullptr;
-
-	ComPtr<ID3D12DescriptorHeap> m_SrvDescriptorHeap = nullptr;
 
 	std::unordered_map<std::string, std::unique_ptr<MeshGeometry>> m_Geometries;
 	std::unordered_map<std::string, ComPtr<ID3DBlob>> m_Shaders;
@@ -88,8 +92,13 @@ private:
 
 	std::vector<D3D12_INPUT_ELEMENT_DESC> m_InputLayout;
 
+	RenderItem* m_WavesRitem = nullptr;
+
 	std::vector<std::unique_ptr<RenderItem>> m_AllRitems;
-	std::vector<RenderItem*> m_OpaqueRitems;
+
+	std::vector<RenderItem*> m_RitemLayer[(int)RenderLayer::Count];
+
+	std::unique_ptr<Waves> m_Waves;
 
 	PassConstants m_MainPassCB;
 
@@ -103,9 +112,12 @@ private:
 	float m_Phi = 0.2f * XM_PI;
 	float m_Radius = 15.0f;
 
+	float m_SunTheta = 1.25f * XM_PI;
+	float m_SunPhi = XM_PIDIV4;
+
 	bool m_IsWireframe = true;
 	POINT m_LastMousePos;
-
 };
 
-#endif // !SHAOESAPP
+
+#endif // !LANDANDWAVEAPP
