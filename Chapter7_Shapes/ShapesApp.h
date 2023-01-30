@@ -2,6 +2,8 @@
 #define SHAOESAPP
 
 #include <d3dApp.h>
+#include <string>
+#include <fstream>
 #include "MathHelper.h"
 #include "UploadBuffer.h"
 #include "GeometryGenerator.h"
@@ -37,6 +39,8 @@ struct RenderItem
 class ShapesApp : public D3DApp
 {
 public:
+	enum class ShowMode { Shapes, Skull };
+public:
 	ShapesApp(HINSTANCE hInstance);
 	ShapesApp(HINSTANCE hInstance, int width, int height);
 	ShapesApp(const ShapesApp& rhs) = delete;
@@ -64,10 +68,13 @@ public:
 	void BuildRootSignature();
 	void BuildShaderAndInputLayout();
 	void BuildShapeGeometry();
+	void BuildSkullGeometry();
 	void BuildPSOs();
 	void BuildFrameResources();
 	void BuildRenderItems();
 	void DrawRenderItems(ID3D12GraphicsCommandList* cmdList, const std::vector<RenderItem*>& ritems);
+
+	void ReadDataFromFile(std::vector<Vertex>& vertices, std::vector<std::uint16_t>& indices);
 
 private:
 	template<class T>
@@ -104,7 +111,10 @@ private:
 	float m_Radius = 15.0f;
 
 	bool m_IsWireframe = true;
+	ShowMode m_CurrMode = ShowMode::Shapes;
 	POINT m_LastMousePos;
+
+	std::string m_VertexFileName = "..\\Models\\skull.txt";
 
 };
 

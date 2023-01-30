@@ -93,6 +93,7 @@ void LandAndWaveApp::Update(const GameTimer& timer)
 
 	UpdateObjectCBs(timer);
 	UpdateMainPassCB(timer);
+	UpdateWaves(timer);
 }
 
 void LandAndWaveApp::Draw(const GameTimer& timer)
@@ -128,17 +129,12 @@ void LandAndWaveApp::Draw(const GameTimer& timer)
 
 	m_CommandList->OMSetRenderTargets(1, &backbufferView, true, &depthbufferView);
 
-	ID3D12DescriptorHeap* descriptorHeaps[] = { m_CBVHeap.Get() };
-	m_CommandList->SetDescriptorHeaps(_countof(descriptorHeaps), descriptorHeaps);
-
 	m_CommandList->SetGraphicsRootSignature(m_RootSignature.Get());
 
-	int passCbvIndex = m_PassCbvOffset + m_CurrFrameResourceIndex;
-	auto passCbvHandle = CD3DX12_GPU_DESCRIPTOR_HANDLE(m_CBVHeap->GetGPUDescriptorHandleForHeapStart());
-	passCbvHandle.Offset(passCbvIndex, m_CBVSRVDescriptorSize);
-	m_CommandList->SetGraphicsRootDescriptorTable(1, passCbvHandle);
+	auto passCB = m_CurrFrameResource->PassCB->Resource();
+	m_CommandList->SetGraphicsRootConstantBufferView(1, passCB->GetGPUVirtualAddress());
 
-	DrawRenderItems(m_CommandList.Get(), m_OpaqueRitems);
+	DrawRenderItems(m_CommandList.Get(), m_RitemLayer[(int)RenderLayer::Opaque]);
 
 	m_CommandList->SetDescriptorHeaps(1, m_SRVHeap.GetAddressOf());
 	ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), m_CommandList.Get());
@@ -262,6 +258,32 @@ void LandAndWaveApp::UpdateMainPassCB(const GameTimer& gt)
 
 void LandAndWaveApp::UpdateWaves(const GameTimer& gt)
 {
+	static float t_base = 0.0f;
+
+	if ((m_Timer.TotalTime() - t_base) >= 0.25f) 
+	{
+		t_base += 0.25f;
+		int i = MathHelper::Rand(4, m_Waves->GetRowCount() - 5);
+		int j = MathHelper::Rand(4, m_Waves->GetColCount() - 5);
+
+		float r = MathHelper::RandF(0.2f, 0.5f);
+
+		m_Waves->Disturb(i, j, r);
+	}
+
+	m_Waves->Update(gt.DeltaTime());
+
+	auto currWavesVB = m_CurrFrameResource->WavesVB.get();
+	for (int i = 0; i < m_Waves->GetVertexCount(); ++i) 
+	{
+		Vertex v;
+		v.Pos = m_Waves->Position(i);
+		v.Color = XMFLOAT4(DirectX::Colors::Blue);
+
+		currWavesVB->CopyData(i, v);
+	}
+
+	m_WavesRitem->Geo->VertexBufferGPU = currWavesVB->Resource();
 }
 
 void LandAndWaveApp::BuildRootSignature()
@@ -294,10 +316,6 @@ void LandAndWaveApp::BuildRootSignature()
 		serializedRootSig->GetBufferPointer(),
 		serializedRootSig->GetBufferSize(), 
 		IID_PPV_ARGS(m_RootSignature.GetAddressOf())));
-}
-
-void LandAndWaveApp::BuildShadersAndInputLayout()
-{
 }
 
 void LandAndWaveApp::BuildLandGeometry()
@@ -344,10 +362,82 @@ void LandAndWaveApp::BuildLandGeometry()
 	HR(D3DCreateBlob(vbByteSize, &geo->VertexBufferCPU));
 	CopyMemory(geo->VertexBufferCPU->GetBufferPointer(), vertices.data(), vbByteSize);
 
+	HR(D3DCreateBlob(ibByteSize, &geo->IndexBufferCPU));
+	CopyMemory(geo->IndexBufferCPU->GetBufferPointer(), indices.data(), ibByteSize);
+
+	geo->VertexBufferGPU = d3dUtil::CreateDefaultBuffer(m_pd3dDevice.Get(),
+		m_CommandList.Get(), vertices.data(), vbByteSize, geo->VertexBufferUploader);
+
+	geo->IndexBufferGPU = d3dUtil::CreateDefaultBuffer(m_pd3dDevice.Get(), 
+		m_CommandList.Get(), indices.data(), ibByteSize, geo->IndexBufferUploader);
+
+	geo->VertexByteStride = sizeof(Vertex);
+	geo->VertexBufferByteSize = vbByteSize;
+	geo->IndexFormat = DXGI_FORMAT_R16_UINT;
+	geo->IndexBufferByteSize = ibByteSize;
+
+	SubmeshGeometry submesh;
+	submesh.IndexCount = (UINT)indices.size();
+	submesh.StartIndexLocation = 0;
+	submesh.BaseVertexLocation = 0;
+
+	geo->DrawArgs["grid"] = submesh;
+	m_Geometries["landGeo"] = std::move(geo);
 }
 
 void LandAndWaveApp::BuildWavesGeometryBuffers()
 {
+	std::vector<std::uint16_t> indices(3 * m_Waves->GetTriangleCount());
+	assert(m_Waves->GetVertexCount() < 0x0000ffff);
+
+	int r = m_Waves->GetRowCount();
+	int c = m_Waves->GetColCount();
+	int k = 0;
+
+	for (int i = 0; i < r - 1; ++i) 
+	{
+		for (int j = 0; j < c - 1; ++j) 
+		{
+			indices[k] = i * c + j;
+			indices[k + 1] = i * c + j + 1;
+			indices[k + 2] = (i + 1) * c + j;
+
+			indices[k + 5] = i * c + j + 1;
+			indices[k + 3] = (i + 1) * c + j + 1;
+			indices[k + 4] = (i + 1) * c + j;
+
+			k += 6;
+		}
+	}
+
+	UINT vbByteSize = m_Waves->GetVertexCount() * sizeof(Vertex);
+	UINT ibByteSize = (UINT)indices.size() * sizeof(std::uint16_t);
+
+	auto geo = std::make_unique<MeshGeometry>();
+	geo->Name = "waterGeo";
+
+	geo->VertexBufferCPU = nullptr;
+	geo->VertexBufferGPU = nullptr;
+
+	HR(D3DCreateBlob(ibByteSize, &geo->IndexBufferCPU));
+	CopyMemory(geo->IndexBufferCPU->GetBufferPointer(), indices.data(), ibByteSize);
+
+	geo->IndexBufferGPU = d3dUtil::CreateDefaultBuffer(m_pd3dDevice.Get(),
+		m_CommandList.Get(), indices.data(), ibByteSize, geo->IndexBufferUploader);
+
+	geo->VertexByteStride = sizeof(Vertex);
+	geo->VertexBufferByteSize = vbByteSize;
+	geo->IndexFormat = DXGI_FORMAT_R16_UINT;
+	geo->IndexBufferByteSize = ibByteSize;
+
+	SubmeshGeometry submesh;
+	submesh.IndexCount = (UINT)indices.size();
+	submesh.StartIndexLocation = 0;
+	submesh.BaseVertexLocation = 0;
+
+	geo->DrawArgs["grid"] = submesh;
+
+	m_Geometries["waterGeo"] = std::move(geo);
 }
 
 void LandAndWaveApp::BuildShadersAndInputLayout()
@@ -361,7 +451,6 @@ void LandAndWaveApp::BuildShadersAndInputLayout()
 		{"COLOR",0,DXGI_FORMAT_R32G32B32A32_FLOAT,0,12,D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA,0}
 	};
 }
-
 
 void LandAndWaveApp::BuildPSOs()
 {
@@ -405,87 +494,37 @@ void LandAndWaveApp::BuildFrameResources()
 	for(int i = 0;i<g_numFrameResources;++i)
 	{
 		m_FrameResources.push_back(std::make_unique<FrameResource>(m_pd3dDevice.Get(),
-			1, (UINT)m_AllRitems.size()));
+			1, (UINT)m_AllRitems.size(), m_Waves->GetVertexCount()));
 	}
 }
 
 void LandAndWaveApp::BuildRenderItems()
 {
-	auto boxRitem = std::make_unique<RenderItem>();
-	XMStoreFloat4x4(&boxRitem->World, XMMatrixScaling(2.0f, 2.0f, 2.0f) * XMMatrixTranslation(0.0f, 0.5f, 0.0f));
-	boxRitem->ObjCBIndex = 0;
-	boxRitem->Geo = m_Geometries["shapeGeo"].get();
-	boxRitem->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
-	boxRitem->IndexCount = boxRitem->Geo->DrawArgs["box"].IndexCount;
-	boxRitem->StartIndexLocation = boxRitem->Geo->DrawArgs["box"].StartIndexLocation;
-	boxRitem->BaseVertexLocation = boxRitem->Geo->DrawArgs["box"].BaseVertexLocation;
-	m_AllRitems.push_back(std::move(boxRitem));
+	auto wavesRitem = std::make_unique<RenderItem>();
+	wavesRitem->World = MathHelper::Identity4x4();
+	wavesRitem->ObjCBIndex = 0;
+	wavesRitem->Geo = m_Geometries["waterGeo"].get();
+	wavesRitem->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+	wavesRitem->IndexCount = wavesRitem->Geo->DrawArgs["grid"].IndexCount;
+	wavesRitem->StartIndexLocation = wavesRitem->Geo->DrawArgs["grid"].StartIndexLocation;
+	wavesRitem->BaseVertexLocation = wavesRitem->Geo->DrawArgs["grid"].BaseVertexLocation;
+
+	m_WavesRitem = wavesRitem.get();
+	m_RitemLayer[(int)RenderLayer::Opaque].push_back(wavesRitem.get());
 
 	auto gridRitem = std::make_unique<RenderItem>();
 	gridRitem->World = MathHelper::Identity4x4();
 	gridRitem->ObjCBIndex = 1;
-	gridRitem->Geo = m_Geometries["shapeGeo"].get();
+	gridRitem->Geo = m_Geometries["landGeo"].get();
 	gridRitem->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
 	gridRitem->IndexCount = gridRitem->Geo->DrawArgs["grid"].IndexCount;
 	gridRitem->StartIndexLocation = gridRitem->Geo->DrawArgs["grid"].StartIndexLocation;
 	gridRitem->BaseVertexLocation = gridRitem->Geo->DrawArgs["grid"].BaseVertexLocation;
+
+	m_RitemLayer[(int)RenderLayer::Opaque].push_back(gridRitem.get());
+
+	m_AllRitems.push_back(std::move(wavesRitem));
 	m_AllRitems.push_back(std::move(gridRitem));
-
-	UINT objCBIndex = 2;
-	for (int i = 0; i < 5; ++i) 
-	{
-		auto leftCylRitem = std::make_unique<RenderItem>();
-		auto rightCylRitem = std::make_unique<RenderItem>();
-		auto leftSphereRitem = std::make_unique<RenderItem>();
-		auto rightSphereRitem = std::make_unique<RenderItem>();
-
-		XMMATRIX leftCylWorld = XMMatrixTranslation(-5.0f, 1.5f, -10.0f + i * 5.0f);
-		XMMATRIX rightCylWorld = XMMatrixTranslation(+5.0f, 1.5f, -10.0f + i * 5.0f);
-		XMMATRIX leftSphereWorld = XMMatrixTranslation(-5.0f, 3.5f, -10.0f + i * 5.0f);
-		XMMATRIX rightSphereWorld = XMMatrixTranslation(+5.0f, 3.5f, -10.0f + i * 5.0f);
-
-		XMStoreFloat4x4(&leftCylRitem->World, rightCylWorld);
-		leftCylRitem->ObjCBIndex = objCBIndex++;
-		leftCylRitem->Geo = m_Geometries["shapeGeo"].get();
-		leftCylRitem->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
-		leftCylRitem->IndexCount = leftCylRitem->Geo->DrawArgs["cylinder"].IndexCount;
-		leftCylRitem->StartIndexLocation = leftCylRitem->Geo->DrawArgs["cylinder"].StartIndexLocation;
-		leftCylRitem->BaseVertexLocation = leftCylRitem->Geo->DrawArgs["cylinder"].BaseVertexLocation;
-
-		XMStoreFloat4x4(&rightCylRitem->World, leftCylWorld);
-		rightCylRitem->ObjCBIndex = objCBIndex++;
-		rightCylRitem->Geo = m_Geometries["shapeGeo"].get();
-		rightCylRitem->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
-		rightCylRitem->IndexCount = rightCylRitem->Geo->DrawArgs["cylinder"].IndexCount;
-		rightCylRitem->StartIndexLocation = rightCylRitem->Geo->DrawArgs["cylinder"].StartIndexLocation;
-		rightCylRitem->BaseVertexLocation = rightCylRitem->Geo->DrawArgs["cylinder"].BaseVertexLocation;
-
-		XMStoreFloat4x4(&leftSphereRitem->World, leftSphereWorld);
-		leftSphereRitem->ObjCBIndex = objCBIndex++;
-		leftSphereRitem->Geo = m_Geometries["shapeGeo"].get();
-		leftSphereRitem->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
-		leftSphereRitem->IndexCount = leftSphereRitem->Geo->DrawArgs["sphere"].IndexCount;
-		leftSphereRitem->StartIndexLocation = leftSphereRitem->Geo->DrawArgs["sphere"].StartIndexLocation;
-		leftSphereRitem->BaseVertexLocation = leftSphereRitem->Geo->DrawArgs["sphere"].BaseVertexLocation;
-
-		XMStoreFloat4x4(&rightSphereRitem->World, rightSphereWorld);
-		rightSphereRitem->ObjCBIndex = objCBIndex++;
-		rightSphereRitem->Geo = m_Geometries["shapeGeo"].get();
-		rightSphereRitem->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
-		rightSphereRitem->IndexCount = rightSphereRitem->Geo->DrawArgs["sphere"].IndexCount;
-		rightSphereRitem->StartIndexLocation = rightSphereRitem->Geo->DrawArgs["sphere"].StartIndexLocation;
-		rightSphereRitem->BaseVertexLocation = rightSphereRitem->Geo->DrawArgs["sphere"].BaseVertexLocation;
-
-		m_AllRitems.push_back(std::move(leftCylRitem));
-		m_AllRitems.push_back(std::move(rightCylRitem));
-		m_AllRitems.push_back(std::move(leftSphereRitem));
-		m_AllRitems.push_back(std::move(rightSphereRitem));
-	}
-
-	for (auto& obj : m_AllRitems) 
-	{
-		m_OpaqueRitems.push_back(obj.get());
-	}
 }
 
 void LandAndWaveApp::DrawRenderItems(ID3D12GraphicsCommandList* cmdList, const std::vector<RenderItem*>& ritems)
@@ -507,12 +546,11 @@ void LandAndWaveApp::DrawRenderItems(ID3D12GraphicsCommandList* cmdList, const s
 		cmdList->IASetIndexBuffer(&indexBufferView);
 		cmdList->IASetPrimitiveTopology(ri->PrimitiveType);
 
-		// 偏移到该物体在描述符表的位置
-		UINT cbvIndex = m_CurrFrameResourceIndex * (UINT)m_OpaqueRitems.size() + ri->ObjCBIndex;
-		auto cbvHandle = CD3DX12_GPU_DESCRIPTOR_HANDLE(m_CBVHeap->GetGPUDescriptorHandleForHeapStart());
-		cbvHandle.Offset(cbvIndex, m_CBVSRVDescriptorSize);
+		// 使用描述符
+		D3D12_GPU_VIRTUAL_ADDRESS objCBAddress = objectCB->GetGPUVirtualAddress();
+		objCBAddress += ri->ObjCBIndex * objCBByteSize;
 
-		cmdList->SetGraphicsRootDescriptorTable(0, cbvHandle);
+		cmdList->SetGraphicsRootConstantBufferView(0, objCBAddress);
 
 		cmdList->DrawIndexedInstanced(ri->IndexCount, 1, ri->StartIndexLocation, ri->BaseVertexLocation, 0);
 	}
