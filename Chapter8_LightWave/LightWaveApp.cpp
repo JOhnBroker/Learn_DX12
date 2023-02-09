@@ -72,12 +72,23 @@ void LightWaveApp::OnResize()
 void LightWaveApp::Update(const GameTimer& timer)
 {
 	// ImGui
+	ImGuiIO& io = ImGui::GetIO();
+	
+	const float dt = timer.DeltaTime();
 	if (ImGui::Begin("LandAndWaveDemo"))
 	{
 		ImGui::Checkbox("Wireframe", &m_IsWireframe);
-
-
 	}
+
+	if (ImGui::IsKeyDown(ImGuiKey_LeftArrow))
+		m_SunTheta -= 1.0f * dt;
+	if (ImGui::IsKeyDown(ImGuiKey_RightArrow))
+		m_SunTheta += 1.0f * dt;
+	if (ImGui::IsKeyDown(ImGuiKey_UpArrow))
+		m_SunPhi -= 1.0f * dt;
+	if (ImGui::IsKeyDown(ImGuiKey_DownArrow))
+		m_SunPhi += 1.0f * dt;
+
 	ImGui::End();
 	ImGui::Render();
 
