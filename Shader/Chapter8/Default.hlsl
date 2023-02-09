@@ -3,11 +3,11 @@
 #endif
 
 #ifndef NUM_POINT_LIGHT
-	#define NUM_POINT_LIGHT 1
+	#define NUM_POINT_LIGHT 0
 #endif
 
 #ifndef NUM_SPOT_LIGHT
-	#define NUM_SPOT_LIGHT 1
+	#define NUM_SPOT_LIGHT 0
 #endif
 
 #include "LightingUtil.hlsl"
@@ -63,21 +63,23 @@ struct VertexOut
 
 VertexOut VS (VertexIn vin)
 {
-	VertexOut vout;
+	VertexOut vout = (VertexOut)0.0f;
 
 	float4 posW = mul( float4(vin.PosL,1.0f), gWorld);
 	vout.PosW = posW.xyz;
 	vout.PosH = mul(posW,gViewProj);
 
-	vout.NormalW = normalize(mul(vin.NormalL, (float3x3)gWorld));
+	vout.NormalW = mul(vin.NormalL, (float3x3)gWorld);
 
 	return vout;
 }
 
 
-float4 PS (VertexOut pin) : SV_POSITION
+float4 PS (VertexOut pin) : SV_Target
 {
-	float3 toEyeW = normalize(gEyePosW - pin.posW);
+    pin.NormalW = normalize(pin.NormalW);
+	
+	float3 toEyeW = normalize(gEyePosW - pin.PosW);
 	float4 ambient = gAmbientLight * gDiffuseAlbedo;
 
 	const float shininess = 1.0f - gRoughness;

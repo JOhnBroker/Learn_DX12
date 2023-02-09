@@ -1,12 +1,13 @@
 #ifndef FRAMERESOURCE_H
 #define FRAMERESOURCE_H
 
+const int g_numFrameResources = 3;
+
 #include <d3dUtil.h>
 #include <MathHelper.h>
 #include <UploadBuffer.h>
 #include <Material.h>
-
-const int g_numFrameResources = 3;
+#include <Light.h>
 
 struct ObjectConstants
 {
@@ -29,6 +30,9 @@ struct PassConstants
 	float FarZ = 0.0f;
 	float TotalTime = 0.0f;
 	float DeltaTime = 0.0f;
+
+	DirectX::XMFLOAT4 AmbientLight = { 0.0f,0.0f,0.0f,1.0f };
+	Light Lights[MAXLIGHTNUM];
 };
 
 struct Vertex
@@ -48,7 +52,7 @@ public:
 	Microsoft::WRL::ComPtr<ID3D12CommandAllocator> CmdListAlloc;
 
 	std::unique_ptr<UploadBuffer<PassConstants>> PassCB = nullptr;
-	std::unique_ptr<UploadBuffer<Material>> MaterialCB = nullptr;
+	std::unique_ptr<UploadBuffer<MaterialConstants>> MaterialCB = nullptr;
 	std::unique_ptr<UploadBuffer<ObjectConstants>> ObjectCB = nullptr;
 
 	std::unique_ptr<UploadBuffer<Vertex>> WavesVB = nullptr;

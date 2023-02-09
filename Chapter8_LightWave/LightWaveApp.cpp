@@ -44,7 +44,7 @@ bool LightWaveApp::InitResource()
 	BuildShadersAndInputLayout();
 	BuildLandGeometry();
 	BuildWavesGeometryBuffers();
-	
+	BuildMaterials();
 	BuildRenderItems();
 	BuildFrameResources();
 	BuildPSOs();
@@ -75,6 +75,8 @@ void LightWaveApp::Update(const GameTimer& timer)
 	if (ImGui::Begin("LandAndWaveDemo"))
 	{
 		ImGui::Checkbox("Wireframe", &m_IsWireframe);
+
+
 	}
 	ImGui::End();
 	ImGui::Render();
@@ -93,6 +95,7 @@ void LightWaveApp::Update(const GameTimer& timer)
 	}
 
 	UpdateObjectCBs(timer);
+	UpdateMaterialCBs(timer);
 	UpdateMainPassCB(timer);
 	UpdateWaves(timer);
 }
@@ -133,7 +136,7 @@ void LightWaveApp::Draw(const GameTimer& timer)
 	m_CommandList->SetGraphicsRootSignature(m_RootSignature.Get());
 
 	auto passCB = m_CurrFrameResource->PassCB->Resource();
-	m_CommandList->SetGraphicsRootConstantBufferView(1, passCB->GetGPUVirtualAddress());
+	m_CommandList->SetGraphicsRootConstantBufferView(2, passCB->GetGPUVirtualAddress());
 
 	DrawRenderItems(m_CommandList.Get(), m_RitemLayer[(int)RenderLayer::Opaque]);
 
@@ -229,12 +232,30 @@ void LightWaveApp::UpdateObjectCBs(const GameTimer& gt)
 
 void LightWaveApp::UpdateMaterialCBs(const GameTimer& gt)
 {
+	auto currMaterialCB = m_CurrFrameResource->MaterialCB.get();
+	for (auto& pair : m_Materials) 
+	{
+		Material* mat = pair.second.get();
+		if (mat->m_NumFramesDirty > 0) 
+		{
+			XMMATRIX matTransform = XMLoadFloat4x4(&mat->m_MatTransform);
+			MaterialConstants matConstants;
+			matConstants.m_DiffuseAlbedo = mat->m_DiffuseAlbedo;
+			matConstants.m_FresnelR0 = mat->m_FresnelR0;
+			matConstants.Roughness = mat->m_Roughness;
+
+			currMaterialCB->CopyData(mat->m_MatCBIndex, matConstants);
+
+			mat->m_NumFramesDirty--;
+		}
+	}
 }
 
 void LightWaveApp::UpdateMainPassCB(const GameTimer& gt)
 {
 	XMMATRIX view = XMLoadFloat4x4(&m_View);
 	XMMATRIX proj = XMLoadFloat4x4(&m_Proj);
+
 	XMMATRIX viewproj = XMMatrixMultiply(view, proj);
 	XMVECTOR dView = XMMatrixDeterminant(view);
 	XMVECTOR dProj = XMMatrixDeterminant(proj);
@@ -256,6 +277,11 @@ void LightWaveApp::UpdateMainPassCB(const GameTimer& gt)
 	m_MainPassCB.FarZ = 1000.0f;
 	m_MainPassCB.TotalTime = gt.TotalTime();
 	m_MainPassCB.DeltaTime = gt.DeltaTime();
+	m_MainPassCB.AmbientLight = { 0.25f,0.25f,0.35f,1.0f };
+
+	XMVECTOR lightDir = -MathHelper::SphericalToCartesian(1.0f, m_SunTheta, m_SunPhi);
+	XMStoreFloat3(&m_MainPassCB.Lights[0].m_Direction, lightDir);
+	m_MainPassCB.Lights[0].m_Strength = { 1.0f,1.0f,0.9f };
 
 	auto currPassCB = m_CurrFrameResource->PassCB.get();
 	currPassCB->CopyData(0, m_MainPassCB);
@@ -283,7 +309,7 @@ void LightWaveApp::UpdateWaves(const GameTimer& gt)
 	{
 		Vertex v;
 		v.Pos = m_Waves->Position(i);
-		v.Color = XMFLOAT4(DirectX::Colors::Blue);
+		v.Normal = m_Waves->Normal(i);
 
 		currWavesVB->CopyData(i, v);
 	}
@@ -294,14 +320,15 @@ void LightWaveApp::UpdateWaves(const GameTimer& gt)
 void LightWaveApp::BuildRootSignature()
 {
 	HRESULT hReturn = E_FAIL;
-	CD3DX12_ROOT_PARAMETER slotRootParameter[2];
+	CD3DX12_ROOT_PARAMETER slotRootParameter[3];
 
 	// 创建根描述符表
 	slotRootParameter[0].InitAsConstantBufferView(0);
 	slotRootParameter[1].InitAsConstantBufferView(1);
+	slotRootParameter[2].InitAsConstantBufferView(2);
 
 	// 一个根签名由一组根参数组成
-	CD3DX12_ROOT_SIGNATURE_DESC rootSigDesc(2, slotRootParameter, 0, nullptr,
+	CD3DX12_ROOT_SIGNATURE_DESC rootSigDesc(3, slotRootParameter, 0, nullptr,
 		D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
 
 	// 序列化处理
@@ -334,27 +361,7 @@ void LightWaveApp::BuildLandGeometry()
 		auto& p = grid.Vertices[i].Position;
 		vertices[i].Pos = p;
 		vertices[i].Pos.y = GetHillsHeight(p.x, p.z);
-
-		if (vertices[i].Pos.y < -10.0f) 
-		{
-			vertices[i].Color = XMFLOAT4(1.0f, 0.96f, 0.62f, 1.0f);
-		}
-		else if (vertices[i].Pos.y < 5.0f)
-		{
-			vertices[i].Color = XMFLOAT4(0.48f, 0.77f, 0.46f, 1.0f);
-		}
-		else if (vertices[i].Pos.y < 12.0f)
-		{
-			vertices[i].Color = XMFLOAT4(0.1f, 0.48f, 0.19f, 1.0f);
-		}
-		else if (vertices[i].Pos.y < 20.0f)
-		{
-			vertices[i].Color = XMFLOAT4(0.45f, 0.39f, 0.34f, 1.0f);
-		}
-		else 
-		{
-			vertices[i].Color = XMFLOAT4(1.0f, 0.96f, 0.62f, 1.0f);
-		}
+		vertices[i].Normal = GetHillsNormal(p.x, p.z);
 	}
 	const UINT vbByteSize = (UINT)vertices.size() * sizeof(Vertex);
 
@@ -447,13 +454,13 @@ void LightWaveApp::BuildWavesGeometryBuffers()
 
 void LightWaveApp::BuildShadersAndInputLayout()
 {
-	m_Shaders["standardVS"] = d3dUtil::CompileShader(L"..\\Shader\\Chapter7\\color.hlsl", nullptr, "VS", "vs_5_1");
-	m_Shaders["opaquePS"] = d3dUtil::CompileShader(L"..\\Shader\\Chapter7\\color.hlsl", nullptr, "PS", "ps_5_1");
+	m_Shaders["standardVS"] = d3dUtil::CompileShader(L"..\\Shader\\Chapter8\\Default.hlsl", nullptr, "VS", "vs_5_1");
+	m_Shaders["opaquePS"] = d3dUtil::CompileShader(L"..\\Shader\\Chapter8\\Default.hlsl", nullptr, "PS", "ps_5_1");
 
 	m_InputLayout =
 	{
 		{"POSITION",0,DXGI_FORMAT_R32G32B32_FLOAT,0,0,D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA,0},
-		{"NORMAL",0,DXGI_FORMAT_R32G32B32_FLOAT,0,12,D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA,0}
+		{"NORMAL"  ,0,DXGI_FORMAT_R32G32B32_FLOAT,0,12,D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA,0}
 	};
 }
 
@@ -528,6 +535,7 @@ void LightWaveApp::BuildRenderItems()
 	auto wavesRitem = std::make_unique<RenderItem>();
 	wavesRitem->World = MathHelper::Identity4x4();
 	wavesRitem->ObjCBIndex = 0;
+	wavesRitem->Mat = m_Materials["water"].get();
 	wavesRitem->Geo = m_Geometries["waterGeo"].get();
 	wavesRitem->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
 	wavesRitem->IndexCount = wavesRitem->Geo->DrawArgs["grid"].IndexCount;
@@ -540,6 +548,7 @@ void LightWaveApp::BuildRenderItems()
 	auto gridRitem = std::make_unique<RenderItem>();
 	gridRitem->World = MathHelper::Identity4x4();
 	gridRitem->ObjCBIndex = 1;
+	gridRitem->Mat = m_Materials["grass"].get();
 	gridRitem->Geo = m_Geometries["landGeo"].get();
 	gridRitem->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
 	gridRitem->IndexCount = gridRitem->Geo->DrawArgs["grid"].IndexCount;
@@ -555,8 +564,10 @@ void LightWaveApp::BuildRenderItems()
 void LightWaveApp::DrawRenderItems(ID3D12GraphicsCommandList* cmdList, const std::vector<RenderItem*>& ritems)
 {
 	UINT objCBByteSize = d3dUtil::CalcConstantBufferByteSize(sizeof(ObjectConstants));
+	UINT matCBByteSize = d3dUtil::CalcConstantBufferByteSize(sizeof(MaterialConstants));
 
 	auto objectCB = m_CurrFrameResource->ObjectCB->Resource();
+	auto materialCB = m_CurrFrameResource->MaterialCB->Resource();
 	D3D12_VERTEX_BUFFER_VIEW vertexBufferView;
 	D3D12_INDEX_BUFFER_VIEW indexBufferView;
 
@@ -574,8 +585,11 @@ void LightWaveApp::DrawRenderItems(ID3D12GraphicsCommandList* cmdList, const std
 		// 使用描述符
 		D3D12_GPU_VIRTUAL_ADDRESS objCBAddress = objectCB->GetGPUVirtualAddress();
 		objCBAddress += ri->ObjCBIndex * objCBByteSize;
+		D3D12_GPU_VIRTUAL_ADDRESS matCBAddress = materialCB->GetGPUVirtualAddress();
+		matCBAddress += ri->Mat->m_MatCBIndex * matCBByteSize;
 
 		cmdList->SetGraphicsRootConstantBufferView(0, objCBAddress);
+		cmdList->SetGraphicsRootConstantBufferView(1, matCBAddress);
 
 		cmdList->DrawIndexedInstanced(ri->IndexCount, 1, ri->StartIndexLocation, ri->BaseVertexLocation, 0);
 	}

@@ -12,7 +12,7 @@ struct Light
 
 struct Material
 {
-	float4 DiffuseAlebdo;
+    float4 DiffuseAlbedo;
 	float3 FresnelR0;
 	float Shininess;
 };
@@ -38,19 +38,19 @@ float3 SchlickFresnel(float3 R0,float3 normal,float3 lightVec)
 float3 BlinnPhong(float3 lightStrength, float3 lightVec, float3 normal, float3 toEye, Material mat)
 {
 	// 计算粗糙度，为什么需要乘255？
-	const float m = mat.Shininess * 255.0f;
+	const float m = mat.Shininess * 256.0f;
 
-	float3 halfVec = normal(toEye + lightVec);
+	float3 halfVec = normalize(toEye + lightVec);
 	
 	// 计算微平面理论的反射率
-	float roughnessFactor = (m+8)* pow(max(dot(normal,halfVec), 0.0f), m) / 8.0f;
+	float roughnessFactor = (m+8.0f)* pow(max(dot(halfVec,normal), 0.0f), m) / 8.0f;
 	// 计算菲涅尔反射率
 	float3 fresnelFactor = SchlickFresnel(mat.FresnelR0, halfVec, lightVec);
 	
 	float3 specAlbedo = fresnelFactor * roughnessFactor;
-	specAlbedo = specAlbedo / specAlbedo + 1.0f;
+	specAlbedo = specAlbedo / (specAlbedo + 1.0f);
 	
-	return (mat.DiffuseAlebdo.rgb + specAlbedo) * lightStrength;
+    return (mat.DiffuseAlbedo.rgb + specAlbedo) * lightStrength;
 }
 
 // 计算直接光照
@@ -59,7 +59,7 @@ float3 ComputeDirectionalLight(Light L, Material mat,float3 normal,float3 toEye)
 	float3 lightVec = -L.Direction;
 	
 	float ndotl = max(dot(normal,lightVec),0.0f);
-	float lightStrength = L.Strength * ndotl;
+	float3 lightStrength = L.Strength * ndotl;
 	
 	return BlinnPhong(lightStrength,lightVec,normal,toEye,mat);
 }
@@ -73,9 +73,9 @@ float3 ComputePointLight(Light L, Material mat, float3 pos, float3 normal, float
 	float dist = length(lightVec);
 	
 	[flatten]
-	if(dist > L.falloffEnd)
+	if(dist > L.FalloffEnd)
 	{
-		rerturn result;
+		return result;
 	}
 
 	lightVec /= dist;
@@ -84,7 +84,7 @@ float3 ComputePointLight(Light L, Material mat, float3 pos, float3 normal, float
 	float3 lightStrength = L.Strength * ndotl;
 	
 	// 衰减量
-	float att = CalcAttenuation(dist, normal, lightVec);
+	float att = CalcAttenuation(dist, L.FalloffStart, L.FalloffEnd);
 	lightStrength *= att;
 
 	result = BlinnPhong(lightStrength, lightVec, normal, toEye, mat);
@@ -94,15 +94,15 @@ float3 ComputePointLight(Light L, Material mat, float3 pos, float3 normal, float
 // 计算聚光灯
 float3 ComputeSpotLight(Light L,Material mat, float3 pos, float3 normal, float3 toEye)
 {
-	float result = {0.0f, 0.0f, 0.0f};
+	float3 result = {0.0f, 0.0f, 0.0f};
 	float3 lightVec = L.Position - pos;
 	
 	float dist = length(lightVec);
 	
 	[flatten]
-	if(dist > L.falloffEnd)
+	if(dist > L.FalloffEnd)
 	{
-		rerturn result;
+		return result;
 	}
 
 	lightVec /= dist;
@@ -110,7 +110,7 @@ float3 ComputeSpotLight(Light L,Material mat, float3 pos, float3 normal, float3 
 	float ndotl = max(dot(normal,lightVec),0.0f);
 	float3 lightStrength = L.Strength * ndotl;
 	
-	float att = CalcAttenuation(dist, normal, lightVec);
+	float att = CalcAttenuation(dist, L.FalloffStart, L.FalloffEnd);
 	lightStrength *= att;
 	
 	// 聚光灯衰减
