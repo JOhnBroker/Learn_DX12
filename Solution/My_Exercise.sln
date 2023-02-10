@@ -15,6 +15,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Chapter7_LandAndWave", "..\
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Chapter8_LightWave", "..\Chapter8_LightWave\Chapter8_LightWave.vcxproj", "{1DB5931D-6C78-4EC7-A934-EA71E42DC4A7}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Chapter8_LightColumns", "..\Chapter8_LightColumns\Chapter8_LightColumns.vcxproj", "{458C5963-A1FD-4FB2-984C-BD2EF281581D}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -69,6 +71,14 @@ Global
 		{1DB5931D-6C78-4EC7-A934-EA71E42DC4A7}.Release|x64.Build.0 = Release|x64
 		{1DB5931D-6C78-4EC7-A934-EA71E42DC4A7}.Release|x86.ActiveCfg = Release|Win32
 		{1DB5931D-6C78-4EC7-A934-EA71E42DC4A7}.Release|x86.Build.0 = Release|Win32
+		{458C5963-A1FD-4FB2-984C-BD2EF281581D}.Debug|x64.ActiveCfg = Debug|x64
+		{458C5963-A1FD-4FB2-984C-BD2EF281581D}.Debug|x64.Build.0 = Debug|x64
+		{458C5963-A1FD-4FB2-984C-BD2EF281581D}.Debug|x86.ActiveCfg = Debug|Win32
+		{458C5963-A1FD-4FB2-984C-BD2EF281581D}.Debug|x86.Build.0 = Debug|Win32
+		{458C5963-A1FD-4FB2-984C-BD2EF281581D}.Release|x64.ActiveCfg = Release|x64
+		{458C5963-A1FD-4FB2-984C-BD2EF281581D}.Release|x64.Build.0 = Release|x64
+		{458C5963-A1FD-4FB2-984C-BD2EF281581D}.Release|x86.ActiveCfg = Release|Win32
+		{458C5963-A1FD-4FB2-984C-BD2EF281581D}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

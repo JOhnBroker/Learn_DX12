@@ -1,5 +1,5 @@
-#ifndef LIGHTWAVEAPP_H
-#define LIGHTWAVEAPP_H
+#ifndef LIGHTCOLUMNSAPP_H
+#define LIGHTCOLUMNSAPP_H
 
 #include <d3dApp.h>
 #include "MathHelper.h"
@@ -41,14 +41,14 @@ enum class RenderLayer :int
 	Count
 };
 
-class LightWaveApp : public D3DApp
+class LightColumnsApp : public D3DApp
 {
 public:
-	LightWaveApp(HINSTANCE hInstance);
-	LightWaveApp(HINSTANCE hInstance, int width, int height);
-	LightWaveApp(const LightWaveApp& rhs) = delete;
-	LightWaveApp& operator=(const LightWaveApp& rhs) = delete;
-	~LightWaveApp();
+	LightColumnsApp(HINSTANCE hInstance);
+	LightColumnsApp(HINSTANCE hInstance, int width, int height);
+	LightColumnsApp(const LightColumnsApp& rhs) = delete;
+	LightColumnsApp& operator=(const LightColumnsApp& rhs) = delete;
+	~LightColumnsApp();
 
 	virtual bool Initialize()override;
 	bool InitResource();
@@ -88,6 +88,7 @@ private:
 	std::vector<std::unique_ptr<FrameResource>> m_FrameResources;
 	FrameResource* m_CurrFrameResource = nullptr;
 	int m_CurrFrameResourceIndex = 0;
+	UINT m_CbvSrvDescriptorSize = 0;
 
 	ComPtr<ID3D12RootSignature> m_RootSignature = nullptr;
 
@@ -126,4 +127,4 @@ private:
 };
 
 
-#endif // LIGHTWAVEAPP_H
+#endif // LIGHTCOLUMNSAPP_H
