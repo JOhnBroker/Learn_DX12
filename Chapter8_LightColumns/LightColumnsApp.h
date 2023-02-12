@@ -35,12 +35,6 @@ struct RenderItem
 	int BaseVertexLocation = 0;
 };
 
-enum class RenderLayer :int
-{
-	Opaque = 0,
-	Count
-};
-
 class LightColumnsApp : public D3DApp
 {
 public:
@@ -66,20 +60,18 @@ public:
 	void UpdateObjectCBs(const GameTimer& gt);
 	void UpdateMaterialCBs(const GameTimer& gt);
 	void UpdateMainPassCB(const GameTimer& gt);
-	void UpdateWaves(const GameTimer& gt);
 
 	void BuildRootSignature();
 	void BuildShadersAndInputLayout();
-	void BuildLandGeometry();
-	void BuildWavesGeometryBuffers();
+	void BuildShapeGeometry();
+	void BuildSkullGeometry();
 	void BuildPSOs();
 	void BuildFrameResources();
 	void BuildMaterials();
 	void BuildRenderItems();
 	void DrawRenderItems(ID3D12GraphicsCommandList* cmdList, const std::vector<RenderItem*>& ritems);
 
-	float GetHillsHeight(float x, float z)const;
-	XMFLOAT3 GetHillsNormal(float x, float z)const;
+	void ReadDataFromFile(std::vector<Vertex>& vertices, std::vector<std::uint16_t>& indices);
 
 private:
 	template<class T>
@@ -88,7 +80,6 @@ private:
 	std::vector<std::unique_ptr<FrameResource>> m_FrameResources;
 	FrameResource* m_CurrFrameResource = nullptr;
 	int m_CurrFrameResourceIndex = 0;
-	UINT m_CbvSrvDescriptorSize = 0;
 
 	ComPtr<ID3D12RootSignature> m_RootSignature = nullptr;
 
@@ -99,13 +90,8 @@ private:
 
 	std::vector<D3D12_INPUT_ELEMENT_DESC> m_InputLayout;
 
-	RenderItem* m_WavesRitem = nullptr;
-
 	std::vector<std::unique_ptr<RenderItem>> m_AllRitems;
-
-	std::vector<RenderItem*> m_RitemLayer[(int)RenderLayer::Count];
-
-	std::unique_ptr<Waves> m_Waves;
+	std::vector<RenderItem*> m_OpaqueRitems;
 
 	PassConstants m_MainPassCB;
 
@@ -124,6 +110,8 @@ private:
 
 	bool m_IsWireframe = true;
 	POINT m_LastMousePos;
+
+	std::string m_VertexFileName = "..\\Models\\skull.txt";
 };
 
 
