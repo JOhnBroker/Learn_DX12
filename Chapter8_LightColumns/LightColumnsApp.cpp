@@ -41,6 +41,7 @@ bool LightColumnsApp::InitResource()
 	BuildRootSignature();
 	BuildShadersAndInputLayout();
 	BuildShapeGeometry();
+	BuildSkullGeometry();
 	BuildMaterials();
 	BuildRenderItems();
 	BuildFrameResources();
@@ -290,6 +291,15 @@ void LightColumnsApp::UpdateMainPassCB(const GameTimer& gt)
 	XMStoreFloat3(&m_MainPassCB.Lights[0].m_Direction, lightDir);
 	m_MainPassCB.Lights[0].m_Strength = { 1.0f,1.0f,0.9f };
 
+	//todo
+	for (int i = 0; i < 5; ++i) 
+	{
+		m_MainPassCB.Lights[i + 1].m_Position = { -5.0f, 3.5f, -10.0f + i * 5.0f };
+		m_MainPassCB.Lights[i + 1].m_Strength = { 0.0f,0.0f,0.8f };
+
+		m_MainPassCB.Lights[i + 6].m_Position = { 5.0f, 3.5f, -10.0f + i * 5.0f };
+		m_MainPassCB.Lights[i + 6].m_Strength = { 1.0f,1.0f,0.0f };
+	}
 	auto currPassCB = m_CurrFrameResource->PassCB.get();
 	currPassCB->CopyData(0, m_MainPassCB);
 }
@@ -329,8 +339,8 @@ void LightColumnsApp::BuildRootSignature()
 
 void LightColumnsApp::BuildShadersAndInputLayout()
 {
-	m_Shaders["standardVS"] = d3dUtil::CompileShader(L"..\\Shader\\Chapter8\\Default.hlsl", nullptr, "VS", "vs_5_1");
-	m_Shaders["opaquePS"] = d3dUtil::CompileShader(L"..\\Shader\\Chapter8\\Default.hlsl", nullptr, "PS", "ps_5_1");
+	m_Shaders["standardVS"] = d3dUtil::CompileShader(L"..\\Shader\\Chapter8\\Default_Columns.hlsl", nullptr, "VS", "vs_5_1");
+	m_Shaders["opaquePS"] = d3dUtil::CompileShader(L"..\\Shader\\Chapter8\\Default_Columns.hlsl", nullptr, "PS", "ps_5_1");
 
 	m_InputLayout =
 	{
@@ -535,22 +545,42 @@ void LightColumnsApp::BuildFrameResources()
 
 void LightColumnsApp::BuildMaterials()
 {
-	auto grass = std::make_unique<Material>();
-	grass->m_Name = "grass";
-	grass->m_MatCBIndex = 0;
-	grass->m_DiffuseAlbedo = XMFLOAT4(0.2f, 0.6f, 0.2f, 1.0f);
-	grass->m_FresnelR0 = XMFLOAT3(0.01f, 0.01f, 0.01f);
-	grass->m_Roughness = 0.125f;
+	auto bricks = std::make_unique<Material>();
+	bricks->m_Name = "bricks";
+	bricks->m_MatCBIndex = 0;
+	bricks->m_DiffuseSrvHeapIndex = 0;
+	bricks->m_DiffuseAlbedo = XMFLOAT4(Colors::ForestGreen);
+	bricks->m_FresnelR0 = XMFLOAT3(0.02f, 0.02f, 0.02f);
+	bricks->m_Roughness = 0.1f;
 
-	auto water = std::make_unique<Material>();
-	water->m_Name = "water";
-	water->m_MatCBIndex = 1;
-	water->m_DiffuseAlbedo = XMFLOAT4(0.0f, 0.2f, 0.6f, 1.0f);
-	water->m_FresnelR0 = XMFLOAT3(0.1f, 0.1f, 0.1f);
-	water->m_Roughness = 0.0f;
+	auto stone = std::make_unique<Material>();
+	stone->m_Name = "stone";
+	stone->m_MatCBIndex = 1;
+	stone->m_DiffuseSrvHeapIndex = 1;
+	stone->m_DiffuseAlbedo = XMFLOAT4(Colors::LightSteelBlue);
+	stone->m_FresnelR0 = XMFLOAT3(0.05f, 0.05f, 0.05f);
+	stone->m_Roughness = 0.3f;
 
-	m_Materials["grass"] = std::move(grass);
-	m_Materials["water"] = std::move(water);
+	auto tile = std::make_unique<Material>();
+	tile->m_Name = "tile";
+	tile->m_MatCBIndex = 2;
+	tile->m_DiffuseSrvHeapIndex = 2;
+	tile->m_DiffuseAlbedo = XMFLOAT4(Colors::LightGray);
+	tile->m_FresnelR0 = XMFLOAT3(0.02f, 0.02f, 0.02f);
+	tile->m_Roughness = 0.2f;
+
+	auto skullMat = std::make_unique<Material>();
+	skullMat->m_Name = "skullMat";
+	skullMat->m_MatCBIndex = 3;
+	skullMat->m_DiffuseSrvHeapIndex = 3;
+	skullMat->m_DiffuseAlbedo = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
+	skullMat->m_FresnelR0 = XMFLOAT3(0.05f, 0.05f, 0.05f);
+	skullMat->m_Roughness = 0.3f;
+
+	m_Materials["bricks"] = std::move(bricks);
+	m_Materials["stone"] = std::move(stone);
+	m_Materials["tile"] = std::move(tile);
+	m_Materials["skullMat"] = std::move(skullMat);
 }
 
 void LightColumnsApp::BuildRenderItems()
@@ -558,6 +588,7 @@ void LightColumnsApp::BuildRenderItems()
 	auto boxRitem = std::make_unique<RenderItem>();
 	XMStoreFloat4x4(&boxRitem->World, XMMatrixScaling(2.0f, 2.0f, 2.0f) * XMMatrixTranslation(0.0f, 0.5f, 0.0f));
 	boxRitem->ObjCBIndex = 0;
+	boxRitem->Mat = m_Materials["stone"].get();
 	boxRitem->Geo = m_Geometries["shapeGeo"].get();
 	boxRitem->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
 	boxRitem->IndexCount = boxRitem->Geo->DrawArgs["box"].IndexCount;
@@ -568,6 +599,7 @@ void LightColumnsApp::BuildRenderItems()
 	auto gridRitem = std::make_unique<RenderItem>();
 	gridRitem->World = MathHelper::Identity4x4();
 	gridRitem->ObjCBIndex = 1;
+	gridRitem->Mat = m_Materials["tile"].get();
 	gridRitem->Geo = m_Geometries["shapeGeo"].get();
 	gridRitem->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
 	gridRitem->IndexCount = gridRitem->Geo->DrawArgs["grid"].IndexCount;
@@ -575,7 +607,18 @@ void LightColumnsApp::BuildRenderItems()
 	gridRitem->BaseVertexLocation = gridRitem->Geo->DrawArgs["grid"].BaseVertexLocation;
 	m_AllRitems.push_back(std::move(gridRitem));
 
-	UINT objCBIndex = 2;
+	auto skullRitem = std::make_unique<RenderItem>();
+	XMStoreFloat4x4(&skullRitem->World, XMMatrixScaling(0.5f, 0.5f, 0.5f) * XMMatrixTranslation(0.0f, 1.0f, 0.0f));
+	skullRitem->ObjCBIndex = 2;
+	skullRitem->Mat = m_Materials["skullMat"].get();
+	skullRitem->Geo = m_Geometries["skullGeo"].get();
+	skullRitem->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+	skullRitem->IndexCount = skullRitem->Geo->DrawArgs["skull"].IndexCount;
+	skullRitem->StartIndexLocation = skullRitem->Geo->DrawArgs["skull"].StartIndexLocation;
+	skullRitem->BaseVertexLocation = skullRitem->Geo->DrawArgs["skull"].BaseVertexLocation;
+	m_AllRitems.push_back(std::move(skullRitem));
+
+	UINT objCBIndex = 3;
 	for (int i = 0; i < 5; ++i)
 	{
 		auto leftCylRitem = std::make_unique<RenderItem>();
@@ -590,6 +633,7 @@ void LightColumnsApp::BuildRenderItems()
 
 		XMStoreFloat4x4(&leftCylRitem->World, rightCylWorld);
 		leftCylRitem->ObjCBIndex = objCBIndex++;
+		leftCylRitem->Mat = m_Materials["bricks"].get();
 		leftCylRitem->Geo = m_Geometries["shapeGeo"].get();
 		leftCylRitem->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
 		leftCylRitem->IndexCount = leftCylRitem->Geo->DrawArgs["cylinder"].IndexCount;
@@ -598,6 +642,7 @@ void LightColumnsApp::BuildRenderItems()
 
 		XMStoreFloat4x4(&rightCylRitem->World, leftCylWorld);
 		rightCylRitem->ObjCBIndex = objCBIndex++;
+		rightCylRitem->Mat = m_Materials["bricks"].get();
 		rightCylRitem->Geo = m_Geometries["shapeGeo"].get();
 		rightCylRitem->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
 		rightCylRitem->IndexCount = rightCylRitem->Geo->DrawArgs["cylinder"].IndexCount;
@@ -606,6 +651,7 @@ void LightColumnsApp::BuildRenderItems()
 
 		XMStoreFloat4x4(&leftSphereRitem->World, leftSphereWorld);
 		leftSphereRitem->ObjCBIndex = objCBIndex++;
+		leftSphereRitem->Mat = m_Materials["stone"].get();
 		leftSphereRitem->Geo = m_Geometries["shapeGeo"].get();
 		leftSphereRitem->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
 		leftSphereRitem->IndexCount = leftSphereRitem->Geo->DrawArgs["sphere"].IndexCount;
@@ -614,6 +660,7 @@ void LightColumnsApp::BuildRenderItems()
 
 		XMStoreFloat4x4(&rightSphereRitem->World, rightSphereWorld);
 		rightSphereRitem->ObjCBIndex = objCBIndex++;
+		rightSphereRitem->Mat = m_Materials["stone"].get();
 		rightSphereRitem->Geo = m_Geometries["shapeGeo"].get();
 		rightSphereRitem->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
 		rightSphereRitem->IndexCount = rightSphereRitem->Geo->DrawArgs["sphere"].IndexCount;
@@ -625,18 +672,6 @@ void LightColumnsApp::BuildRenderItems()
 		m_AllRitems.push_back(std::move(leftSphereRitem));
 		m_AllRitems.push_back(std::move(rightSphereRitem));
 	}
-
-	auto skullRitem = std::make_unique<RenderItem>();
-	skullRitem->World = MathHelper::Identity4x4();
-	skullRitem->ObjCBIndex = 0;
-	skullRitem->Mat = m_Materials["water"].get();
-	skullRitem->Geo = m_Geometries["waterGeo"].get();
-	skullRitem->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
-	skullRitem->IndexCount = skullRitem->Geo->DrawArgs["grid"].IndexCount;
-	skullRitem->StartIndexLocation = skullRitem->Geo->DrawArgs["grid"].StartIndexLocation;
-	skullRitem->BaseVertexLocation = skullRitem->Geo->DrawArgs["grid"].BaseVertexLocation;
-
-	m_AllRitems.push_back(std::move(skullRitem));
 
 	for (auto& obj : m_AllRitems)
 	{
@@ -680,5 +715,39 @@ void LightColumnsApp::DrawRenderItems(ID3D12GraphicsCommandList* cmdList, const 
 
 void LightColumnsApp::ReadDataFromFile(std::vector<Vertex>& vertices, std::vector<std::uint16_t>& indices)
 {
+	std::ifstream fin(m_VertexFileName);
 
+	if (!fin)
+	{
+		OutputDebugStringA(m_VertexFileName.c_str());
+		OutputDebugStringA(" not found,\n");
+		return;
+	}
+
+	UINT vcount = 0, tcount = 0;
+	float normal = 0.0f;
+	std::string ignore;
+	fin >> ignore >> vcount;
+	fin >> ignore >> tcount;
+	fin >> ignore >> ignore >> ignore >> ignore;
+
+	vertices.resize(vcount);
+	indices.resize(3 * tcount);
+
+	for (UINT i = 0; i < vcount; ++i)
+	{
+		fin >> vertices[i].Pos.x >> vertices[i].Pos.y >> vertices[i].Pos.z;
+		fin >> vertices[i].Normal.x >> vertices[i].Normal.y >> vertices[i].Normal.z;
+	}
+
+	fin >> ignore;
+	fin >> ignore;
+	fin >> ignore;
+
+	for (UINT i = 0; i < tcount; ++i)
+	{
+		fin >> indices[i * 3 + 0] >> indices[i * 3 + 1] >> indices[i * 3 + 2];
+	}
+
+	fin.close();
 }
