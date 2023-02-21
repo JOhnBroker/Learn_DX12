@@ -41,6 +41,7 @@ bool TexWaveApp::InitResource()
 	m_Waves = std::make_unique<Waves>(128, 128, 1.0f, 0.03f, 4.0f, 0.2f);
 
 	BuildRootSignature();
+	BuildDescriptorHeaps();
 	BuildShadersAndInputLayout();
 	BuildLandGeometry();
 	BuildWavesGeometryBuffers();
@@ -241,6 +242,10 @@ void TexWaveApp::UpdateObjectCBs(const GameTimer& gt)
 	}
 }
 
+void TexWaveApp::AnimateMaterials(const GameTimer& gt)
+{
+}
+
 void TexWaveApp::UpdateMaterialCBs(const GameTimer& gt)
 {
 	auto currMaterialCB = m_CurrFrameResource->MaterialCB.get();
@@ -361,6 +366,15 @@ void TexWaveApp::BuildRootSignature()
 		IID_PPV_ARGS(m_RootSignature.GetAddressOf())));
 }
 
+void TexWaveApp::BuildDescriptorHeaps()
+{
+	D3D12_DESCRIPTOR_HEAP_DESC srvHeapDesc = {};
+	srvHeapDesc.NumDescriptors = 3;
+	srvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+	srvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+	HR(m_pd3dDevice->CreateDescriptorHeap(&srvHeapDesc, IID_PPV_ARGS(&m_SrvDescriptorHeap)));
+}
+
 void TexWaveApp::BuildLandGeometry()
 {
 	GeometryGenerator geoGen;
@@ -461,6 +475,10 @@ void TexWaveApp::BuildWavesGeometryBuffers()
 	geo->DrawArgs["grid"] = submesh;
 
 	m_Geometries["waterGeo"] = std::move(geo);
+}
+
+void TexWaveApp::BuildBoxGeometry()
+{
 }
 
 void TexWaveApp::BuildShadersAndInputLayout()
@@ -606,6 +624,11 @@ void TexWaveApp::DrawRenderItems(ID3D12GraphicsCommandList* cmdList, const std::
 	}
 }
 
+std::array<const CD3DX12_STATIC_SAMPLER_DESC, 6> TexWaveApp::GetStaticSamplers()
+{
+	return std::array<const CD3DX12_STATIC_SAMPLER_DESC, 6>();
+}
+
 float TexWaveApp::GetHillsHeight(float x, float z) const
 {
 	return 0.3f * (z * sinf(0.1f * x) + x * cosf(0.1f * z));
@@ -623,4 +646,14 @@ XMFLOAT3 TexWaveApp::GetHillsNormal(float x, float z) const
 	XMVECTOR unitNormal = XMVector3Normalize(XMLoadFloat3(&N));
 	XMStoreFloat3(&N, unitNormal);
 	return N;
+}
+
+void TexWaveApp::LoadTexture(std::string name, std::wstring filename)
+{
+	auto texture = std::make_unique<Texture>();
+	texture->m_Name = name;
+	texture->m_Filename = filename;
+	HR(DirectX::CreateDDSTextureFromFile12(m_pd3dDevice.Get(), m_CommandList.Get(),
+		texture->m_Filename.c_str(), texture->m_Resource, texture->m_UploadHeap));
+
 }

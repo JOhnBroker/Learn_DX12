@@ -2,13 +2,15 @@
 #define LIGHTWAVEAPP_H
 
 #include <d3dApp.h>
+#include <array>
 #include "MathHelper.h"
 #include "UploadBuffer.h"
 #include "GeometryGenerator.h"
 #include "FrameResource.h"
 #include "Waves.h"
-#include "Material.h"
 #include "Light.h"
+#include "Material.h"
+#include "Texture.h"
 
 using namespace DirectX;
 using namespace DirectX::PackedVector;
@@ -64,22 +66,29 @@ public:
 
 	void UpdateCamera(const GameTimer& gt);
 	void UpdateObjectCBs(const GameTimer& gt);
+	void AnimateMaterials(const GameTimer& gt);
 	void UpdateMaterialCBs(const GameTimer& gt);
 	void UpdateMainPassCB(const GameTimer& gt);
 	void UpdateWaves(const GameTimer& gt);
 
 	void BuildRootSignature();
+	void BuildDescriptorHeaps();
 	void BuildShadersAndInputLayout();
 	void BuildLandGeometry();
 	void BuildWavesGeometryBuffers();
+	void BuildBoxGeometry();
 	void BuildPSOs();
 	void BuildFrameResources();
 	void BuildMaterials();
 	void BuildRenderItems();
 	void DrawRenderItems(ID3D12GraphicsCommandList* cmdList, const std::vector<RenderItem*>& ritems);
 
+	std::array<const CD3DX12_STATIC_SAMPLER_DESC, 6>GetStaticSamplers();
+
 	float GetHillsHeight(float x, float z)const;
 	XMFLOAT3 GetHillsNormal(float x, float z)const;
+
+	void LoadTexture(std::string name, std::wstring filename);
 
 private:
 	template<class T>
@@ -90,9 +99,11 @@ private:
 	int m_CurrFrameResourceIndex = 0;
 
 	ComPtr<ID3D12RootSignature> m_RootSignature = nullptr;
+	ComPtr<ID3D12DescriptorHeap> m_SrvDescriptorHeap = nullptr;
 
 	std::unordered_map<std::string, std::unique_ptr<MeshGeometry>> m_Geometries;
 	std::unordered_map<std::string, std::unique_ptr<Material>> m_Materials;
+	std::unordered_map<std::string, std::unique_ptr<Texture>> m_Textures;
 	std::unordered_map<std::string, ComPtr<ID3DBlob>> m_Shaders;
 	std::unordered_map<std::string, ComPtr<ID3D12PipelineState>>m_PSOs;
 

@@ -30,6 +30,7 @@
 #include <cassert>
 #include <d3dx12.h>
 #include <DXTrace.h>
+#include <DDSTextureLoader.h>
 
 // 是否开启图形调试对象名称
 #if (defined(DEBUG) || defined(_DEBUG)) && !defined(GRAPHICS_DEBUGGER_OBJECT_NAME)
