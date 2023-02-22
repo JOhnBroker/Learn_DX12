@@ -20,6 +20,7 @@ struct RenderItem
 	RenderItem() = default;
 
 	XMFLOAT4X4 World = MathHelper::Identity4x4();
+	XMFLOAT4X4 TexTransform = MathHelper::Identity4x4();
 
 	int NumFramesDirty = g_numFrameResources;
 
@@ -83,7 +84,7 @@ public:
 	void BuildRenderItems();
 	void DrawRenderItems(ID3D12GraphicsCommandList* cmdList, const std::vector<RenderItem*>& ritems);
 
-	std::array<const CD3DX12_STATIC_SAMPLER_DESC, 6>GetStaticSamplers();
+	std::array<const CD3DX12_STATIC_SAMPLER_DESC, 7>GetStaticSamplers();
 
 	float GetHillsHeight(float x, float z)const;
 	XMFLOAT3 GetHillsNormal(float x, float z)const;
@@ -132,8 +133,13 @@ private:
 	float m_SunTheta = 1.25f * XM_PI;
 	float m_SunPhi = XM_PIDIV4;
 
-	bool m_IsWireframe = true;
 	POINT m_LastMousePos;
+	
+	// ImGui operable item
+	bool m_IsWireframe = false;
+	bool m_IsMultiTex = false;
+	XMFLOAT3 m_BoxTexScale = { 1.0f,1.0f,1.0f };
+
 };
 
 

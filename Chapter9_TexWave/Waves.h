@@ -17,7 +17,7 @@ public:
 	int GetVertexCount()const { return m_VertexCount; };
 	int GetTriangleCount()const { return m_TriangleCount; };
 	float GetWidth() const { return m_NumCols * m_SpatialStep; };
-	float GetHeight() const { return m_NumRows * m_SpatialStep; };
+	float GetDepth() const { return m_NumRows * m_SpatialStep; };
 
 	const DirectX::XMFLOAT3& Position(int i)const { return m_CurrSolution[i]; };
 	const DirectX::XMFLOAT3& Normal(int i)const { return m_Normals[i]; };
