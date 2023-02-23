@@ -94,9 +94,9 @@ VertexOut VS (VertexIn vin)
 
 float4 PS (VertexOut pin) : SV_Target
 {
-    float4 mainColor = gMainMap.Sample(gsamAnisotropicWrap, pin.TexC) * gDiffuseAlbedo;
-    float4 alphaColor = gMainMap.Sample(gsamAnisotropicWrap, pin.TexC) * gDiffuseAlbedo;
-    float4 diffuseColor = mainColor * alphaColor;
+    float4 mainColor = gMainMap.Sample(gsamLinearWrap, pin.TexC);
+    float4 alphaColor = gAlphaMap.Sample(gsamLinearWrap, pin.TexC);
+    float4 diffuseColor = mainColor * alphaColor * gDiffuseAlbedo;
 	
     pin.NormalW = normalize(pin.NormalW);
 	

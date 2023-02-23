@@ -19,14 +19,15 @@ struct Material
 {
 	std::string m_Name;
 	
-	// ³£Á¿»º³åÇø ¶ÔÓ¦µ½¸Ã ²ÄÖÊµÄË÷Òı
+	// å¸¸é‡ç¼“å†²åŒº å¯¹åº”åˆ°è¯¥ æè´¨çš„ç´¢å¼•
 	int m_MatCBIndex = -1;
-	// DiffuseÌùÍ¼ SRV heap µÄË÷Òı
+	// Diffuse è´´å›¾ SRV heap çš„ç´¢å¼•
 	int m_DiffuseSrvHeapIndex = -1;
-	// NormalÌùÍ¼ SRV heap µÄË÷Òı
+	int m_AlphaSrvHeapIndex = -1;
+	// Normal è´´å›¾ SRV heap çš„ç´¢å¼•
 	int m_NormalSrvHeapIndex = -1;
 
-	// Ã¿¸öFrameResource¾ùĞèÒªÉı¼¶
+	// æ¯ä¸ªFrameResourceå‡éœ€è¦å‡çº§
 	int m_NumFramesDirty = g_numFrameResources;
 
 	DirectX::XMFLOAT4 m_DiffuseAlbedo = { 1.0f,1.0f,1.0f,1.0f };

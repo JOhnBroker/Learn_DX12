@@ -88,7 +88,7 @@ void TexWaveApp::Update(const GameTimer& timer)
 	ImGuiIO& io = ImGui::GetIO();
 	
 	const float dt = timer.DeltaTime();
-	if (ImGui::Begin("LandAndWaveDemo"))
+	if (ImGui::Begin("TexWave Demo"))
 	{
 		ImGui::Checkbox("Wireframe", &m_IsWireframe);
 		ImGui::Checkbox("Use fire texture", &m_IsMultiTex);
@@ -119,6 +119,7 @@ void TexWaveApp::Update(const GameTimer& timer)
 		CloseHandle(eventHandle);
 	}
 
+	RotationMaterials(timer);
 	AnimateMaterials(timer);
 	UpdateObjectCBs(timer);
 	UpdateMaterialCBs(timer);
@@ -169,7 +170,7 @@ void TexWaveApp::Draw(const GameTimer& timer)
 	m_CommandList->SetGraphicsRootSignature(m_RootSignature.Get());
 
 	auto passCB = m_CurrFrameResource->PassCB->Resource();
-	m_CommandList->SetGraphicsRootConstantBufferView(3, passCB->GetGPUVirtualAddress());
+	m_CommandList->SetGraphicsRootConstantBufferView(4, passCB->GetGPUVirtualAddress());
 
 	DrawRenderItems(m_CommandList.Get(), m_RitemLayer[(int)RenderLayer::Opaque]);
 
@@ -289,6 +290,19 @@ void TexWaveApp::AnimateMaterials(const GameTimer& gt)
 	waterMat->m_NumFramesDirty = g_numFrameResources;
 }
 
+void TexWaveApp::RotationMaterials(const GameTimer& gt)
+{
+	// rotate box
+	auto boxMat = m_Materials["wirefence"].get();
+
+	static float phi = 0.0f;
+	phi += 0.001f;
+
+	XMMATRIX texRotation = XMMatrixTranslation(-0.5f, -0.5f, 0.0f) * XMMatrixRotationZ(phi) * XMMatrixTranslation(+0.5f, +0.5f, 0.0f);
+	XMStoreFloat4x4(&boxMat->m_MatTransform, texRotation);
+	boxMat->m_NumFramesDirty = g_numFrameResources;
+}
+
 void TexWaveApp::UpdateMaterialCBs(const GameTimer& gt)
 {
 	auto currMaterialCB = m_CurrFrameResource->MaterialCB.get();
@@ -383,21 +397,24 @@ void TexWaveApp::UpdateWaves(const GameTimer& gt)
 void TexWaveApp::BuildRootSignature()
 {
 	HRESULT hReturn = E_FAIL;
-	CD3DX12_DESCRIPTOR_RANGE texTable;
-	CD3DX12_ROOT_PARAMETER slotRootParameter[4];
+	CD3DX12_DESCRIPTOR_RANGE texTable0;
+	CD3DX12_DESCRIPTOR_RANGE texTable1;
+	CD3DX12_ROOT_PARAMETER slotRootParameter[5];
 
-	texTable.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0);
+	texTable0.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0);
+	texTable1.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 1);
 
 	// 创建根描述符表
-	slotRootParameter[0].InitAsDescriptorTable(1, &texTable, D3D12_SHADER_VISIBILITY_PIXEL);
-	slotRootParameter[1].InitAsConstantBufferView(0);
-	slotRootParameter[2].InitAsConstantBufferView(1);
-	slotRootParameter[3].InitAsConstantBufferView(2);
+	slotRootParameter[0].InitAsDescriptorTable(1, &texTable0, D3D12_SHADER_VISIBILITY_PIXEL);
+	slotRootParameter[1].InitAsDescriptorTable(1, &texTable1, D3D12_SHADER_VISIBILITY_PIXEL);
+	slotRootParameter[2].InitAsConstantBufferView(0);
+	slotRootParameter[3].InitAsConstantBufferView(1);
+	slotRootParameter[4].InitAsConstantBufferView(2);
 
 	auto staticSamplers = GetStaticSamplers();
 
 	// 一个根签名由一组根参数组成
-	CD3DX12_ROOT_SIGNATURE_DESC rootSigDesc(4, slotRootParameter,
+	CD3DX12_ROOT_SIGNATURE_DESC rootSigDesc(5, slotRootParameter,
 		(UINT)staticSamplers.size(), staticSamplers.data(),
 		D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
 
@@ -427,9 +444,11 @@ void TexWaveApp::BuildDescriptorHeaps()
 	ComPtr<ID3D12Resource> grassTex;
 	ComPtr<ID3D12Resource> waterTex;
 	ComPtr<ID3D12Resource> fenceTex;
+	ComPtr<ID3D12Resource> fireTex;
+	ComPtr<ID3D12Resource> fireAlphaTex;
 
 	// SRV Heap
-	srvHeapDesc.NumDescriptors = 3;
+	srvHeapDesc.NumDescriptors = 5;
 	srvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
 	srvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
 	HR(m_pd3dDevice->CreateDescriptorHeap(&srvHeapDesc, IID_PPV_ARGS(&m_SrvDescriptorHeap)));
@@ -439,8 +458,8 @@ void TexWaveApp::BuildDescriptorHeaps()
 	grassTex = m_Textures["grassTex"]->m_Resource;
 	waterTex = m_Textures["waterTex"]->m_Resource;
 	fenceTex = m_Textures["fenceTex"]->m_Resource;
-	fenceTex = m_Textures["flare"]->m_Resource;
-	fenceTex = m_Textures["flareAlpha"]->m_Resource;
+	fireTex = m_Textures["flare"]->m_Resource;
+	fireAlphaTex = m_Textures["flareAlpha"]->m_Resource;
 
 	srvDesc.Format = grassTex->GetDesc().Format;
 	srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
@@ -456,6 +475,14 @@ void TexWaveApp::BuildDescriptorHeaps()
 	hDescriptor.Offset(1, m_CBVSRVDescriptorSize);
 	srvDesc.Format = fenceTex->GetDesc().Format;
 	m_pd3dDevice->CreateShaderResourceView(fenceTex.Get(), &srvDesc, hDescriptor);
+
+	hDescriptor.Offset(1, m_CBVSRVDescriptorSize);
+	srvDesc.Format = fireTex->GetDesc().Format;
+	m_pd3dDevice->CreateShaderResourceView(fireTex.Get(), &srvDesc, hDescriptor);
+
+	hDescriptor.Offset(1, m_CBVSRVDescriptorSize);
+	srvDesc.Format = fireAlphaTex->GetDesc().Format;
+	m_pd3dDevice->CreateShaderResourceView(fireAlphaTex.Get(), &srvDesc, hDescriptor);
 }
 
 void TexWaveApp::BuildLandGeometry()
@@ -611,6 +638,7 @@ void TexWaveApp::BuildShadersAndInputLayout()
 {
 	m_Shaders["standardVS"] = d3dUtil::CompileShader(L"..\\Shader\\Chapter9\\Default.hlsl", nullptr, "VS", "vs_5_1");
 	m_Shaders["opaquePS"] = d3dUtil::CompileShader(L"..\\Shader\\Chapter9\\Default.hlsl", nullptr, "PS", "ps_5_1");
+	m_Shaders["multiTexVS"] = d3dUtil::CompileShader(L"..\\Shader\\Chapter9\\MultiTex.hlsl", nullptr, "VS", "vs_5_1");
 	m_Shaders["multiTexPS"] = d3dUtil::CompileShader(L"..\\Shader\\Chapter9\\MultiTex.hlsl", nullptr, "PS", "ps_5_1");
 
 	m_InputLayout =
@@ -651,19 +679,25 @@ void TexWaveApp::BuildPSOs()
 	opaquePsoDesc.DSVFormat = m_DepthStencilFormat;
 	HR(m_pd3dDevice->CreateGraphicsPipelineState(&opaquePsoDesc, IID_PPV_ARGS(&m_PSOs["opaque"])));
 
+	// wireframe object
+	D3D12_GRAPHICS_PIPELINE_STATE_DESC opaqueWireframePsoDesc = opaquePsoDesc;
+	opaqueWireframePsoDesc.RasterizerState.FillMode = D3D12_FILL_MODE_WIREFRAME;
+	HR(m_pd3dDevice->CreateGraphicsPipelineState(&opaqueWireframePsoDesc, IID_PPV_ARGS(&m_PSOs["opaque_wireframe"])));
+
 	// box
 	D3D12_GRAPHICS_PIPELINE_STATE_DESC boxPsoDesc = opaquePsoDesc;
+	boxPsoDesc.RasterizerState.FillMode = D3D12_FILL_MODE_SOLID;
+	opaquePsoDesc.VS =
+	{
+		reinterpret_cast<BYTE*>(m_Shaders["multiTexVS"]->GetBufferPointer()),
+		m_Shaders["multiTexVS"]->GetBufferSize()
+	};
 	boxPsoDesc.PS =
 	{
 		reinterpret_cast<BYTE*>(m_Shaders["multiTexPS"]->GetBufferPointer()),
 		m_Shaders["multiTexPS"]->GetBufferSize()
 	};
 	HR(m_pd3dDevice->CreateGraphicsPipelineState(&boxPsoDesc, IID_PPV_ARGS(&m_PSOs["box"])));
-
-	// wireframe object
-	D3D12_GRAPHICS_PIPELINE_STATE_DESC opaqueWireframePsoDesc = opaquePsoDesc;
-	opaqueWireframePsoDesc.RasterizerState.FillMode = D3D12_FILL_MODE_WIREFRAME;
-	HR(m_pd3dDevice->CreateGraphicsPipelineState(&opaqueWireframePsoDesc, IID_PPV_ARGS(&m_PSOs["opaque_wireframe"])));
 
 }
 
@@ -682,6 +716,7 @@ void TexWaveApp::BuildMaterials()
 	grass->m_Name = "grass";
 	grass->m_MatCBIndex = 0;
 	grass->m_DiffuseSrvHeapIndex = 0;
+	grass->m_AlphaSrvHeapIndex = 0;
 	grass->m_DiffuseAlbedo = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
 	grass->m_FresnelR0 = XMFLOAT3(0.01f, 0.01f, 0.01f);
 	grass->m_Roughness = 0.125f;
@@ -690,6 +725,7 @@ void TexWaveApp::BuildMaterials()
 	water->m_Name = "water";
 	water->m_MatCBIndex = 1;
 	water->m_DiffuseSrvHeapIndex = 1;
+	water->m_AlphaSrvHeapIndex = 1;
 	water->m_DiffuseAlbedo = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
 	water->m_FresnelR0 = XMFLOAT3(0.2f, 0.2f, 0.2f);
 	water->m_Roughness = 0.0f;
@@ -697,7 +733,8 @@ void TexWaveApp::BuildMaterials()
 	auto wirefence = std::make_unique<Material>();
 	wirefence->m_Name = "wirefence";
 	wirefence->m_MatCBIndex = 2;
-	wirefence->m_DiffuseSrvHeapIndex = 2;
+	wirefence->m_DiffuseSrvHeapIndex = 3;
+	wirefence->m_AlphaSrvHeapIndex = 4;
 	wirefence->m_DiffuseAlbedo = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
 	wirefence->m_FresnelR0 = XMFLOAT3(0.01f, 0.01f, 0.01f);
 	wirefence->m_Roughness = 0.25f;
@@ -738,7 +775,7 @@ void TexWaveApp::BuildRenderItems()
 
 	auto boxRitem = std::make_unique<RenderItem>();
 	XMStoreFloat4x4(&boxRitem->World, XMMatrixTranslation(3.0f, 2.0f, -9.0f));
-	XMStoreFloat4x4(&boxRitem->TexTransform, XMMatrixScaling(2.0f, 2.0f, 2.0f));
+	//XMStoreFloat4x4(&boxRitem->TexTransform, XMMatrixScaling(2.0f, 2.0f, 2.0f));
 	boxRitem->ObjCBIndex = 2;
 	boxRitem->Mat = m_Materials["wirefence"].get();
 	boxRitem->Geo = m_Geometries["boxGeo"].get();
@@ -785,8 +822,18 @@ void TexWaveApp::DrawRenderItems(ID3D12GraphicsCommandList* cmdList, const std::
 		matCBAddress += ri->Mat->m_MatCBIndex * matCBByteSize;
 
 		cmdList->SetGraphicsRootDescriptorTable(0, tex);
-		cmdList->SetGraphicsRootConstantBufferView(1, objCBAddress);
-		cmdList->SetGraphicsRootConstantBufferView(2, matCBAddress);
+		cmdList->SetGraphicsRootConstantBufferView(2, objCBAddress);
+		cmdList->SetGraphicsRootConstantBufferView(3, matCBAddress);
+		if (m_IsMultiTex)
+		{
+			CD3DX12_GPU_DESCRIPTOR_HANDLE alphaTex(m_SrvDescriptorHeap->GetGPUDescriptorHandleForHeapStart());
+			alphaTex.Offset(ri->Mat->m_AlphaSrvHeapIndex, m_CBVSRVDescriptorSize);
+			cmdList->SetGraphicsRootDescriptorTable(1, alphaTex);
+		}
+		else
+		{
+			cmdList->SetGraphicsRootDescriptorTable(1, tex);
+		}
 
 		cmdList->DrawIndexedInstanced(ri->IndexCount, 1, ri->StartIndexLocation, ri->BaseVertexLocation, 0);
 	}
