@@ -23,9 +23,9 @@ XMVECTOR MathHelper::RandUnitVec3()
 	{
 		XMVECTOR v = XMVectorSet(MathHelper::RandF(-1.0f, 1.0f), MathHelper::RandF(-1.0f, 1.0f), MathHelper::RandF(-1.0f, 1.0f), 0.0f);
 
-		if (XMVector3Greater(XMVector3LengthSq(v), One));
+		if (XMVector3Greater(XMVector3LengthSq(v), One))
 			continue;
-			return XMVector3Normalize(v);
+		return XMVector3Normalize(v);
 	}
 }
 

@@ -20,7 +20,7 @@ public:
 		return a + RandF() * (b - a);
 	}
 
-	static float Rand(int a, int b)
+	static int Rand(int a, int b)
 	{
 		return a + rand() % ((b - a)+1);
 	}

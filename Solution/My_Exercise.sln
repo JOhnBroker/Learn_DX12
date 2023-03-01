@@ -19,6 +19,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Chapter8_LightColumns", "..
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Chapter9_TexWave", "..\Chapter9_TexWave\Chapter9_TexWave.vcxproj", "{C288D836-B793-412E-A901-5D72DDA48352}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Chapter10_Blend", "..\Chapter10_Blend\Chapter10_Blend.vcxproj", "{D169124B-9DB6-4A2C-9D9A-E719A3233A37}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -89,6 +91,14 @@ Global
 		{C288D836-B793-412E-A901-5D72DDA48352}.Release|x64.Build.0 = Release|x64
 		{C288D836-B793-412E-A901-5D72DDA48352}.Release|x86.ActiveCfg = Release|Win32
 		{C288D836-B793-412E-A901-5D72DDA48352}.Release|x86.Build.0 = Release|Win32
+		{D169124B-9DB6-4A2C-9D9A-E719A3233A37}.Debug|x64.ActiveCfg = Debug|x64
+		{D169124B-9DB6-4A2C-9D9A-E719A3233A37}.Debug|x64.Build.0 = Debug|x64
+		{D169124B-9DB6-4A2C-9D9A-E719A3233A37}.Debug|x86.ActiveCfg = Debug|Win32
+		{D169124B-9DB6-4A2C-9D9A-E719A3233A37}.Debug|x86.Build.0 = Debug|Win32
+		{D169124B-9DB6-4A2C-9D9A-E719A3233A37}.Release|x64.ActiveCfg = Release|x64
+		{D169124B-9DB6-4A2C-9D9A-E719A3233A37}.Release|x64.Build.0 = Release|x64
+		{D169124B-9DB6-4A2C-9D9A-E719A3233A37}.Release|x86.ActiveCfg = Release|Win32
+		{D169124B-9DB6-4A2C-9D9A-E719A3233A37}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
