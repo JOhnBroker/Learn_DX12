@@ -51,6 +51,8 @@ enum class RenderLayer :int
 class BlendApp : public D3DApp
 {
 public:
+	enum class ShowMode { Wireframe, NoFog, Fog };
+public:
 	BlendApp(HINSTANCE hInstance);
 	BlendApp(HINSTANCE hInstance, int width, int height);
 	BlendApp(const BlendApp& rhs) = delete;
@@ -139,8 +141,7 @@ private:
 	POINT m_LastMousePos;
 	
 	// ImGui operable item
-	bool m_IsWireframe = false;
-	bool m_IsFog = true;
+	ShowMode m_CurrMode = ShowMode::Fog;
 	XMFLOAT3 m_BoxTexScale = { 1.0f,1.0f,1.0f };
 
 };

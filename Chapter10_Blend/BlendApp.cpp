@@ -64,10 +64,7 @@ bool BlendApp::InitResource()
 
 	LoadTexture("grassTex", L"..\\Textures\\grass.dds");
 	LoadTexture("waterTex", L"..\\Textures\\water1.dds");
-	LoadTexture("fenceTex", L"..\\Textures\\WoodCrate01.dds");
-
-	LoadTexture("flare", L"..\\Textures\\flare.dds");
-	LoadTexture("flareAlpha", L"..\\Textures\\flarealpha.dds");
+	LoadTexture("fenceTex", L"..\\Textures\\WireFence.dds");
 
 	bResult = true;
 
@@ -88,10 +85,29 @@ void BlendApp::Update(const GameTimer& timer)
 	ImGuiIO& io = ImGui::GetIO();
 	
 	const float dt = timer.DeltaTime();
-	if (ImGui::Begin("TexWave Demo"))
+	if (ImGui::Begin("Blend demo"))
 	{
-		ImGui::Checkbox("Wireframe", &m_IsWireframe);
-
+		static int curr_mode_item = static_cast<int>(m_CurrMode);
+		const char* mode_strs[] = {
+			"Wireframe",
+			"NoFog",
+			"Fog"
+		};
+		if (ImGui::Combo("Mode", &curr_mode_item, mode_strs, ARRAYSIZE(mode_strs)))
+		{
+			if (curr_mode_item == 0)
+			{
+				m_CurrMode = ShowMode::Wireframe;
+			}
+			else if (curr_mode_item == 1) 
+			{
+				m_CurrMode = ShowMode::NoFog;
+			}
+			else if (curr_mode_item == 2) 
+			{
+				m_CurrMode = ShowMode::Fog;
+			}
+		}
 	}
 
 	if (ImGui::IsKeyDown(ImGuiKey_LeftArrow))
@@ -119,7 +135,6 @@ void BlendApp::Update(const GameTimer& timer)
 		CloseHandle(eventHandle);
 	}
 
-	RotationMaterials(timer);
 	AnimateMaterials(timer);
 	UpdateObjectCBs(timer);
 	UpdateMaterialCBs(timer);
@@ -137,18 +152,7 @@ void BlendApp::Draw(const GameTimer& timer)
 
 	HR(cmdListAlloc->Reset());
 
-	if (m_IsWireframe) 
-	{
-		HR(m_CommandList->Reset(cmdListAlloc.Get(), m_PSOs["opaque_wireframe"].Get()));
-	}
-	else if (m_IsFog)
-	{
-		m_CommandList->SetPipelineState(m_PSOs["fog"].Get());
-	}
-	else
-	{
-		HR(m_CommandList->Reset(cmdListAlloc.Get(), m_PSOs["opaque"].Get()));
-	}
+	HR(m_CommandList->Reset(cmdListAlloc.Get(), m_PSOs["opaque"].Get()));
 
 	m_CommandList->RSSetViewports(1, &m_ScreenViewPort);
 	m_CommandList->RSSetScissorRects(1, &m_ScissorRect);
@@ -159,7 +163,7 @@ void BlendApp::Draw(const GameTimer& timer)
 
 	backbufferView = CurrentBackBufferView();
 	depthbufferView = DepthStencilView();
-	m_CommandList->ClearRenderTargetView(backbufferView, DirectX::Colors::LightSteelBlue, 0, nullptr);
+	m_CommandList->ClearRenderTargetView(backbufferView, (float*)&m_MainPassCB.FogColor, 0, nullptr);
 	m_CommandList->ClearDepthStencilView(depthbufferView, D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, 1.0f, 0, 0, nullptr);
 
 	m_CommandList->OMSetRenderTargets(1, &backbufferView, true, &depthbufferView);
@@ -170,16 +174,32 @@ void BlendApp::Draw(const GameTimer& timer)
 	m_CommandList->SetGraphicsRootSignature(m_RootSignature.Get());
 
 	auto passCB = m_CurrFrameResource->PassCB->Resource();
-	m_CommandList->SetGraphicsRootConstantBufferView(4, passCB->GetGPUVirtualAddress());
+	m_CommandList->SetGraphicsRootConstantBufferView(3, passCB->GetGPUVirtualAddress());
 
-	
-	DrawRenderItems(m_CommandList.Get(), m_RitemLayer[(int)RenderLayer::Opaque]);
-
-	m_CommandList->SetPipelineState(m_PSOs["alphaTested"].Get());
-	DrawRenderItems(m_CommandList.Get(), m_RitemLayer[(int)RenderLayer::AlphaTested]);
-
-	m_CommandList->SetPipelineState(m_PSOs["transparent"].Get());
-	DrawRenderItems(m_CommandList.Get(), m_RitemLayer[(int)RenderLayer::Transparent]);
+	switch (m_CurrMode)
+	{
+	case BlendApp::ShowMode::Wireframe:
+		m_CommandList->SetPipelineState(m_PSOs["opaque_wireframe"].Get());
+		DrawRenderItems(m_CommandList.Get(), m_RitemLayer[(int)RenderLayer::Opaque]);
+		DrawRenderItems(m_CommandList.Get(), m_RitemLayer[(int)RenderLayer::AlphaTested]);
+		DrawRenderItems(m_CommandList.Get(), m_RitemLayer[(int)RenderLayer::Transparent]);
+		break;
+	case BlendApp::ShowMode::NoFog:
+		DrawRenderItems(m_CommandList.Get(), m_RitemLayer[(int)RenderLayer::Opaque]);
+		m_CommandList->SetPipelineState(m_PSOs["alphaTested"].Get());
+		DrawRenderItems(m_CommandList.Get(), m_RitemLayer[(int)RenderLayer::AlphaTested]);
+		m_CommandList->SetPipelineState(m_PSOs["transparent"].Get());
+		DrawRenderItems(m_CommandList.Get(), m_RitemLayer[(int)RenderLayer::Transparent]);
+		break;
+	case BlendApp::ShowMode::Fog:
+		m_CommandList->SetPipelineState(m_PSOs["fog"].Get());
+		DrawRenderItems(m_CommandList.Get(), m_RitemLayer[(int)RenderLayer::Opaque]);
+		//m_CommandList->SetPipelineState(m_PSOs["alphaTested"].Get());
+		DrawRenderItems(m_CommandList.Get(), m_RitemLayer[(int)RenderLayer::AlphaTested]);
+		m_CommandList->SetPipelineState(m_PSOs["transparentFog"].Get());
+		DrawRenderItems(m_CommandList.Get(), m_RitemLayer[(int)RenderLayer::Transparent]);
+		break;
+	}
 
 	m_CommandList->SetDescriptorHeaps(1, m_SRVHeap.GetAddressOf());
 	ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), m_CommandList.Get());
@@ -632,23 +652,23 @@ void BlendApp::BuildBoxGeometry()
 
 void BlendApp::BuildShadersAndInputLayout()
 {
-	const D3D_SHADER_MACRO defines[] =
-	{
-		"FOG", "1",
-		NULL, NULL
-	};
-
-	const D3D_SHADER_MACRO alphaTestDefines[] =
+	const D3D_SHADER_MACRO fogDefines[] =
 	{
 		"FOG", "1",
 		"ALPHA_TEST", "1",
 		NULL, NULL
 	};
 
-	m_Shaders["standardVS"]		= d3dUtil::CompileShader(L"..\\Shader\\Chapter10\\Default.hlsl", nullptr, "VS", "vs_5_0");
-	m_Shaders["opaquePS"]		= d3dUtil::CompileShader(L"..\\Shader\\Chapter10\\Default.hlsl", nullptr, "PS", "ps_5_0");
-	m_Shaders["fogPS"]			= d3dUtil::CompileShader(L"..\\Shader\\Chapter10\\Default.hlsl", defines, "PS", "ps_5_0");
-	m_Shaders["alphaTestedPS"]	= d3dUtil::CompileShader(L"..\\Shader\\Chapter10\\Default.hlsl", alphaTestDefines, "PS", "ps_5_0");
+	const D3D_SHADER_MACRO alphaTestDefines[] =
+	{
+		"ALPHA_TEST", "1",
+		NULL, NULL
+	};
+
+	m_Shaders["standardVS"]		= d3dUtil::CompileShader(L"..\\Shader\\Chapter10\\Default.hlsl", nullptr, "VS", "vs_5_1");
+	m_Shaders["opaquePS"]		= d3dUtil::CompileShader(L"..\\Shader\\Chapter10\\Default.hlsl", nullptr, "PS", "ps_5_1");
+	m_Shaders["fogPS"]			= d3dUtil::CompileShader(L"..\\Shader\\Chapter10\\Default.hlsl", fogDefines, "PS", "ps_5_1");
+	m_Shaders["alphaTestedPS"]	= d3dUtil::CompileShader(L"..\\Shader\\Chapter10\\Default.hlsl", alphaTestDefines, "PS", "ps_5_1");
 
 	m_InputLayout =
 	{
@@ -711,22 +731,30 @@ void BlendApp::BuildPSOs()
 	transparentPsoDesc.BlendState.RenderTarget[0] = transparencyBlendDesc;
 	HR(m_pd3dDevice->CreateGraphicsPipelineState(&transparentPsoDesc, IID_PPV_ARGS(&m_PSOs["transparent"])));
 
+	D3D12_GRAPHICS_PIPELINE_STATE_DESC transparentFogPsoDesc = transparentPsoDesc;
+
+	transparentFogPsoDesc.PS =
+	{
+		reinterpret_cast<BYTE*>(m_Shaders["fogPS"]->GetBufferPointer()),
+		m_Shaders["fogPS"]->GetBufferSize()
+	};
+	HR(m_pd3dDevice->CreateGraphicsPipelineState(&transparentFogPsoDesc, IID_PPV_ARGS(&m_PSOs["transparentFog"])));
+
 	// fog
 	D3D12_GRAPHICS_PIPELINE_STATE_DESC fogPsoDesc = opaquePsoDesc;
 	fogPsoDesc.PS =
 	{
-		reinterpret_cast<BYTE*>(m_Shaders["fogPS"]->GetBufferPointer(),
-		m_Shaders["fogPS"]->GetBufferSize())
+		reinterpret_cast<BYTE*>(m_Shaders["fogPS"]->GetBufferPointer()),
+		m_Shaders["fogPS"]->GetBufferSize()
 	};
-	m_PSOs["fog"];
 	HR(m_pd3dDevice->CreateGraphicsPipelineState(&fogPsoDesc, IID_PPV_ARGS(&m_PSOs["fog"])));
 
 	// alpha test
 	D3D12_GRAPHICS_PIPELINE_STATE_DESC alphaTestedPsoDesc = opaquePsoDesc;
 	alphaTestedPsoDesc.PS =
 	{
-		reinterpret_cast<BYTE*>(m_Shaders["alphaTestedPS"]->GetBufferPointer(),
-		m_Shaders["alphaTestedPS"]->GetBufferSize())
+		reinterpret_cast<BYTE*>(m_Shaders["alphaTestedPS"]->GetBufferPointer()),
+		m_Shaders["alphaTestedPS"]->GetBufferSize()
 	};
 	alphaTestedPsoDesc.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;
 	HR(m_pd3dDevice->CreateGraphicsPipelineState(&alphaTestedPsoDesc, IID_PPV_ARGS(&m_PSOs["alphaTested"])));
@@ -756,8 +784,8 @@ void BlendApp::BuildMaterials()
 	water->m_Name = "water";
 	water->m_MatCBIndex = 1;
 	water->m_DiffuseSrvHeapIndex = 1;
-	water->m_DiffuseAlbedo = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
-	water->m_FresnelR0 = XMFLOAT3(0.2f, 0.2f, 0.2f);
+	water->m_DiffuseAlbedo = XMFLOAT4(1.0f, 1.0f, 1.0f, 0.5f);
+	water->m_FresnelR0 = XMFLOAT3(0.1f, 0.1f, 0.1f);
 	water->m_Roughness = 0.0f;
 
 	auto wirefence = std::make_unique<Material>();
@@ -851,8 +879,8 @@ void BlendApp::DrawRenderItems(ID3D12GraphicsCommandList* cmdList, const std::ve
 		matCBAddress += ri->Mat->m_MatCBIndex * matCBByteSize;
 
 		cmdList->SetGraphicsRootDescriptorTable(0, tex);
-		cmdList->SetGraphicsRootConstantBufferView(2, objCBAddress);
-		cmdList->SetGraphicsRootConstantBufferView(3, matCBAddress);
+		cmdList->SetGraphicsRootConstantBufferView(1, objCBAddress);
+		cmdList->SetGraphicsRootConstantBufferView(2, matCBAddress);
 
 		cmdList->DrawIndexedInstanced(ri->IndexCount, 1, ri->StartIndexLocation, ri->BaseVertexLocation, 0);
 	}
