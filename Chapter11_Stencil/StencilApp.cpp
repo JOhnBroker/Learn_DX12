@@ -1,15 +1,15 @@
-#include "BlendApp.h"
+#include "StencilApp.h"
 
-BlendApp::BlendApp(HINSTANCE hInstance) :D3DApp(hInstance) 
+StencilApp::StencilApp(HINSTANCE hInstance) :D3DApp(hInstance) 
 {
 }
 
-BlendApp::BlendApp(HINSTANCE hInstance, int width, int height)
+StencilApp::StencilApp(HINSTANCE hInstance, int width, int height)
 	: D3DApp(hInstance, width, height) 
 {
 }
 
-BlendApp::~BlendApp()
+StencilApp::~StencilApp()
 {
 	if (m_pd3dDevice != nullptr)
 	{
@@ -17,7 +17,7 @@ BlendApp::~BlendApp()
 	}
 }
 
-bool BlendApp::Initialize()
+bool StencilApp::Initialize()
 {
 	bool bResult = false;
 
@@ -58,7 +58,7 @@ bool BlendApp::Initialize()
 	return bResult;
 }
 
-bool BlendApp::InitResource()
+bool StencilApp::InitResource()
 {
 	bool bResult = false;
 
@@ -71,7 +71,7 @@ bool BlendApp::InitResource()
 	return bResult;
 }
 
-void BlendApp::OnResize()
+void StencilApp::OnResize()
 {
 	D3DApp::OnResize();
 
@@ -79,7 +79,7 @@ void BlendApp::OnResize()
 	XMStoreFloat4x4(&m_Proj, P);
 }
 
-void BlendApp::Update(const GameTimer& timer)
+void StencilApp::Update(const GameTimer& timer)
 {
 	// ImGui
 	ImGuiIO& io = ImGui::GetIO();
@@ -142,7 +142,7 @@ void BlendApp::Update(const GameTimer& timer)
 	UpdateWaves(timer);
 }
 
-void BlendApp::Draw(const GameTimer& timer)
+void StencilApp::Draw(const GameTimer& timer)
 {
 	auto cmdListAlloc = m_CurrFrameResource->CmdListAlloc;
 	D3D12_RESOURCE_BARRIER present2render;
@@ -178,20 +178,20 @@ void BlendApp::Draw(const GameTimer& timer)
 
 	switch (m_CurrMode)
 	{
-	case BlendApp::ShowMode::Wireframe:
+	case StencilApp::ShowMode::Wireframe:
 		m_CommandList->SetPipelineState(m_PSOs["opaque_wireframe"].Get());
 		DrawRenderItems(m_CommandList.Get(), m_RitemLayer[(int)RenderLayer::Opaque]);
 		DrawRenderItems(m_CommandList.Get(), m_RitemLayer[(int)RenderLayer::AlphaTested]);
 		DrawRenderItems(m_CommandList.Get(), m_RitemLayer[(int)RenderLayer::Transparent]);
 		break;
-	case BlendApp::ShowMode::NoFog:
+	case StencilApp::ShowMode::NoFog:
 		DrawRenderItems(m_CommandList.Get(), m_RitemLayer[(int)RenderLayer::Opaque]);
 		m_CommandList->SetPipelineState(m_PSOs["alphaTested"].Get());
 		DrawRenderItems(m_CommandList.Get(), m_RitemLayer[(int)RenderLayer::AlphaTested]);
 		m_CommandList->SetPipelineState(m_PSOs["transparent"].Get());
 		DrawRenderItems(m_CommandList.Get(), m_RitemLayer[(int)RenderLayer::Transparent]);
 		break;
-	case BlendApp::ShowMode::Fog:
+	case StencilApp::ShowMode::Fog:
 		m_CommandList->SetPipelineState(m_PSOs["fog"].Get());
 		DrawRenderItems(m_CommandList.Get(), m_RitemLayer[(int)RenderLayer::Opaque]);
 		m_CommandList->SetPipelineState(m_PSOs["alphaTested"].Get());
@@ -221,7 +221,7 @@ void BlendApp::Draw(const GameTimer& timer)
 
 }
 
-void BlendApp::OnMouseMove(WPARAM btnState, int x, int y)
+void StencilApp::OnMouseMove(WPARAM btnState, int x, int y)
 {
 	if ((btnState & MK_LBUTTON) != 0)
 	{
@@ -244,19 +244,19 @@ void BlendApp::OnMouseMove(WPARAM btnState, int x, int y)
 	m_LastMousePos.y = y;
 }
 
-void BlendApp::OnMouseUp(WPARAM btnState, int x, int y)
+void StencilApp::OnMouseUp(WPARAM btnState, int x, int y)
 {
 	ReleaseCapture();
 }
 
-void BlendApp::OnMouseDown(WPARAM btnState, int x, int y)
+void StencilApp::OnMouseDown(WPARAM btnState, int x, int y)
 {
 	m_LastMousePos.x = x;
 	m_LastMousePos.y = y;
 	SetCapture(m_hMainWnd);
 }
 
-void BlendApp::UpdateCamera(const GameTimer& gt)
+void StencilApp::UpdateCamera(const GameTimer& gt)
 {
 	m_EyePos.x = m_Radius * sinf(m_Phi) * cosf(m_Theta);
 	m_EyePos.z = m_Radius * sinf(m_Phi) * sinf(m_Theta);
@@ -270,7 +270,7 @@ void BlendApp::UpdateCamera(const GameTimer& gt)
 	XMStoreFloat4x4(&m_View, view);
 }
 
-void BlendApp::UpdateObjectCBs(const GameTimer& gt)
+void StencilApp::UpdateObjectCBs(const GameTimer& gt)
 {
 	auto currObjectCB = m_CurrFrameResource->ObjectCB.get();
 
@@ -293,7 +293,7 @@ void BlendApp::UpdateObjectCBs(const GameTimer& gt)
 	}
 }
 
-void BlendApp::AnimateMaterials(const GameTimer& gt)
+void StencilApp::AnimateMaterials(const GameTimer& gt)
 {
 	auto waterMat = m_Materials["water"].get();
 
@@ -317,7 +317,7 @@ void BlendApp::AnimateMaterials(const GameTimer& gt)
 	waterMat->m_NumFramesDirty = g_numFrameResources;
 }
 
-void BlendApp::RotationMaterials(const GameTimer& gt)
+void StencilApp::RotationMaterials(const GameTimer& gt)
 {
 	// rotate box
 	auto boxMat = m_Materials["wirefence"].get();
@@ -330,7 +330,7 @@ void BlendApp::RotationMaterials(const GameTimer& gt)
 	boxMat->m_NumFramesDirty = g_numFrameResources;
 }
 
-void BlendApp::UpdateMaterialCBs(const GameTimer& gt)
+void StencilApp::UpdateMaterialCBs(const GameTimer& gt)
 {
 	auto currMaterialCB = m_CurrFrameResource->MaterialCB.get();
 	for (auto& pair : m_Materials) 
@@ -352,7 +352,7 @@ void BlendApp::UpdateMaterialCBs(const GameTimer& gt)
 	}
 }
 
-void BlendApp::UpdateMainPassCB(const GameTimer& gt)
+void StencilApp::UpdateMainPassCB(const GameTimer& gt)
 {
 	XMMATRIX view = XMLoadFloat4x4(&m_View);
 	XMMATRIX proj = XMLoadFloat4x4(&m_Proj);
@@ -392,7 +392,7 @@ void BlendApp::UpdateMainPassCB(const GameTimer& gt)
 	currPassCB->CopyData(0, m_MainPassCB);
 }
 
-void BlendApp::UpdateWaves(const GameTimer& gt)
+void StencilApp::UpdateWaves(const GameTimer& gt)
 {
 	static float t_base = 0.0f;
 
@@ -425,7 +425,7 @@ void BlendApp::UpdateWaves(const GameTimer& gt)
 	m_WavesRitem->Geo->VertexBufferGPU = currWavesVB->Resource();
 }
 
-void BlendApp::BuildRootSignature()
+void StencilApp::BuildRootSignature()
 {
 	HRESULT hReturn = E_FAIL;
 	CD3DX12_DESCRIPTOR_RANGE texTable;
@@ -465,7 +465,7 @@ void BlendApp::BuildRootSignature()
 		IID_PPV_ARGS(m_RootSignature.GetAddressOf())));
 }
 
-void BlendApp::BuildDescriptorHeaps()
+void StencilApp::BuildDescriptorHeaps()
 {
 	D3D12_DESCRIPTOR_HEAP_DESC srvHeapDesc = {};
 	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
@@ -501,7 +501,7 @@ void BlendApp::BuildDescriptorHeaps()
 	m_pd3dDevice->CreateShaderResourceView(fenceTex.Get(), &srvDesc, hDescriptor);
 }
 
-void BlendApp::BuildLandGeometry()
+void StencilApp::BuildLandGeometry()
 {
 	GeometryGenerator geoGen;
 	GeometryGenerator::MeshData grid = geoGen.CreateGrid(160.0f, 160.0f, 50, 50);
@@ -549,7 +549,7 @@ void BlendApp::BuildLandGeometry()
 	m_Geometries["landGeo"] = std::move(geo);
 }
 
-void BlendApp::BuildWavesGeometry()
+void StencilApp::BuildWavesGeometry()
 {
 	std::vector<std::uint16_t> indices(3 * m_Waves->GetTriangleCount());
 	assert(m_Waves->GetVertexCount() < 0x0000ffff);
@@ -604,7 +604,7 @@ void BlendApp::BuildWavesGeometry()
 	m_Geometries["waterGeo"] = std::move(geo);
 }
 
-void BlendApp::BuildBoxGeometry()
+void StencilApp::BuildBoxGeometry()
 {
 	GeometryGenerator geoGen;
 	GeometryGenerator::MeshData box = geoGen.CreateBox(8.0f, 8.0f, 8.0f, 0);
@@ -650,7 +650,7 @@ void BlendApp::BuildBoxGeometry()
 	m_Geometries[geo->Name] = std::move(geo);
 }
 
-void BlendApp::BuildShadersAndInputLayout()
+void StencilApp::BuildShadersAndInputLayout()
 {
 	const D3D_SHADER_MACRO fogDefines[] =
 	{
@@ -678,7 +678,7 @@ void BlendApp::BuildShadersAndInputLayout()
 	};
 }
 
-void BlendApp::BuildPSOs()
+void StencilApp::BuildPSOs()
 {
 	D3D12_GRAPHICS_PIPELINE_STATE_DESC opaquePsoDesc;
 
@@ -761,7 +761,7 @@ void BlendApp::BuildPSOs()
 
 }
 
-void BlendApp::BuildFrameResources()
+void StencilApp::BuildFrameResources()
 {
 	for(int i = 0;i<g_numFrameResources;++i)
 	{
@@ -770,7 +770,7 @@ void BlendApp::BuildFrameResources()
 	}
 }
 
-void BlendApp::BuildMaterials()
+void StencilApp::BuildMaterials()
 {
 	auto grass = std::make_unique<Material>();
 	grass->m_Name = "grass";
@@ -801,7 +801,7 @@ void BlendApp::BuildMaterials()
 	m_Materials["wirefence"] = std::move(wirefence);
 }
 
-void BlendApp::BuildRenderItems()
+void StencilApp::BuildRenderItems()
 {
 	auto wavesRitem = std::make_unique<RenderItem>();
 	wavesRitem->World = MathHelper::Identity4x4();
@@ -848,7 +848,7 @@ void BlendApp::BuildRenderItems()
 	m_AllRitems.push_back(std::move(boxRitem));
 }
 
-void BlendApp::DrawRenderItems(ID3D12GraphicsCommandList* cmdList, const std::vector<RenderItem*>& ritems)
+void StencilApp::DrawRenderItems(ID3D12GraphicsCommandList* cmdList, const std::vector<RenderItem*>& ritems)
 {
 	UINT objCBByteSize = d3dUtil::CalcConstantBufferByteSize(sizeof(ObjectConstants));
 	UINT matCBByteSize = d3dUtil::CalcConstantBufferByteSize(sizeof(MaterialConstants));
@@ -886,7 +886,7 @@ void BlendApp::DrawRenderItems(ID3D12GraphicsCommandList* cmdList, const std::ve
 	}
 }
 
-std::array<const CD3DX12_STATIC_SAMPLER_DESC, STATICSAMPLERCOUNT> BlendApp::GetStaticSamplers()
+std::array<const CD3DX12_STATIC_SAMPLER_DESC, STATICSAMPLERCOUNT> StencilApp::GetStaticSamplers()
 {
 	const CD3DX12_STATIC_SAMPLER_DESC pointWrap(
 		0,
@@ -939,12 +939,12 @@ std::array<const CD3DX12_STATIC_SAMPLER_DESC, STATICSAMPLERCOUNT> BlendApp::GetS
 			anisotropicWrap ,anisotropicClamp  };
 }
 
-float BlendApp::GetHillsHeight(float x, float z) const
+float StencilApp::GetHillsHeight(float x, float z) const
 {
 	return 0.3f * (z * sinf(0.1f * x) + x * cosf(0.1f * z));
 }
 
-XMFLOAT3 BlendApp::GetHillsNormal(float x, float z) const
+XMFLOAT3 StencilApp::GetHillsNormal(float x, float z) const
 {
 	// n = (-df/dx, 1, -df/dz)
 	// f(x,z) = 0.3z * sin(0.1f * x) + x * cos(0.1f * x) 
@@ -958,7 +958,7 @@ XMFLOAT3 BlendApp::GetHillsNormal(float x, float z) const
 	return N;
 }
 
-void BlendApp::LoadTexture(std::string name, std::wstring filename)
+void StencilApp::LoadTexture(std::string name, std::wstring filename)
 {
 	auto texture = std::make_unique<Texture>();
 	texture->m_Name = name;

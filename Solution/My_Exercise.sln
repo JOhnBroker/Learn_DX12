@@ -21,6 +21,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Chapter9_TexWave", "..\Chap
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Chapter10_Blend", "..\Chapter10_Blend\Chapter10_Blend.vcxproj", "{D169124B-9DB6-4A2C-9D9A-E719A3233A37}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Chapter11_Stencil", "..\Chapter11_Stencil\Chapter11_Stencil.vcxproj", "{90ACB486-66F4-4BD1-A442-DB0BE05B9824}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -99,6 +101,14 @@ Global
 		{D169124B-9DB6-4A2C-9D9A-E719A3233A37}.Release|x64.Build.0 = Release|x64
 		{D169124B-9DB6-4A2C-9D9A-E719A3233A37}.Release|x86.ActiveCfg = Release|Win32
 		{D169124B-9DB6-4A2C-9D9A-E719A3233A37}.Release|x86.Build.0 = Release|Win32
+		{90ACB486-66F4-4BD1-A442-DB0BE05B9824}.Debug|x64.ActiveCfg = Debug|x64
+		{90ACB486-66F4-4BD1-A442-DB0BE05B9824}.Debug|x64.Build.0 = Debug|x64
+		{90ACB486-66F4-4BD1-A442-DB0BE05B9824}.Debug|x86.ActiveCfg = Debug|Win32
+		{90ACB486-66F4-4BD1-A442-DB0BE05B9824}.Debug|x86.Build.0 = Debug|Win32
+		{90ACB486-66F4-4BD1-A442-DB0BE05B9824}.Release|x64.ActiveCfg = Release|x64
+		{90ACB486-66F4-4BD1-A442-DB0BE05B9824}.Release|x64.Build.0 = Release|x64
+		{90ACB486-66F4-4BD1-A442-DB0BE05B9824}.Release|x86.ActiveCfg = Release|Win32
+		{90ACB486-66F4-4BD1-A442-DB0BE05B9824}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
