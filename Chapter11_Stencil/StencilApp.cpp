@@ -38,9 +38,8 @@ bool StencilApp::Initialize()
 	BuildRootSignature();
 	BuildDescriptorHeaps();
 	BuildShadersAndInputLayout();
-	BuildLandGeometry();
-	BuildWavesGeometry();
-	BuildBoxGeometry();
+	BuildRoomGeometry();
+	BuildSkullGeometry();
 	BuildMaterials();
 	BuildRenderItems();
 	BuildFrameResources();
@@ -139,7 +138,7 @@ void StencilApp::Update(const GameTimer& timer)
 	UpdateObjectCBs(timer);
 	UpdateMaterialCBs(timer);
 	UpdateMainPassCB(timer);
-	UpdateWaves(timer);
+	UpdateReflectedPassCB(timer);
 }
 
 void StencilApp::Draw(const GameTimer& timer)
@@ -317,19 +316,6 @@ void StencilApp::AnimateMaterials(const GameTimer& gt)
 	waterMat->m_NumFramesDirty = g_numFrameResources;
 }
 
-void StencilApp::RotationMaterials(const GameTimer& gt)
-{
-	// rotate box
-	auto boxMat = m_Materials["wirefence"].get();
-
-	static float phi = 0.0f;
-	phi += 0.001f;
-
-	XMMATRIX texRotation = XMMatrixTranslation(-0.5f, -0.5f, 0.0f) * XMMatrixRotationZ(phi) * XMMatrixTranslation(+0.5f, +0.5f, 0.0f);
-	XMStoreFloat4x4(&boxMat->m_MatTransform, texRotation);
-	boxMat->m_NumFramesDirty = g_numFrameResources;
-}
-
 void StencilApp::UpdateMaterialCBs(const GameTimer& gt)
 {
 	auto currMaterialCB = m_CurrFrameResource->MaterialCB.get();
@@ -392,37 +378,8 @@ void StencilApp::UpdateMainPassCB(const GameTimer& gt)
 	currPassCB->CopyData(0, m_MainPassCB);
 }
 
-void StencilApp::UpdateWaves(const GameTimer& gt)
+void StencilApp::UpdateReflectedPassCB(const GameTimer& gt)
 {
-	static float t_base = 0.0f;
-
-	if ((m_Timer.TotalTime() - t_base) >= 0.25f) 
-	{
-		t_base += 0.25f;
-		int i = MathHelper::Rand(4, m_Waves->GetRowCount() - 5);
-		int j = MathHelper::Rand(4, m_Waves->GetColCount() - 5);
-
-		float r = MathHelper::RandF(0.2f, 0.5f);
-
-		m_Waves->Disturb(i, j, r);
-	}
-
-	m_Waves->Update(gt.DeltaTime());
-
-	auto currWavesVB = m_CurrFrameResource->WavesVB.get();
-	for (int i = 0; i < m_Waves->GetVertexCount(); ++i) 
-	{
-		Vertex v;
-		v.Pos = m_Waves->Position(i);
-		v.Normal = m_Waves->Normal(i);
-
-		v.TexC.x = 0.5f + v.Pos.x / m_Waves->GetWidth();
-		v.TexC.y = 0.5f - v.Pos.z / m_Waves->GetDepth();
-
-		currWavesVB->CopyData(i, v);
-	}
-
-	m_WavesRitem->Geo->VertexBufferGPU = currWavesVB->Resource();
 }
 
 void StencilApp::BuildRootSignature()
@@ -501,155 +458,6 @@ void StencilApp::BuildDescriptorHeaps()
 	m_pd3dDevice->CreateShaderResourceView(fenceTex.Get(), &srvDesc, hDescriptor);
 }
 
-void StencilApp::BuildLandGeometry()
-{
-	GeometryGenerator geoGen;
-	GeometryGenerator::MeshData grid = geoGen.CreateGrid(160.0f, 160.0f, 50, 50);
-
-	std::vector<Vertex> vertices(grid.Vertices.size());
-	for (size_t i = 0; i < grid.Vertices.size(); ++i) 
-	{
-		auto& p = grid.Vertices[i].Position;
-		vertices[i].Pos = p;
-		vertices[i].Pos.y = GetHillsHeight(p.x, p.z);
-		vertices[i].Normal = GetHillsNormal(p.x, p.z);
-		vertices[i].TexC = grid.Vertices[i].TexC;
-	}
-	const UINT vbByteSize = (UINT)vertices.size() * sizeof(Vertex);
-
-	std::vector<std::uint16_t>indices = grid.GetIndices16();
-	const UINT ibByteSize = (UINT)indices.size() * sizeof(std::uint16_t);
-
-	auto geo = std::make_unique<MeshGeometry>();
-	geo->Name = "landGeo";
-
-	HR(D3DCreateBlob(vbByteSize, &geo->VertexBufferCPU));
-	CopyMemory(geo->VertexBufferCPU->GetBufferPointer(), vertices.data(), vbByteSize);
-
-	HR(D3DCreateBlob(ibByteSize, &geo->IndexBufferCPU));
-	CopyMemory(geo->IndexBufferCPU->GetBufferPointer(), indices.data(), ibByteSize);
-
-	geo->VertexBufferGPU = d3dUtil::CreateDefaultBuffer(m_pd3dDevice.Get(),
-		m_CommandList.Get(), vertices.data(), vbByteSize, geo->VertexBufferUploader);
-
-	geo->IndexBufferGPU = d3dUtil::CreateDefaultBuffer(m_pd3dDevice.Get(), 
-		m_CommandList.Get(), indices.data(), ibByteSize, geo->IndexBufferUploader);
-
-	geo->VertexByteStride = sizeof(Vertex);
-	geo->VertexBufferByteSize = vbByteSize;
-	geo->IndexFormat = DXGI_FORMAT_R16_UINT;
-	geo->IndexBufferByteSize = ibByteSize;
-
-	SubmeshGeometry submesh;
-	submesh.IndexCount = (UINT)indices.size();
-	submesh.StartIndexLocation = 0;
-	submesh.BaseVertexLocation = 0;
-
-	geo->DrawArgs["grid"] = submesh;
-	m_Geometries["landGeo"] = std::move(geo);
-}
-
-void StencilApp::BuildWavesGeometry()
-{
-	std::vector<std::uint16_t> indices(3 * m_Waves->GetTriangleCount());
-	assert(m_Waves->GetVertexCount() < 0x0000ffff);
-
-	int r = m_Waves->GetRowCount();
-	int c = m_Waves->GetColCount();
-	int k = 0;
-
-	for (int i = 0; i < r - 1; ++i) 
-	{
-		for (int j = 0; j < c - 1; ++j) 
-		{
-			indices[k] = i * c + j;
-			indices[k + 1] = i * c + j + 1;
-			indices[k + 2] = (i + 1) * c + j;
-
-			indices[k + 5] = i * c + j + 1;
-			indices[k + 3] = (i + 1) * c + j + 1;
-			indices[k + 4] = (i + 1) * c + j;
-
-			k += 6;
-		}
-	}
-
-	UINT vbByteSize = m_Waves->GetVertexCount() * sizeof(Vertex);
-	UINT ibByteSize = (UINT)indices.size() * sizeof(std::uint16_t);
-
-	auto geo = std::make_unique<MeshGeometry>();
-	geo->Name = "waterGeo";
-
-	geo->VertexBufferCPU = nullptr;
-	geo->VertexBufferGPU = nullptr;
-
-	HR(D3DCreateBlob(ibByteSize, &geo->IndexBufferCPU));
-	CopyMemory(geo->IndexBufferCPU->GetBufferPointer(), indices.data(), ibByteSize);
-
-	geo->IndexBufferGPU = d3dUtil::CreateDefaultBuffer(m_pd3dDevice.Get(),
-		m_CommandList.Get(), indices.data(), ibByteSize, geo->IndexBufferUploader);
-
-	geo->VertexByteStride = sizeof(Vertex);
-	geo->VertexBufferByteSize = vbByteSize;
-	geo->IndexFormat = DXGI_FORMAT_R16_UINT;
-	geo->IndexBufferByteSize = ibByteSize;
-
-	SubmeshGeometry submesh;
-	submesh.IndexCount = (UINT)indices.size();
-	submesh.StartIndexLocation = 0;
-	submesh.BaseVertexLocation = 0;
-
-	geo->DrawArgs["grid"] = submesh;
-
-	m_Geometries["waterGeo"] = std::move(geo);
-}
-
-void StencilApp::BuildBoxGeometry()
-{
-	GeometryGenerator geoGen;
-	GeometryGenerator::MeshData box = geoGen.CreateBox(8.0f, 8.0f, 8.0f, 0);
-
-	std::vector<Vertex> vertices(box.Vertices.size());
-	std::vector<std::uint16_t> indices = box.GetIndices16();
-
-	for (size_t i = 0; i < box.Vertices.size(); ++i) 
-	{
-		vertices[i].Pos = box.Vertices[i].Position;
-		vertices[i].Normal = box.Vertices[i].Normal;
-		vertices[i].TexC = box.Vertices[i].TexC;
-	}
-	const UINT vbByteSize = (UINT)vertices.size() * sizeof(Vertex);
-	const UINT ibByteSize = (UINT)indices.size() * sizeof(std::uint16_t);
-
-	auto geo = std::make_unique<MeshGeometry>();
-	geo->Name = "boxGeo";
-
-	HR(D3DCreateBlob(vbByteSize, &geo->VertexBufferCPU));
-	CopyMemory(geo->VertexBufferCPU->GetBufferPointer(), vertices.data(), vertices.size());
-	HR(D3DCreateBlob(ibByteSize, &geo->IndexBufferCPU));
-	CopyMemory(geo->IndexBufferCPU->GetBufferPointer(), indices.data(), indices.size());
-
-	geo->VertexBufferGPU = d3dUtil::CreateDefaultBuffer(m_pd3dDevice.Get(), m_CommandList.Get(),
-		vertices.data(), vbByteSize, geo->VertexBufferUploader);
-
-	geo->IndexBufferGPU = d3dUtil::CreateDefaultBuffer(m_pd3dDevice.Get(), m_CommandList.Get(),
-		indices.data(), ibByteSize, geo->IndexBufferUploader);
-
-	geo->VertexByteStride = sizeof(Vertex);
-	geo->VertexBufferByteSize = vbByteSize;
-	geo->IndexFormat = DXGI_FORMAT_R16_UINT;
-	geo->IndexBufferByteSize = ibByteSize;
-
-	SubmeshGeometry boxSubmesh;
-	boxSubmesh.BaseVertexLocation = 0;
-	boxSubmesh.StartIndexLocation = 0;
-	boxSubmesh.IndexCount = (UINT)indices.size();
-
-	geo->DrawArgs["box"] = boxSubmesh;
-
-	m_Geometries[geo->Name] = std::move(geo);
-}
-
 void StencilApp::BuildShadersAndInputLayout()
 {
 	const D3D_SHADER_MACRO fogDefines[] =
@@ -676,6 +484,154 @@ void StencilApp::BuildShadersAndInputLayout()
 		{"NORMAL"  ,0,DXGI_FORMAT_R32G32B32_FLOAT,0,12,D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA,0},
 		{"TEXCOORD"  ,0,DXGI_FORMAT_R32G32_FLOAT,0,24,D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA,0}
 	};
+}
+
+void StencilApp::BuildRoomGeometry()
+{
+	//   |--------------|
+	//   |              |
+	//   |----|----|----|
+	//   |Wall|Mirr|Wall|
+	//   |    | or |    |
+	//   /--------------/
+	//  /   Floor      /
+	// /--------------/
+
+	std::array<Vertex, 20> vertices =
+	{
+		// Floor: Observe we tile texture coordinates.
+		Vertex(-3.5f, 0.0f, -10.0f, 0.0f, 1.0f, 0.0f, 0.0f, 4.0f), // 0 
+		Vertex(-3.5f, 0.0f,   0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f),
+		Vertex(7.5f, 0.0f,   0.0f, 0.0f, 1.0f, 0.0f, 4.0f, 0.0f),
+		Vertex(7.5f, 0.0f, -10.0f, 0.0f, 1.0f, 0.0f, 4.0f, 4.0f),
+
+		// Wall: Observe we tile texture coordinates, and that we
+		// leave a gap in the middle for the mirror.
+		Vertex(-3.5f, 0.0f, 0.0f, 0.0f, 0.0f, -1.0f, 0.0f, 2.0f), // 4
+		Vertex(-3.5f, 4.0f, 0.0f, 0.0f, 0.0f, -1.0f, 0.0f, 0.0f),
+		Vertex(-2.5f, 4.0f, 0.0f, 0.0f, 0.0f, -1.0f, 0.5f, 0.0f),
+		Vertex(-2.5f, 0.0f, 0.0f, 0.0f, 0.0f, -1.0f, 0.5f, 2.0f),
+
+		Vertex(2.5f, 0.0f, 0.0f, 0.0f, 0.0f, -1.0f, 0.0f, 2.0f), // 8 
+		Vertex(2.5f, 4.0f, 0.0f, 0.0f, 0.0f, -1.0f, 0.0f, 0.0f),
+		Vertex(7.5f, 4.0f, 0.0f, 0.0f, 0.0f, -1.0f, 2.0f, 0.0f),
+		Vertex(7.5f, 0.0f, 0.0f, 0.0f, 0.0f, -1.0f, 2.0f, 2.0f),
+
+		Vertex(-3.5f, 4.0f, 0.0f, 0.0f, 0.0f, -1.0f, 0.0f, 1.0f), // 12
+		Vertex(-3.5f, 6.0f, 0.0f, 0.0f, 0.0f, -1.0f, 0.0f, 0.0f),
+		Vertex(7.5f, 6.0f, 0.0f, 0.0f, 0.0f, -1.0f, 6.0f, 0.0f),
+		Vertex(7.5f, 4.0f, 0.0f, 0.0f, 0.0f, -1.0f, 6.0f, 1.0f),
+
+		// Mirror
+		Vertex(-2.5f, 0.0f, 0.0f, 0.0f, 0.0f, -1.0f, 0.0f, 1.0f), // 16
+		Vertex(-2.5f, 4.0f, 0.0f, 0.0f, 0.0f, -1.0f, 0.0f, 0.0f),
+		Vertex(2.5f, 4.0f, 0.0f, 0.0f, 0.0f, -1.0f, 1.0f, 0.0f),
+		Vertex(2.5f, 0.0f, 0.0f, 0.0f, 0.0f, -1.0f, 1.0f, 1.0f)
+	};
+
+	std::array<std::int16_t, 30> indices =
+	{
+		// Floor
+		0, 1, 2,
+		0, 2, 3,
+
+		// Walls
+		4, 5, 6,
+		4, 6, 7,
+
+		8, 9, 10,
+		8, 10, 11,
+
+		12, 13, 14,
+		12, 14, 15,
+
+		// Mirror
+		16, 17, 18,
+		16, 18, 19
+	};
+
+
+	SubmeshGeometry floorSubmesh;
+	floorSubmesh.IndexCount = 6;
+	floorSubmesh.StartIndexLocation = 0;
+	floorSubmesh.BaseVertexLocation = 0;
+
+	SubmeshGeometry wallSubmesh;
+	wallSubmesh.IndexCount = 18;
+	wallSubmesh.StartIndexLocation = 6;
+	wallSubmesh.BaseVertexLocation = 0;
+
+	SubmeshGeometry mirrorSubmesh;
+	mirrorSubmesh.IndexCount = 6;
+	mirrorSubmesh.StartIndexLocation = 24;
+	mirrorSubmesh.BaseVertexLocation = 0;
+
+	const UINT vbByteSize = (UINT)vertices.size() * sizeof(UINT);
+	const UINT ibByteSize = (UINT)indices.size() * sizeof(std::uint16_t);
+
+	auto geo = std::make_unique<MeshGeometry>();
+	geo->Name = "roomGeo";
+
+	HR(D3DCreateBlob(vbByteSize, &geo->VertexBufferCPU));
+	CopyMemory(geo->VertexBufferCPU->GetBufferPointer(), vertices.data(), vbByteSize);
+
+	HR(D3DCreateBlob(ibByteSize, &geo->IndexBufferCPU));
+	CopyMemory(geo->IndexBufferCPU->GetBufferPointer(), indices.data(), ibByteSize);
+	
+	geo->VertexBufferGPU = d3dUtil::CreateDefaultBuffer(m_pd3dDevice.Get(),
+		m_CommandList.Get(), vertices.data(), vbByteSize, geo->VertexBufferUploader);
+	geo->IndexBufferGPU = d3dUtil::CreateDefaultBuffer(m_pd3dDevice.Get(),
+		m_CommandList.Get(), indices.data(), ibByteSize, geo->IndexBufferUploader);
+
+	geo->VertexByteStride = sizeof(Vertex);
+	geo->VertexBufferByteSize = vbByteSize;
+	geo->IndexFormat = DXGI_FORMAT_R16_UINT;
+	geo->IndexBufferByteSize = ibByteSize;
+
+	geo->DrawArgs["floor"] = floorSubmesh;
+	geo->DrawArgs["wall"] = wallSubmesh;
+	geo->DrawArgs["mirror"] = mirrorSubmesh;
+
+	m_Geometries[geo->Name] = std::move(geo);
+}
+
+void StencilApp::BuildSkullGeometry()
+{
+	std::vector<Vertex> vertices(1);
+	std::vector<std::uint16_t> indices;
+
+	ReadDataFromFile(vertices, indices);
+
+	const UINT vbByteSize = vertices.size() * sizeof(Vertex);
+	const UINT ibByteSize = indices.size() * sizeof(std::uint16_t);
+
+	auto geo = std::make_unique<MeshGeometry>();
+	geo->Name = "skullGeo";
+
+	HR(D3DCreateBlob(vbByteSize, &geo->VertexBufferCPU));
+	CopyMemory(geo->VertexBufferCPU->GetBufferPointer(), vertices.data(), vbByteSize);
+
+	HR(D3DCreateBlob(ibByteSize, &geo->IndexBufferCPU));
+	CopyMemory(geo->IndexBufferCPU->GetBufferPointer(), indices.data(), ibByteSize);
+
+	geo->VertexBufferGPU = d3dUtil::CreateDefaultBuffer(m_pd3dDevice.Get(),
+		m_CommandList.Get(), vertices.data(), vbByteSize, geo->VertexBufferUploader);
+	geo->IndexBufferGPU = d3dUtil::CreateDefaultBuffer(m_pd3dDevice.Get(),
+		m_CommandList.Get(), indices.data(), ibByteSize, geo->IndexBufferUploader);
+
+	geo->VertexByteStride = sizeof(Vertex);
+	geo->VertexBufferByteSize = vbByteSize;
+	geo->IndexFormat = DXGI_FORMAT_R16_UINT;
+	geo->IndexBufferByteSize = ibByteSize;
+
+	SubmeshGeometry submesh;
+	submesh.IndexCount = ibByteSize;
+	submesh.StartIndexLocation = 0;
+	submesh.BaseVertexLocation = 0;
+
+	geo->DrawArgs["skull"] = submesh;
+
+	m_Geometries[geo->Name] = std::move(geo);
 }
 
 void StencilApp::BuildPSOs()
@@ -772,33 +728,51 @@ void StencilApp::BuildFrameResources()
 
 void StencilApp::BuildMaterials()
 {
-	auto grass = std::make_unique<Material>();
-	grass->m_Name = "grass";
-	grass->m_MatCBIndex = 0;
-	grass->m_DiffuseSrvHeapIndex = 0;
-	grass->m_DiffuseAlbedo = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
-	grass->m_FresnelR0 = XMFLOAT3(0.01f, 0.01f, 0.01f);
-	grass->m_Roughness = 0.125f;
+	auto bricks = std::make_unique<Material>();
+	bricks->m_Name = "bricks";
+	bricks->m_MatCBIndex = 0;
+	bricks->m_DiffuseSrvHeapIndex = 0;
+	bricks->m_DiffuseAlbedo = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
+	bricks->m_FresnelR0 = XMFLOAT3(0.05f, 0.05f, 0.05f);
+	bricks->m_Roughness = 0.25f;
 
-	auto water = std::make_unique<Material>();
-	water->m_Name = "water";
-	water->m_MatCBIndex = 1;
-	water->m_DiffuseSrvHeapIndex = 1;
-	water->m_DiffuseAlbedo = XMFLOAT4(1.0f, 1.0f, 1.0f, 0.5f);
-	water->m_FresnelR0 = XMFLOAT3(0.1f, 0.1f, 0.1f);
-	water->m_Roughness = 0.0f;
+	auto checkertile = std::make_unique<Material>();
+	checkertile->m_Name = "checkertile";
+	checkertile->m_MatCBIndex = 1;
+	checkertile->m_DiffuseSrvHeapIndex = 1;
+	checkertile->m_DiffuseAlbedo = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
+	checkertile->m_FresnelR0 = XMFLOAT3(0.07f, 0.07f, 0.07f);
+	checkertile->m_Roughness = 0.3f;
 
-	auto wirefence = std::make_unique<Material>();
-	wirefence->m_Name = "wirefence";
-	wirefence->m_MatCBIndex = 2;
-	wirefence->m_DiffuseSrvHeapIndex = 2;
-	wirefence->m_DiffuseAlbedo = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
-	wirefence->m_FresnelR0 = XMFLOAT3(0.01f, 0.01f, 0.01f);
-	wirefence->m_Roughness = 0.25f;
+	auto icemirror = std::make_unique<Material>();
+	icemirror->m_Name = "icemirror";
+	icemirror->m_MatCBIndex = 2;
+	icemirror->m_DiffuseSrvHeapIndex = 2;
+	icemirror->m_DiffuseAlbedo = XMFLOAT4(1.0f, 1.0f, 1.0f, 0.3f);
+	icemirror->m_FresnelR0 = XMFLOAT3(0.01f, 0.01f, 0.01f);
+	icemirror->m_Roughness = 0.5f;
 
-	m_Materials["grass"] = std::move(grass);
-	m_Materials["water"] = std::move(water);
-	m_Materials["wirefence"] = std::move(wirefence);
+	auto skullMat = std::make_unique<Material>();
+	skullMat->m_Name = "skullMat";
+	skullMat->m_MatCBIndex = 3;
+	skullMat->m_DiffuseSrvHeapIndex = 3;
+	skullMat->m_DiffuseAlbedo = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
+	skullMat->m_FresnelR0 = XMFLOAT3(0.05f, 0.05f, 0.05f);
+	skullMat->m_Roughness = 0.3f;
+
+	auto shadowMat = std::make_unique<Material>();
+	shadowMat->m_Name = "shadowMat";
+	shadowMat->m_MatCBIndex = 4;
+	shadowMat->m_DiffuseSrvHeapIndex = 3;
+	shadowMat->m_DiffuseAlbedo = XMFLOAT4(0.0f, 0.0f, 0.0f, 0.5f);
+	shadowMat->m_FresnelR0 = XMFLOAT3(0.001f, 0.001f, 0.001f);
+	shadowMat->m_Roughness = 0.0f;
+
+	m_Materials["brick"] = std::move(bricks);
+	m_Materials["checkertile"] = std::move(checkertile);
+	m_Materials["icemirror"] = std::move(icemirror);
+	m_Materials["skullMat"] = std::move(skullMat);
+	m_Materials["shadowMat"] = std::move(shadowMat);
 }
 
 void StencilApp::BuildRenderItems()
@@ -807,8 +781,8 @@ void StencilApp::BuildRenderItems()
 	wavesRitem->World = MathHelper::Identity4x4();
 	XMStoreFloat4x4(&wavesRitem->TexTransform, XMMatrixScaling(5.0f, 5.0f, 1.0f));
 	wavesRitem->ObjCBIndex = 0;
-	wavesRitem->Mat = m_Materials["water"].get();
-	wavesRitem->Geo = m_Geometries["waterGeo"].get();
+	wavesRitem->Mat = m_Materials[""].get();
+	wavesRitem->Geo = m_Geometries[""].get();
 	wavesRitem->PrimitiveType = D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
 	wavesRitem->IndexCount = wavesRitem->Geo->DrawArgs["grid"].IndexCount;
 	wavesRitem->StartIndexLocation = wavesRitem->Geo->DrawArgs["grid"].StartIndexLocation;
@@ -821,8 +795,8 @@ void StencilApp::BuildRenderItems()
 	gridRitem->World = MathHelper::Identity4x4();
 	XMStoreFloat4x4(&gridRitem->TexTransform, XMMatrixScaling(5.0f, 5.0f, 1.0f));
 	gridRitem->ObjCBIndex = 1;
-	gridRitem->Mat = m_Materials["grass"].get();
-	gridRitem->Geo = m_Geometries["landGeo"].get();
+	gridRitem->Mat = m_Materials[""].get();
+	gridRitem->Geo = m_Geometries[""].get();
 	gridRitem->PrimitiveType = D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
 	gridRitem->IndexCount = gridRitem->Geo->DrawArgs["grid"].IndexCount;
 	gridRitem->StartIndexLocation = gridRitem->Geo->DrawArgs["grid"].StartIndexLocation;
@@ -834,8 +808,8 @@ void StencilApp::BuildRenderItems()
 	XMStoreFloat4x4(&boxRitem->World, XMMatrixTranslation(3.0f, 2.0f, -9.0f));
 	//XMStoreFloat4x4(&boxRitem->TexTransform, XMMatrixScaling(2.0f, 2.0f, 2.0f));
 	boxRitem->ObjCBIndex = 2;
-	boxRitem->Mat = m_Materials["wirefence"].get();
-	boxRitem->Geo = m_Geometries["boxGeo"].get();
+	boxRitem->Mat = m_Materials[""].get();
+	boxRitem->Geo = m_Geometries[""].get();
 	boxRitem->PrimitiveType = D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
 	boxRitem->IndexCount = boxRitem->Geo->DrawArgs["box"].IndexCount;
 	boxRitem->StartIndexLocation = boxRitem->Geo->DrawArgs["box"].StartIndexLocation;
@@ -939,25 +913,6 @@ std::array<const CD3DX12_STATIC_SAMPLER_DESC, STATICSAMPLERCOUNT> StencilApp::Ge
 			anisotropicWrap ,anisotropicClamp  };
 }
 
-float StencilApp::GetHillsHeight(float x, float z) const
-{
-	return 0.3f * (z * sinf(0.1f * x) + x * cosf(0.1f * z));
-}
-
-XMFLOAT3 StencilApp::GetHillsNormal(float x, float z) const
-{
-	// n = (-df/dx, 1, -df/dz)
-	// f(x,z) = 0.3z * sin(0.1f * x) + x * cos(0.1f * x) 
-	XMFLOAT3 N(
-		-0.03f * z * cosf(0.1f * x) - 0.3f * cosf(0.1f * z),
-		1.0f,
-		-0.3f * sinf(0.1f * x) + 0.03f * x * sinf(0.1f * z));
-
-	XMVECTOR unitNormal = XMVector3Normalize(XMLoadFloat3(&N));
-	XMStoreFloat3(&N, unitNormal);
-	return N;
-}
-
 void StencilApp::LoadTexture(std::string name, std::wstring filename)
 {
 	auto texture = std::make_unique<Texture>();
@@ -967,4 +922,43 @@ void StencilApp::LoadTexture(std::string name, std::wstring filename)
 		texture->m_Filename.c_str(), texture->m_Resource, texture->m_UploadHeap));
 
 	m_Textures[name] = std::move(texture);
+}
+
+void StencilApp::ReadDataFromFile(std::vector<Vertex>& vertices, std::vector<std::uint16_t>& indices)
+{
+	std::ifstream fin(m_VertexFileName);
+
+	if (!fin)
+	{
+		OutputDebugStringA(m_VertexFileName.c_str());
+		OutputDebugStringA(" not found,\n");
+		return;
+	}
+
+	UINT vcount = 0, tcount = 0;
+	float normal = 0.0f;
+	std::string ignore;
+	fin >> ignore >> vcount;
+	fin >> ignore >> tcount;
+	fin >> ignore >> ignore >> ignore >> ignore;
+
+	vertices.resize(vcount);
+	indices.resize(3 * tcount);
+
+	for (UINT i = 0; i < vcount; ++i)
+	{
+		fin >> vertices[i].Pos.x >> vertices[i].Pos.y >> vertices[i].Pos.z;
+		fin >> normal >> normal >> normal;
+	}
+
+	fin >> ignore;
+	fin >> ignore;
+	fin >> ignore;
+
+	for (UINT i = 0; i < tcount; ++i)
+	{
+		fin >> indices[i * 3 + 0] >> indices[i * 3 + 1] >> indices[i * 3 + 2];
+	}
+
+	fin.close();
 }

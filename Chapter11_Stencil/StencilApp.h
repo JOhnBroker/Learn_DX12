@@ -74,17 +74,15 @@ public:
 	void UpdateCamera(const GameTimer& gt);
 	void UpdateObjectCBs(const GameTimer& gt);
 	void AnimateMaterials(const GameTimer& gt);
-	void RotationMaterials(const GameTimer& gt);
 	void UpdateMaterialCBs(const GameTimer& gt);
 	void UpdateMainPassCB(const GameTimer& gt);
-	void UpdateWaves(const GameTimer& gt);
+	void UpdateReflectedPassCB(const GameTimer& gt);
 
 	void BuildRootSignature();
 	void BuildDescriptorHeaps();
 	void BuildShadersAndInputLayout();
-	void BuildLandGeometry();
-	void BuildWavesGeometry();
-	void BuildBoxGeometry();
+	void BuildRoomGeometry();
+	void BuildSkullGeometry();
 	void BuildPSOs();
 	void BuildFrameResources();
 	void BuildMaterials();
@@ -93,10 +91,8 @@ public:
 
 	std::array<const CD3DX12_STATIC_SAMPLER_DESC, STATICSAMPLERCOUNT>GetStaticSamplers();
 
-	float GetHillsHeight(float x, float z)const;
-	XMFLOAT3 GetHillsNormal(float x, float z)const;
-
 	void LoadTexture(std::string name, std::wstring filename);
+	void ReadDataFromFile(std::vector<Vertex>& vertices, std::vector<std::uint16_t>& indices);
 
 private:
 	template<class T>
@@ -118,6 +114,9 @@ private:
 	std::vector<D3D12_INPUT_ELEMENT_DESC> m_InputLayout;
 
 	RenderItem* m_WavesRitem = nullptr;
+	RenderItem* m_SkullRitem = nullptr;
+	RenderItem* m_ReflectedRitem = nullptr;
+	RenderItem* m_ShadowedRitem = nullptr;
 
 	std::vector<std::unique_ptr<RenderItem>> m_AllRitems;
 
@@ -126,6 +125,7 @@ private:
 	std::unique_ptr<Waves> m_Waves;
 
 	PassConstants m_MainPassCB;
+	PassConstants m_ReflectedPassCB;
 
 	XMFLOAT3 m_EyePos = { 0.0f,0.0f,0.0f };
 	XMFLOAT4X4 m_View = MathHelper::Identity4x4();
@@ -140,6 +140,8 @@ private:
 
 	POINT m_LastMousePos;
 	
+	std::string m_VertexFileName = "..\\Models\\skull.txt";
+
 	// ImGui operable item
 	ShowMode m_CurrMode = ShowMode::Fog;
 	XMFLOAT3 m_BoxTexScale = { 1.0f,1.0f,1.0f };
