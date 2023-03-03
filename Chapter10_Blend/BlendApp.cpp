@@ -91,7 +91,8 @@ void BlendApp::Update(const GameTimer& timer)
 		const char* mode_strs[] = {
 			"Wireframe",
 			"NoFog",
-			"Fog"
+			"Fog",
+			"DeepComplex"
 		};
 		if (ImGui::Combo("Mode", &curr_mode_item, mode_strs, ARRAYSIZE(mode_strs)))
 		{
@@ -106,6 +107,10 @@ void BlendApp::Update(const GameTimer& timer)
 			else if (curr_mode_item == 2) 
 			{
 				m_CurrMode = ShowMode::Fog;
+			}
+			else if (curr_mode_item == 3) 
+			{
+				m_CurrMode = ShowMode::DeepComplex;
 			}
 		}
 	}
@@ -197,6 +202,13 @@ void BlendApp::Draw(const GameTimer& timer)
 		m_CommandList->SetPipelineState(m_PSOs["alphaTested"].Get());
 		DrawRenderItems(m_CommandList.Get(), m_RitemLayer[(int)RenderLayer::AlphaTested]);
 		m_CommandList->SetPipelineState(m_PSOs["transparentFog"].Get());
+		DrawRenderItems(m_CommandList.Get(), m_RitemLayer[(int)RenderLayer::Transparent]);
+		break;
+	case ShowMode::DeepComplex:
+		m_CommandList->ClearRenderTargetView(backbufferView, DirectX::Colors::Black, 0, nullptr);
+		m_CommandList->SetPipelineState(m_PSOs["deep"].Get());
+		DrawRenderItems(m_CommandList.Get(), m_RitemLayer[(int)RenderLayer::Opaque]);
+		DrawRenderItems(m_CommandList.Get(), m_RitemLayer[(int)RenderLayer::AlphaTested]);
 		DrawRenderItems(m_CommandList.Get(), m_RitemLayer[(int)RenderLayer::Transparent]);
 		break;
 	}
@@ -669,6 +681,8 @@ void BlendApp::BuildShadersAndInputLayout()
 	m_Shaders["opaquePS"]		= d3dUtil::CompileShader(L"..\\Shader\\Chapter10\\Default.hlsl", nullptr, "PS", "ps_5_1");
 	m_Shaders["fogPS"]			= d3dUtil::CompileShader(L"..\\Shader\\Chapter10\\Default.hlsl", fogDefines, "PS", "ps_5_1");
 	m_Shaders["alphaTestedPS"]	= d3dUtil::CompileShader(L"..\\Shader\\Chapter10\\Default.hlsl", alphaTestDefines, "PS", "ps_5_1");
+	m_Shaders["deepVS"]			= d3dUtil::CompileShader(L"..\\Shader\\Chapter10\\DeepComplexity.hlsl", nullptr, "VS", "vs_5_1");
+	m_Shaders["deepPS"]			= d3dUtil::CompileShader(L"..\\Shader\\Chapter10\\DeepComplexity.hlsl", nullptr, "PS", "ps_5_1");
 
 	m_InputLayout =
 	{
@@ -680,8 +694,8 @@ void BlendApp::BuildShadersAndInputLayout()
 
 void BlendApp::BuildPSOs()
 {
+	// opaque
 	D3D12_GRAPHICS_PIPELINE_STATE_DESC opaquePsoDesc;
-
 	ZeroMemory(&opaquePsoDesc, sizeof(D3D12_GRAPHICS_PIPELINE_STATE_DESC));
 	opaquePsoDesc.InputLayout = { m_InputLayout.data(),(UINT)m_InputLayout.size() };
 	opaquePsoDesc.pRootSignature = m_RootSignature.Get();
@@ -715,7 +729,6 @@ void BlendApp::BuildPSOs()
 
 	// transparent
 	D3D12_GRAPHICS_PIPELINE_STATE_DESC transparentPsoDesc = opaquePsoDesc;
-
 	D3D12_RENDER_TARGET_BLEND_DESC transparencyBlendDesc;
 	transparencyBlendDesc.BlendEnable = true;
 	transparencyBlendDesc.LogicOpEnable = false;
@@ -727,12 +740,11 @@ void BlendApp::BuildPSOs()
 	transparencyBlendDesc.BlendOpAlpha = D3D12_BLEND_OP_ADD;
 	transparencyBlendDesc.LogicOp = D3D12_LOGIC_OP_NOOP;
 	transparencyBlendDesc.RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
-
 	transparentPsoDesc.BlendState.RenderTarget[0] = transparencyBlendDesc;
 	HR(m_pd3dDevice->CreateGraphicsPipelineState(&transparentPsoDesc, IID_PPV_ARGS(&m_PSOs["transparent"])));
 
+	// transparent with fog and alpha test
 	D3D12_GRAPHICS_PIPELINE_STATE_DESC transparentFogPsoDesc = transparentPsoDesc;
-
 	transparentFogPsoDesc.PS =
 	{
 		reinterpret_cast<BYTE*>(m_Shaders["fogPS"]->GetBufferPointer()),
@@ -759,6 +771,34 @@ void BlendApp::BuildPSOs()
 	alphaTestedPsoDesc.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;
 	HR(m_pd3dDevice->CreateGraphicsPipelineState(&alphaTestedPsoDesc, IID_PPV_ARGS(&m_PSOs["alphaTested"])));
 
+	// Deep complexity
+	D3D12_GRAPHICS_PIPELINE_STATE_DESC deepPsoDesc = opaquePsoDesc;
+	D3D12_DEPTH_STENCIL_DESC deepDSS = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
+	deepDSS.DepthEnable = false;
+	D3D12_RENDER_TARGET_BLEND_DESC deepBlendDesc;
+	deepBlendDesc.BlendEnable = true;
+	deepBlendDesc.LogicOpEnable = false;
+	deepBlendDesc.SrcBlend = D3D12_BLEND_ONE;
+	deepBlendDesc.DestBlend = D3D12_BLEND_ONE;
+	deepBlendDesc.BlendOp = D3D12_BLEND_OP_ADD;
+	deepBlendDesc.SrcBlendAlpha = D3D12_BLEND_ONE;
+	deepBlendDesc.DestBlendAlpha = D3D12_BLEND_ZERO;
+	deepBlendDesc.BlendOpAlpha = D3D12_BLEND_OP_ADD;
+	deepBlendDesc.LogicOp = D3D12_LOGIC_OP_NOOP;
+	deepBlendDesc.RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
+	deepPsoDesc.VS =
+	{
+		reinterpret_cast<BYTE*>(m_Shaders["deepVS"]->GetBufferPointer()),
+		m_Shaders["deepVS"]->GetBufferSize()
+	};
+	deepPsoDesc.PS =
+	{
+		reinterpret_cast<BYTE*>(m_Shaders["deepPS"]->GetBufferPointer()),
+		m_Shaders["deepPS"]->GetBufferSize()
+	};
+	deepPsoDesc.BlendState.RenderTarget[0] = deepBlendDesc;
+	deepPsoDesc.DepthStencilState = deepDSS;
+	HR(m_pd3dDevice->CreateGraphicsPipelineState(&deepPsoDesc, IID_PPV_ARGS(&m_PSOs["deep"])));
 }
 
 void BlendApp::BuildFrameResources()

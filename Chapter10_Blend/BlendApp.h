@@ -51,7 +51,7 @@ enum class RenderLayer :int
 class BlendApp : public D3DApp
 {
 public:
-	enum class ShowMode { Wireframe, NoFog, Fog };
+	enum class ShowMode { Wireframe, NoFog, Fog, DeepComplex };
 public:
 	BlendApp(HINSTANCE hInstance);
 	BlendApp(HINSTANCE hInstance, int width, int height);

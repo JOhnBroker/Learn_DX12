@@ -43,15 +43,18 @@ struct RenderItem
 enum class RenderLayer :int
 {
 	Opaque = 0,
+	Mirrors,
+	Reflected,
 	Transparent,
-	AlphaTested,
+	Shadow,
+	ReflectedShadow,
 	Count
 };
 
 class StencilApp : public D3DApp
 {
 public:
-	enum class ShowMode { Wireframe, NoFog, Fog };
+	enum class ShowMode { Wireframe, WithoutStencil, Other };
 public:
 	StencilApp(HINSTANCE hInstance);
 	StencilApp(HINSTANCE hInstance, int width, int height);
@@ -73,6 +76,7 @@ public:
 
 	void UpdateCamera(const GameTimer& gt);
 	void UpdateObjectCBs(const GameTimer& gt);
+	void UpdateSkull(const GameTimer& gt);
 	void AnimateMaterials(const GameTimer& gt);
 	void UpdateMaterialCBs(const GameTimer& gt);
 	void UpdateMainPassCB(const GameTimer& gt);
@@ -113,10 +117,11 @@ private:
 
 	std::vector<D3D12_INPUT_ELEMENT_DESC> m_InputLayout;
 
-	RenderItem* m_WavesRitem = nullptr;
+	RenderItem* m_WallRitem = nullptr;
 	RenderItem* m_SkullRitem = nullptr;
-	RenderItem* m_ReflectedRitem = nullptr;
-	RenderItem* m_ShadowedRitem = nullptr;
+	RenderItem* m_ReflectedSkullRitem = nullptr;
+	RenderItem* m_ReflectedShadowedSkullRitem = nullptr;
+	RenderItem* m_ShadowedSkullRitem = nullptr;
 
 	std::vector<std::unique_ptr<RenderItem>> m_AllRitems;
 
@@ -126,6 +131,8 @@ private:
 
 	PassConstants m_MainPassCB;
 	PassConstants m_ReflectedPassCB;
+
+	XMFLOAT3 m_SkullTranslation = { 0.0f,1.0f,-5.0f };
 
 	XMFLOAT3 m_EyePos = { 0.0f,0.0f,0.0f };
 	XMFLOAT4X4 m_View = MathHelper::Identity4x4();
@@ -143,7 +150,7 @@ private:
 	std::string m_VertexFileName = "..\\Models\\skull.txt";
 
 	// ImGui operable item
-	ShowMode m_CurrMode = ShowMode::Fog;
+	ShowMode m_CurrMode = ShowMode::Other;
 	XMFLOAT3 m_BoxTexScale = { 1.0f,1.0f,1.0f };
 
 };
