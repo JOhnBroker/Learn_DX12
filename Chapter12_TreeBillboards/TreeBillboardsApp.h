@@ -46,6 +46,7 @@ enum class RenderLayer :int
 	Transparent,
 	AlphaTested,
 	AlphaTestedTreeSprites,
+	Exerciese,
 	Count
 };
 
@@ -87,6 +88,8 @@ public:
 	void BuildWavesGeometry();
 	void BuildBoxGeometry();
 	void BuildTreeSpritesGeometry();
+	void BuildRoundWireGeometry();
+	void BuildSphereGeometry();
 	void BuildPSOs();
 	void BuildFrameResources();
 	void BuildMaterials();

@@ -182,7 +182,7 @@ GeometryGenerator::MeshData GeometryGenerator::CreateGeosphere(float radius, uin
     MeshData meshData;
 
     // 确定细分的次数 
-    numSubdivisions = std::min<uint32>(numSubdivisions, 6u);
+    numSubdivisions = std::min<uint32>(numSubdivisions, 0u);
 
     // 通过对正二十面体进行曲面细分 逼近 球体
     const float X = 0.525731f;
