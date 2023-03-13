@@ -46,14 +46,19 @@ enum class RenderLayer :int
 	Transparent,
 	AlphaTested,
 	AlphaTestedTreeSprites,
-	Exerciese,
+	OpaqueVertNormal,
+	OpaquePlanNormal,
+	Cylinder,
+	Sphere,
+	CylinderVertexNormal,
+	SpherePlaneNormal,
 	Count
 };
 
 class TreeBillboardsApp : public D3DApp
 {
 public:
-	enum class ShowMode { TreeSprites ,Cylinder, Sphere, VertexNormal, PlaneNormal };
+	enum class ShowMode { TreeSprites ,Cylinder, Sphere };
 public:
 	TreeBillboardsApp(HINSTANCE hInstance);
 	TreeBillboardsApp(HINSTANCE hInstance, int width, int height);
@@ -147,6 +152,8 @@ private:
 	// ImGui operable item
 	ShowMode m_CurrMode = ShowMode::TreeSprites;
 	XMFLOAT3 m_BoxTexScale = { 1.0f,1.0f,1.0f };
+	bool m_VertexNormalEnable = false;
+	bool m_PlaneNormalEnable = false;
 
 };
 

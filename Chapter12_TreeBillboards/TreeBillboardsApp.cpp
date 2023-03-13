@@ -97,10 +97,10 @@ void TreeBillboardsApp::Update(const GameTimer& timer)
 		const char* mode_strs[] = {
 			"TreeSprites",
 			"Cylinder",
-			"Sphere",
-			"VertexNormal",
-			"PlaneNormal"
+			"Sphere"
 		};
+		ImGui::Checkbox("VertexNormal", &m_VertexNormalEnable);
+		ImGui::Checkbox("PlaneNormal", &m_PlaneNormalEnable);
 		if (ImGui::Combo("Mode", &curr_mode_item, mode_strs, ARRAYSIZE(mode_strs)))
 		{
 			if (curr_mode_item == 0)
@@ -115,15 +115,8 @@ void TreeBillboardsApp::Update(const GameTimer& timer)
 			{
 				m_CurrMode = ShowMode::Sphere;
 			}
-			else if (curr_mode_item == 3) 
-			{
-				m_CurrMode = ShowMode::VertexNormal;
-			}
-			else if (curr_mode_item == 4) 
-			{
-				m_CurrMode = ShowMode::PlaneNormal;
-			}
 		}
+
 	}
 
 	if (ImGui::IsKeyDown(ImGuiKey_LeftArrow))
@@ -197,6 +190,16 @@ void TreeBillboardsApp::Draw(const GameTimer& timer)
 		//TreeSprites ,Cylinder, Sphere, VertexNormal, PlaneNormal
 	case TreeBillboardsApp::ShowMode::TreeSprites:
 		DrawRenderItems(m_CommandList.Get(), m_RitemLayer[(int)RenderLayer::Opaque]);
+		if (m_VertexNormalEnable)
+		{
+			m_CommandList->SetPipelineState(m_PSOs["vertexNormal"].Get());
+			DrawRenderItems(m_CommandList.Get(), m_RitemLayer[(int)RenderLayer::OpaqueVertNormal]);
+		}
+		if (m_PlaneNormalEnable)
+		{
+			m_CommandList->SetPipelineState(m_PSOs["planeNormal"].Get());
+			DrawRenderItems(m_CommandList.Get(), m_RitemLayer[(int)RenderLayer::OpaquePlanNormal]);
+		}
 		m_CommandList->SetPipelineState(m_PSOs["alphaTested"].Get());
 		DrawRenderItems(m_CommandList.Get(), m_RitemLayer[(int)RenderLayer::AlphaTested]);
 		m_CommandList->SetPipelineState(m_PSOs["treeSprites"].Get());
@@ -206,14 +209,21 @@ void TreeBillboardsApp::Draw(const GameTimer& timer)
 		break;
 	case TreeBillboardsApp::ShowMode::Cylinder:
 		m_CommandList->SetPipelineState(m_PSOs["cylinder"].Get());
-		DrawRenderItems(m_CommandList.Get(), m_RitemLayer[(int)RenderLayer::Exerciese]);
+		DrawRenderItems(m_CommandList.Get(), m_RitemLayer[(int)RenderLayer::Cylinder]);
+		if (m_VertexNormalEnable) 
+		{
+			m_CommandList->SetPipelineState(m_PSOs["vertexNormal"].Get());
+			DrawRenderItems(m_CommandList.Get(), m_RitemLayer[(int)RenderLayer::CylinderVertexNormal]);
+		}
 		break;
 	case TreeBillboardsApp::ShowMode::Sphere:
-		break;
-	case ShowMode::VertexNormal:
-		break;
-	case ShowMode::PlaneNormal:
-
+		m_CommandList->SetPipelineState(m_PSOs["sphere"].Get());
+		DrawRenderItems(m_CommandList.Get(), m_RitemLayer[(int)RenderLayer::Sphere]);
+		if (m_PlaneNormalEnable)
+		{
+			m_CommandList->SetPipelineState(m_PSOs["planeNormal"].Get());
+			DrawRenderItems(m_CommandList.Get(), m_RitemLayer[(int)RenderLayer::SpherePlaneNormal]);
+		}
 		break;
 	}
 
@@ -793,7 +803,7 @@ void TreeBillboardsApp::BuildRoundWireGeometry()
 void TreeBillboardsApp::BuildSphereGeometry()
 {
 	GeometryGenerator geoGen;
-	GeometryGenerator::MeshData sphere = geoGen.CreateGeosphere(5.0f, 0);
+	GeometryGenerator::MeshData sphere = geoGen.CreateGeosphere(1.0f, 0);
 
 	std::vector<Vertex> vertices(sphere.Vertices.size());
 	std::vector<std::uint16_t> indices = sphere.GetIndices16();
@@ -833,7 +843,7 @@ void TreeBillboardsApp::BuildSphereGeometry()
 
 	geo->DrawArgs["sphere"] = sphereSubmesh;
 
-	m_Geometries[geo->Name] = std::move(geo);
+	m_Geometries["sphereGeo"] = std::move(geo);
 }
 
 void TreeBillboardsApp::BuildShadersAndInputLayout()
@@ -858,7 +868,9 @@ void TreeBillboardsApp::BuildShadersAndInputLayout()
 	m_Shaders["treeSpriteGS"]	= d3dUtil::CompileShader(L"..\\Shader\\Chapter12\\TreeSprite.hlsl", nullptr, "GS", "gs_5_1");
 	m_Shaders["treeSpritePS"]	= d3dUtil::CompileShader(L"..\\Shader\\Chapter12\\TreeSprite.hlsl", alphaTestDefines, "PS", "ps_5_1");
 	m_Shaders["exerciseVS"]		= d3dUtil::CompileShader(L"..\\Shader\\Chapter12\\Exercise.hlsl", nullptr, "VS", "vs_5_1");
+	m_Shaders["sphereVS"]		= d3dUtil::CompileShader(L"..\\Shader\\Chapter12\\Exercise.hlsl", nullptr, "Sphere_VS", "vs_5_1");
 	m_Shaders["cylinderGS"]		= d3dUtil::CompileShader(L"..\\Shader\\Chapter12\\Exercise.hlsl", nullptr, "Cylinder_GS", "gs_5_1");
+	m_Shaders["sphereGS"]		= d3dUtil::CompileShader(L"..\\Shader\\Chapter12\\Exercise.hlsl", nullptr, "Sphere_GS", "gs_5_1");
 	m_Shaders["vertexNormalGS"] = d3dUtil::CompileShader(L"..\\Shader\\Chapter12\\Exercise.hlsl", nullptr, "VertexNormal_GS", "gs_5_1");
 	m_Shaders["planeNormalGS"]	= d3dUtil::CompileShader(L"..\\Shader\\Chapter12\\Exercise.hlsl", nullptr, "PlaneNormal_GS", "gs_5_1");
 	m_Shaders["exercisePS"]		= d3dUtil::CompileShader(L"..\\Shader\\Chapter12\\Exercise.hlsl", alphaTestDefines, "PS", "ps_5_1");
@@ -983,8 +995,47 @@ void TreeBillboardsApp::BuildPSOs()
 	HR(m_pd3dDevice->CreateGraphicsPipelineState(&cylinderPsoDesc, IID_PPV_ARGS(&m_PSOs["cylinder"])));
 
 	// Sphere
+	D3D12_GRAPHICS_PIPELINE_STATE_DESC spherePsoDesc = cylinderPsoDesc;
+	spherePsoDesc.VS =
+	{
+		reinterpret_cast<BYTE*>(m_Shaders["sphereVS"]->GetBufferPointer()),
+		m_Shaders["sphereVS"]->GetBufferSize()
+	};
+	spherePsoDesc.GS =
+	{
+		reinterpret_cast<BYTE*>(m_Shaders["sphereGS"]->GetBufferPointer()),
+		m_Shaders["sphereGS"]->GetBufferSize()
+	};
+	spherePsoDesc.PS =
+	{
+		reinterpret_cast<BYTE*>(m_Shaders["exercisePS"]->GetBufferPointer()),
+		m_Shaders["exercisePS"]->GetBufferSize()
+	};
+	spherePsoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+	spherePsoDesc.RasterizerState.CullMode = D3D12_CULL_MODE_BACK;
+	HR(m_pd3dDevice->CreateGraphicsPipelineState(&spherePsoDesc, IID_PPV_ARGS(&m_PSOs["sphere"])));
 
-
+	// Vertex normal
+	D3D12_GRAPHICS_PIPELINE_STATE_DESC vertexNormalPsoDesc = spherePsoDesc;
+	vertexNormalPsoDesc.GS =
+	{
+		reinterpret_cast<BYTE*>(m_Shaders["vertexNormalGS"]->GetBufferPointer()),
+		m_Shaders["vertexNormalGS"]->GetBufferSize()
+	};
+	vertexNormalPsoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_POINT;
+	vertexNormalPsoDesc.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;
+	HR(m_pd3dDevice->CreateGraphicsPipelineState(&vertexNormalPsoDesc, IID_PPV_ARGS(&m_PSOs["vertexNormal"])));
+	
+	// Plane normal
+	D3D12_GRAPHICS_PIPELINE_STATE_DESC planeNormalPsoDesc = spherePsoDesc;
+	planeNormalPsoDesc.GS =
+	{
+		reinterpret_cast<BYTE*>(m_Shaders["planeNormalGS"]->GetBufferPointer()),
+		m_Shaders["planeNormalGS"]->GetBufferSize()
+	};
+	planeNormalPsoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+	planeNormalPsoDesc.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;
+	HR(m_pd3dDevice->CreateGraphicsPipelineState(&planeNormalPsoDesc, IID_PPV_ARGS(&m_PSOs["planeNormal"])));
 }
 
 void TreeBillboardsApp::BuildFrameResources()
@@ -1073,11 +1124,25 @@ void TreeBillboardsApp::BuildRenderItems()
 	gridRitem->BaseVertexLocation = gridRitem->Geo->DrawArgs["grid"].BaseVertexLocation;
 
 	m_RitemLayer[(int)RenderLayer::Opaque].push_back(gridRitem.get());
+	m_RitemLayer[(int)RenderLayer::OpaquePlanNormal].push_back(gridRitem.get());
+
+	auto gridNormalRitem = std::make_unique<RenderItem>();
+	gridNormalRitem->World = MathHelper::Identity4x4();
+	XMStoreFloat4x4(&gridNormalRitem->TexTransform, XMMatrixScaling(5.0f, 5.0f, 1.0f));
+	gridNormalRitem->ObjCBIndex = 2;
+	gridNormalRitem->Mat = m_Materials["grass"].get();
+	gridNormalRitem->Geo = m_Geometries["landGeo"].get();
+	gridNormalRitem->PrimitiveType = D3D11_PRIMITIVE_TOPOLOGY_POINTLIST;
+	gridNormalRitem->IndexCount = gridNormalRitem->Geo->DrawArgs["grid"].IndexCount;
+	gridNormalRitem->StartIndexLocation = gridNormalRitem->Geo->DrawArgs["grid"].StartIndexLocation;
+	gridNormalRitem->BaseVertexLocation = gridNormalRitem->Geo->DrawArgs["grid"].BaseVertexLocation;
+
+	m_RitemLayer[(int)RenderLayer::OpaqueVertNormal].push_back(gridNormalRitem.get());
 
 	auto boxRitem = std::make_unique<RenderItem>();
 	XMStoreFloat4x4(&boxRitem->World, XMMatrixTranslation(3.0f, 2.0f, -9.0f));
 	//XMStoreFloat4x4(&boxRitem->TexTransform, XMMatrixScaling(2.0f, 2.0f, 2.0f));
-	boxRitem->ObjCBIndex = 2;
+	boxRitem->ObjCBIndex = 3;
 	boxRitem->Mat = m_Materials["wirefence"].get();
 	boxRitem->Geo = m_Geometries["boxGeo"].get();
 	boxRitem->PrimitiveType = D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
@@ -1086,9 +1151,10 @@ void TreeBillboardsApp::BuildRenderItems()
 	boxRitem->BaseVertexLocation = boxRitem->Geo->DrawArgs["box"].BaseVertexLocation;
 
 	m_RitemLayer[(int)RenderLayer::AlphaTested].push_back(boxRitem.get());
+	m_RitemLayer[(int)RenderLayer::OpaquePlanNormal].push_back(boxRitem.get());
 
 	auto treeSpritesRitem = std::make_unique<RenderItem>();
-	treeSpritesRitem->ObjCBIndex = 3;
+	treeSpritesRitem->ObjCBIndex = 4;
 	treeSpritesRitem->Mat = m_Materials["treeSprites"].get();
 	treeSpritesRitem->Geo = m_Geometries["trees"].get();
 	treeSpritesRitem->PrimitiveType = D3D11_PRIMITIVE_TOPOLOGY_POINTLIST;
@@ -1100,23 +1166,60 @@ void TreeBillboardsApp::BuildRenderItems()
 	
 	// Cylinder
 	auto cylinderRitem = std::make_unique<RenderItem>();
-	cylinderRitem->ObjCBIndex = 4;
+	cylinderRitem->ObjCBIndex = 5;
 	cylinderRitem->Mat = m_Materials["exercise"].get();
 	cylinderRitem->Geo = m_Geometries["roundWire"].get();
-	cylinderRitem->PrimitiveType = D3D11_PRIMITIVE_TOPOLOGY_LINELIST;
+	cylinderRitem->PrimitiveType = D3D11_PRIMITIVE_TOPOLOGY_LINESTRIP;
 	cylinderRitem->IndexCount = cylinderRitem->Geo->DrawArgs["line"].IndexCount;
 	cylinderRitem->StartIndexLocation = cylinderRitem->Geo->DrawArgs["line"].StartIndexLocation;
 	cylinderRitem->BaseVertexLocation = cylinderRitem->Geo->DrawArgs["line"].BaseVertexLocation;
 
-	m_RitemLayer[(int)RenderLayer::Exerciese].push_back(cylinderRitem.get());
+	m_RitemLayer[(int)RenderLayer::Cylinder].push_back(cylinderRitem.get());
+	
+	auto cylinderNormalRitem = std::make_unique<RenderItem>();
+	cylinderNormalRitem->ObjCBIndex = 6;
+	cylinderNormalRitem->Mat = m_Materials["exercise"].get();
+	cylinderNormalRitem->Geo = m_Geometries["roundWire"].get();
+	cylinderNormalRitem->PrimitiveType = D3D11_PRIMITIVE_TOPOLOGY_POINTLIST;
+	cylinderNormalRitem->IndexCount = cylinderNormalRitem->Geo->DrawArgs["line"].IndexCount;
+	cylinderNormalRitem->StartIndexLocation = cylinderNormalRitem->Geo->DrawArgs["line"].StartIndexLocation;
+	cylinderNormalRitem->BaseVertexLocation = cylinderNormalRitem->Geo->DrawArgs["line"].BaseVertexLocation;
+
+	m_RitemLayer[(int)RenderLayer::CylinderVertexNormal].push_back(cylinderNormalRitem.get());
 	
 	// Sphere
+	auto sphereRitem = std::make_unique<RenderItem>();
+	sphereRitem->ObjCBIndex = 7;
+	sphereRitem->Mat = m_Materials["exercise"].get();
+	sphereRitem->Geo = m_Geometries["sphereGeo"].get();
+	sphereRitem->PrimitiveType = D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+	sphereRitem->IndexCount = sphereRitem->Geo->DrawArgs["sphere"].IndexCount;
+	sphereRitem->StartIndexLocation = sphereRitem->Geo->DrawArgs["sphere"].StartIndexLocation;
+	sphereRitem->BaseVertexLocation = sphereRitem->Geo->DrawArgs["sphere"].BaseVertexLocation;
+
+	m_RitemLayer[(int)RenderLayer::Sphere].push_back(sphereRitem.get());
+	m_RitemLayer[(int)RenderLayer::SpherePlaneNormal].push_back(sphereRitem.get());
+
+	auto sphereNorRitem = std::make_unique<RenderItem>();
+	sphereNorRitem->ObjCBIndex = 8;
+	sphereNorRitem->Mat = m_Materials["exercise"].get();
+	sphereNorRitem->Geo = m_Geometries["sphereGeo"].get();
+	sphereNorRitem->PrimitiveType = D3D11_PRIMITIVE_TOPOLOGY_POINTLIST;
+	sphereNorRitem->IndexCount = sphereNorRitem->Geo->DrawArgs["sphere"].IndexCount;
+	sphereNorRitem->StartIndexLocation = sphereNorRitem->Geo->DrawArgs["sphere"].StartIndexLocation;
+	sphereNorRitem->BaseVertexLocation = sphereNorRitem->Geo->DrawArgs["sphere"].BaseVertexLocation;
+
 
 	m_AllRitems.push_back(std::move(wavesRitem));
 	m_AllRitems.push_back(std::move(gridRitem));
+	m_AllRitems.push_back(std::move(gridNormalRitem));
 	m_AllRitems.push_back(std::move(boxRitem));
 	m_AllRitems.push_back(std::move(treeSpritesRitem));
 	m_AllRitems.push_back(std::move(cylinderRitem));
+	m_AllRitems.push_back(std::move(cylinderNormalRitem));
+	m_AllRitems.push_back(std::move(sphereRitem));
+	m_AllRitems.push_back(std::move(sphereNorRitem));
+
 }
 
 void TreeBillboardsApp::DrawRenderItems(ID3D12GraphicsCommandList* cmdList, const std::vector<RenderItem*>& ritems)

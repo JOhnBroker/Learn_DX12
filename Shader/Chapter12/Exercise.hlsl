@@ -95,6 +95,17 @@ VertexPosHWNormalTex VS(VertexIn vin)
 	return vout;
 }
 
+VertexIn Sphere_VS(VertexIn vin)
+{
+    VertexIn vout;
+    
+    vout.PosL = vin.PosL;
+    vout.NormalL = vin.NormalL;
+    vout.TexC = vin.TexC;
+    
+    return vout;
+}
+
 [maxvertexcount(6)]
 void Cylinder_GS(line VertexPosHWNormalTex gin[2],
 	inout TriangleStream<VertexPosHWNormalTex> triStream)
@@ -133,21 +144,144 @@ void Cylinder_GS(line VertexPosHWNormalTex gin[2],
     triStream.RestartStrip();    
 }
 
-[maxvertexcount(2)]
-void VertexNormal_GS(point VertexPosHWNormalTex gin[1],
+void Subdivide(VertexIn inVerts[3], out VertexPosHWNormalTex outVerts[6])
+{
+     //       v1
+    //       *
+    //      / \
+	//     /   \
+	//  m0*-----*m1
+    //   / \   / \
+	//  /   \ /   \
+	// *-----*-----*
+    // v0    m2     v2
+    
+    VertexPosHWNormalTex m[3];
+
+    float4 posW0 = mul(float4((0.5f * (inVerts[0].PosL + inVerts[1].PosL)), 1.0f), gWorld);
+    float4 posW1 = mul(float4((0.5f * (inVerts[1].PosL + inVerts[2].PosL)), 1.0f), gWorld);
+    float4 posW2 = mul(float4((0.5f * (inVerts[0].PosL + inVerts[2].PosL)), 1.0f), gWorld);
+    
+    m[0].PosW = normalize(posW0.xyz);
+    m[1].PosW = normalize(posW1.xyz);
+    m[2].PosW = normalize(posW2.xyz);
+    m[0].PosH = mul(float4(m[0].PosW, 1.0f), gViewProj);
+    m[1].PosH = mul(float4(m[1].PosW, 1.0f), gViewProj);
+    m[2].PosH = mul(float4(m[2].PosW, 1.0f), gViewProj);
+    
+    m[0].NormalW = normalize(mul(0.5f * (inVerts[0].NormalL + inVerts[1].NormalL), (float3x3) gWorld));
+    m[1].NormalW = normalize(mul(0.5f * (inVerts[1].NormalL + inVerts[2].NormalL), (float3x3) gWorld));
+    m[2].NormalW = normalize(mul(0.5f * (inVerts[0].NormalL + inVerts[2].NormalL), (float3x3) gWorld));
+
+    float4 texC0 = mul(float4(0.5f * (inVerts[0].TexC + inVerts[1].TexC), 0.0f, 1.0f), gTexTransform);
+    float4 texC1 = mul(float4(0.5f * (inVerts[1].TexC + inVerts[2].TexC), 0.0f, 1.0f), gTexTransform);
+    float4 texC2 = mul(float4(0.5f * (inVerts[0].TexC + inVerts[2].TexC), 0.0f, 1.0f), gTexTransform);
+    m[0].TexC = mul(texC0, gMatTransform).xy;
+    m[1].TexC = mul(texC1, gMatTransform).xy;
+    m[2].TexC = mul(texC2, gMatTransform).xy;
+    
+    VertexPosHWNormalTex v[3];
+    [unroll]
+    for (int i = 0; i < 3; ++i)
+    {
+        float4 posW = mul(float4(inVerts[i].PosL, 1.0f), gWorld);
+        v[i].PosW = posW.xyz;
+        v[i].PosH = mul(posW, gViewProj);
+	
+        float4 texC = mul(float4(inVerts[i].TexC, 0.0f, 1.0f), gTexTransform);
+        v[i].TexC = mul(texC, gMatTransform).xy;
+	
+        v[i].NormalW = mul(inVerts[i].NormalL, (float3x3) gWorld);
+    }
+    
+    outVerts[0] = v[0];
+    outVerts[1] = m[0];
+    outVerts[2] = m[2];
+    outVerts[3] = m[1];
+    outVerts[4] = v[2];
+    outVerts[5] = v[1];
+    
+}
+
+[maxvertexcount(12)]
+void Sphere_GS(triangle VertexIn gin[3],
 	inout TriangleStream<VertexPosHWNormalTex> triStream)
 {
+    VertexPosHWNormalTex v[6];
+    Subdivide(gin, v);
+    
+    float3 toEyeW = gEyePosW - v[0].PosW;
+    float distToEye = length(toEyeW);
+    
+    if (distToEye < 15.0f)
+    {
+        triStream.Append(v[0]);
+        triStream.Append(v[1]);
+        triStream.Append(v[2]);
+        triStream.Append(v[3]);
+        triStream.Append(v[4]);
+        triStream.RestartStrip();
+    
+        triStream.Append(v[1]);
+        triStream.Append(v[5]);
+        triStream.Append(v[3]);
+        
+    }
+    if(distToEye >= 15.0f)
+    {
+        triStream.Append(v[0]);
+        triStream.Append(v[5]);
+        triStream.Append(v[4]);
+    }
+    
+}
 
+[maxvertexcount(2)]
+void VertexNormal_GS(point VertexIn gin[1],
+	inout LineStream<VertexPosHWNormalTex> triStream)
+{
+    VertexPosHWNormalTex v[2];
+    
+    float4 posW = mul(float4(gin[0].PosL, 1.0f), gWorld);
+    v[0].PosW = posW.xyz;
+    v[0].NormalW = mul(gin[0].NormalL, (float3x3) gWorld);
+    v[1].PosW = posW.xyz + v[0].NormalW * 1.0f;
+    v[1].NormalW = v[0].NormalW;
+    
+    [unroll]
+    for (int i = 0; i < 2; ++i)
+    {
+        float4 texC = mul(float4(gin[0].TexC, 0.0f, 1.0f), gTexTransform);
+        v[i].TexC = mul(texC, gMatTransform).xy;
+        v[i].PosH = mul(float4(v[i].PosW, 1.0f), gViewProj);
+        triStream.Append(v[i]);
+    }
+    triStream.RestartStrip();
 }
 
 
 [maxvertexcount(2)]
-void PlaneNormal_GS(point VertexPosHWNormalTex gin[1],
-	inout TriangleStream<VertexPosHWNormalTex> triStream)
+void PlaneNormal_GS(triangle VertexIn gin[3],
+	inout LineStream<VertexPosHWNormalTex> triStream)
 {
-
+    VertexPosHWNormalTex v[2];
+    
+    float4 posW = mul(float4((gin[0].PosL + gin[1].PosL + gin[2].PosL) * 0.33f, 1.0f), gWorld);
+    v[0].PosW = posW.xyz;
+    v[0].NormalW = mul(gin[0].NormalL + gin[1].NormalL + gin[2].NormalL, (float3x3) gWorld);
+    v[1].PosW = posW.xyz + v[0].NormalW * 1.0f;
+    v[1].NormalW = v[0].NormalW;
+    
+    [unroll]
+    for (int i = 0; i < 2; ++i)
+    {
+        float4 texC = mul(float4(gin[0].TexC, 0.0f, 1.0f), gTexTransform);
+        v[i].TexC = mul(texC, gMatTransform).xy;
+        v[i].PosH = mul(float4(v[i].PosW, 1.0f), gViewProj);
+        triStream.Append(v[i]);
+    }
+    triStream.RestartStrip();
 }
-
 
 float4 PS(VertexPosHWNormalTex pin) : SV_Target
 {
