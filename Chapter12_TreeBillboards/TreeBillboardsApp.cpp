@@ -101,6 +101,7 @@ void TreeBillboardsApp::Update(const GameTimer& timer)
 		};
 		ImGui::Checkbox("VertexNormal", &m_VertexNormalEnable);
 		ImGui::Checkbox("PlaneNormal", &m_PlaneNormalEnable);
+		ImGui::Checkbox("MSAA enable", &m_4xMsaaState);
 		if (ImGui::Combo("Mode", &curr_mode_item, mode_strs, ARRAYSIZE(mode_strs)))
 		{
 			if (curr_mode_item == 0)
@@ -166,29 +167,22 @@ void TreeBillboardsApp::Draw(const GameTimer& timer)
 	m_CommandList->RSSetViewports(1, &m_ScreenViewPort);
 	m_CommandList->RSSetScissorRects(1, &m_ScissorRect);
 
-	present2render = CD3DX12_RESOURCE_BARRIER::Transition(CurrentBackBuffer(),
-		D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
-	m_CommandList->ResourceBarrier(1, &present2render);
-
-	backbufferView = CurrentBackBufferView();
-	depthbufferView = DepthStencilView();
-	m_CommandList->ClearRenderTargetView(backbufferView, (float*)&m_MainPassCB.FogColor, 0, nullptr);
-	m_CommandList->ClearDepthStencilView(depthbufferView, D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, 1.0f, 0, 0, nullptr);
-
-	m_CommandList->OMSetRenderTargets(1, &backbufferView, true, &depthbufferView);
-
-	ID3D12DescriptorHeap* descriptorHeaps[] = { m_SrvDescriptorHeap.Get() };
-	m_CommandList->SetDescriptorHeaps(_countof(descriptorHeaps), descriptorHeaps);
-
-	m_CommandList->SetGraphicsRootSignature(m_RootSignature.Get());
-
-	auto passCB = m_CurrFrameResource->PassCB->Resource();
-	m_CommandList->SetGraphicsRootConstantBufferView(3, passCB->GetGPUVirtualAddress());
-
-	switch (m_CurrMode)
+	if (m_4xMsaaState && m_CurrMode == ShowMode::TreeSprites)
 	{
-		//TreeSprites ,Cylinder, Sphere, VertexNormal, PlaneNormal
-	case TreeBillboardsApp::ShowMode::TreeSprites:
+		m_CommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_MsaaRenderTarget.Get(),
+			D3D12_RESOURCE_STATE_RESOLVE_SOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET));
+
+		auto rtvDescriptor = m_MsaaRTVHeap->GetCPUDescriptorHandleForHeapStart();
+		auto dsvDescriptor = m_MsaaDSVHeap->GetCPUDescriptorHandleForHeapStart();
+		m_CommandList->OMSetRenderTargets(1, &rtvDescriptor, FALSE, &dsvDescriptor);
+		m_CommandList->ClearRenderTargetView(rtvDescriptor, (float*)&m_MainPassCB.FogColor, 0, nullptr);
+		m_CommandList->ClearDepthStencilView(dsvDescriptor, D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, 1.0f, 0, 0, nullptr);
+
+		m_CommandList->SetGraphicsRootSignature(m_RootSignature.Get());
+		auto passCB = m_CurrFrameResource->PassCB->Resource();
+		m_CommandList->SetGraphicsRootConstantBufferView(3, passCB->GetGPUVirtualAddress());
+
+		// draw
 		DrawRenderItems(m_CommandList.Get(), m_RitemLayer[(int)RenderLayer::Opaque]);
 		if (m_VertexNormalEnable)
 		{
@@ -202,29 +196,88 @@ void TreeBillboardsApp::Draw(const GameTimer& timer)
 		}
 		m_CommandList->SetPipelineState(m_PSOs["alphaTested"].Get());
 		DrawRenderItems(m_CommandList.Get(), m_RitemLayer[(int)RenderLayer::AlphaTested]);
-		m_CommandList->SetPipelineState(m_PSOs["treeSprites"].Get());
+		m_CommandList->SetPipelineState(m_PSOs["treeSprites_4x"].Get());
 		DrawRenderItems(m_CommandList.Get(), m_RitemLayer[(int)RenderLayer::AlphaTestedTreeSprites]);
 		m_CommandList->SetPipelineState(m_PSOs["transparent"].Get());
 		DrawRenderItems(m_CommandList.Get(), m_RitemLayer[(int)RenderLayer::Transparent]);
-		break;
-	case TreeBillboardsApp::ShowMode::Cylinder:
-		m_CommandList->SetPipelineState(m_PSOs["cylinder"].Get());
-		DrawRenderItems(m_CommandList.Get(), m_RitemLayer[(int)RenderLayer::Cylinder]);
-		if (m_VertexNormalEnable) 
+
+		// 将render target 解析到交换链的后台缓冲区
+		D3D12_RESOURCE_BARRIER barriers[2] =
 		{
-			m_CommandList->SetPipelineState(m_PSOs["vertexNormal"].Get());
-			DrawRenderItems(m_CommandList.Get(), m_RitemLayer[(int)RenderLayer::CylinderVertexNormal]);
-		}
-		break;
-	case TreeBillboardsApp::ShowMode::Sphere:
-		m_CommandList->SetPipelineState(m_PSOs["sphere"].Get());
-		DrawRenderItems(m_CommandList.Get(), m_RitemLayer[(int)RenderLayer::Sphere]);
-		if (m_PlaneNormalEnable)
+			CD3DX12_RESOURCE_BARRIER::Transition(m_MsaaRenderTarget.Get(),
+			D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_RESOLVE_SOURCE),
+			CD3DX12_RESOURCE_BARRIER::Transition(CurrentBackBuffer(),
+			D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RESOLVE_DEST)
+		};
+		m_CommandList->ResourceBarrier(2, barriers);
+
+		m_CommandList->ResolveSubresource(CurrentBackBuffer(), 0, m_MsaaRenderTarget.Get(), 0, m_BackBufferFormat);
+
+		m_CommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(CurrentBackBuffer(),
+			D3D12_RESOURCE_STATE_RESOLVE_DEST, D3D12_RESOURCE_STATE_PRESENT));
+	}
+	else 
+	{
+		present2render = CD3DX12_RESOURCE_BARRIER::Transition(CurrentBackBuffer(),
+			D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
+		m_CommandList->ResourceBarrier(1, &present2render);
+
+		backbufferView = CurrentBackBufferView();
+		depthbufferView = DepthStencilView();
+		m_CommandList->ClearRenderTargetView(backbufferView, (float*)&m_MainPassCB.FogColor, 0, nullptr);
+		m_CommandList->ClearDepthStencilView(depthbufferView, D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, 1.0f, 0, 0, nullptr);
+
+		m_CommandList->OMSetRenderTargets(1, &backbufferView, true, &depthbufferView);
+
+		ID3D12DescriptorHeap* descriptorHeaps[] = { m_SrvDescriptorHeap.Get() };
+		m_CommandList->SetDescriptorHeaps(_countof(descriptorHeaps), descriptorHeaps);
+
+		m_CommandList->SetGraphicsRootSignature(m_RootSignature.Get());
+
+		auto passCB = m_CurrFrameResource->PassCB->Resource();
+		m_CommandList->SetGraphicsRootConstantBufferView(3, passCB->GetGPUVirtualAddress());
+
+		switch (m_CurrMode)
 		{
-			m_CommandList->SetPipelineState(m_PSOs["planeNormal"].Get());
-			DrawRenderItems(m_CommandList.Get(), m_RitemLayer[(int)RenderLayer::SpherePlaneNormal]);
+			//TreeSprites ,Cylinder, Sphere, VertexNormal, PlaneNormal
+		case TreeBillboardsApp::ShowMode::TreeSprites:
+			DrawRenderItems(m_CommandList.Get(), m_RitemLayer[(int)RenderLayer::Opaque]);
+			if (m_VertexNormalEnable)
+			{
+				m_CommandList->SetPipelineState(m_PSOs["vertexNormal"].Get());
+				DrawRenderItems(m_CommandList.Get(), m_RitemLayer[(int)RenderLayer::OpaqueVertNormal]);
+			}
+			if (m_PlaneNormalEnable)
+			{
+				m_CommandList->SetPipelineState(m_PSOs["planeNormal"].Get());
+				DrawRenderItems(m_CommandList.Get(), m_RitemLayer[(int)RenderLayer::OpaquePlanNormal]);
+			}
+			m_CommandList->SetPipelineState(m_PSOs["alphaTested"].Get());
+			DrawRenderItems(m_CommandList.Get(), m_RitemLayer[(int)RenderLayer::AlphaTested]);
+			m_CommandList->SetPipelineState(m_PSOs["treeSprites"].Get());
+			DrawRenderItems(m_CommandList.Get(), m_RitemLayer[(int)RenderLayer::AlphaTestedTreeSprites]);
+			m_CommandList->SetPipelineState(m_PSOs["transparent"].Get());
+			DrawRenderItems(m_CommandList.Get(), m_RitemLayer[(int)RenderLayer::Transparent]);
+			break;
+		case TreeBillboardsApp::ShowMode::Cylinder:
+			m_CommandList->SetPipelineState(m_PSOs["cylinder"].Get());
+			DrawRenderItems(m_CommandList.Get(), m_RitemLayer[(int)RenderLayer::Cylinder]);
+			if (m_VertexNormalEnable)
+			{
+				m_CommandList->SetPipelineState(m_PSOs["vertexNormal"].Get());
+				DrawRenderItems(m_CommandList.Get(), m_RitemLayer[(int)RenderLayer::CylinderVertexNormal]);
+			}
+			break;
+		case TreeBillboardsApp::ShowMode::Sphere:
+			m_CommandList->SetPipelineState(m_PSOs["sphere"].Get());
+			DrawRenderItems(m_CommandList.Get(), m_RitemLayer[(int)RenderLayer::Sphere]);
+			if (m_PlaneNormalEnable)
+			{
+				m_CommandList->SetPipelineState(m_PSOs["planeNormal"].Get());
+				DrawRenderItems(m_CommandList.Get(), m_RitemLayer[(int)RenderLayer::SpherePlaneNormal]);
+			}
+			break;
 		}
-		break;
 	}
 
 	m_CommandList->SetDescriptorHeaps(1, m_SRVHeap.GetAddressOf());
@@ -970,7 +1023,9 @@ void TreeBillboardsApp::BuildPSOs()
 	treeSpritePsoDesc.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;
 	HR(m_pd3dDevice->CreateGraphicsPipelineState(&treeSpritePsoDesc, IID_PPV_ARGS(&m_PSOs["treeSprites"])));
 
-	//TODO
+	D3D12_GRAPHICS_PIPELINE_STATE_DESC treeSprite4xPsoDesc = treeSpritePsoDesc;
+	treeSprite4xPsoDesc.SampleDesc.Count = 4;
+	HR(m_pd3dDevice->CreateGraphicsPipelineState(&treeSprite4xPsoDesc, IID_PPV_ARGS(&m_PSOs["treeSprites_4x"])));
 
 	// Cylinder
 	D3D12_GRAPHICS_PIPELINE_STATE_DESC cylinderPsoDesc = opaquePsoDesc;
