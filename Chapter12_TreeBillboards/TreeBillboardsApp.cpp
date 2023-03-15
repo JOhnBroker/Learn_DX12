@@ -178,27 +178,21 @@ void TreeBillboardsApp::Draw(const GameTimer& timer)
 		m_CommandList->ClearRenderTargetView(rtvDescriptor, (float*)&m_MainPassCB.FogColor, 0, nullptr);
 		m_CommandList->ClearDepthStencilView(dsvDescriptor, D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, 1.0f, 0, 0, nullptr);
 
+		ID3D12DescriptorHeap* descriptorHeaps[] = { m_SrvDescriptorHeap.Get() };
+		m_CommandList->SetDescriptorHeaps(_countof(descriptorHeaps), descriptorHeaps);
+
 		m_CommandList->SetGraphicsRootSignature(m_RootSignature.Get());
 		auto passCB = m_CurrFrameResource->PassCB->Resource();
 		m_CommandList->SetGraphicsRootConstantBufferView(3, passCB->GetGPUVirtualAddress());
 
 		// draw
+		m_CommandList->SetPipelineState(m_PSOs["opaque_4x"].Get());
 		DrawRenderItems(m_CommandList.Get(), m_RitemLayer[(int)RenderLayer::Opaque]);
-		if (m_VertexNormalEnable)
-		{
-			m_CommandList->SetPipelineState(m_PSOs["vertexNormal"].Get());
-			DrawRenderItems(m_CommandList.Get(), m_RitemLayer[(int)RenderLayer::OpaqueVertNormal]);
-		}
-		if (m_PlaneNormalEnable)
-		{
-			m_CommandList->SetPipelineState(m_PSOs["planeNormal"].Get());
-			DrawRenderItems(m_CommandList.Get(), m_RitemLayer[(int)RenderLayer::OpaquePlanNormal]);
-		}
-		m_CommandList->SetPipelineState(m_PSOs["alphaTested"].Get());
+		m_CommandList->SetPipelineState(m_PSOs["alphaTested_4x"].Get());
 		DrawRenderItems(m_CommandList.Get(), m_RitemLayer[(int)RenderLayer::AlphaTested]);
 		m_CommandList->SetPipelineState(m_PSOs["treeSprites_4x"].Get());
 		DrawRenderItems(m_CommandList.Get(), m_RitemLayer[(int)RenderLayer::AlphaTestedTreeSprites]);
-		m_CommandList->SetPipelineState(m_PSOs["transparent"].Get());
+		m_CommandList->SetPipelineState(m_PSOs["transparent_4x"].Get());
 		DrawRenderItems(m_CommandList.Get(), m_RitemLayer[(int)RenderLayer::Transparent]);
 
 		// 将render target 解析到交换链的后台缓冲区
@@ -278,14 +272,13 @@ void TreeBillboardsApp::Draw(const GameTimer& timer)
 			}
 			break;
 		}
+		m_CommandList->SetDescriptorHeaps(1, m_SRVHeap.GetAddressOf());
+		ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), m_CommandList.Get());
+
+		render2present = CD3DX12_RESOURCE_BARRIER::Transition(CurrentBackBuffer(),
+			D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT);
+		m_CommandList->ResourceBarrier(1, &render2present);
 	}
-
-	m_CommandList->SetDescriptorHeaps(1, m_SRVHeap.GetAddressOf());
-	ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), m_CommandList.Get());
-
-	render2present = CD3DX12_RESOURCE_BARRIER::Transition(CurrentBackBuffer(),
-		D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT);
-	m_CommandList->ResourceBarrier(1, &render2present);
 
 	HR(m_CommandList->Close());
 	
@@ -972,6 +965,10 @@ void TreeBillboardsApp::BuildPSOs()
 	opaquePsoDesc.DSVFormat = m_DepthStencilFormat;
 	HR(m_pd3dDevice->CreateGraphicsPipelineState(&opaquePsoDesc, IID_PPV_ARGS(&m_PSOs["opaque"])));
 
+	D3D12_GRAPHICS_PIPELINE_STATE_DESC opaque4xPsoDesc = opaquePsoDesc;
+	opaque4xPsoDesc.SampleDesc.Count = 4;
+	HR(m_pd3dDevice->CreateGraphicsPipelineState(&opaque4xPsoDesc, IID_PPV_ARGS(&m_PSOs["opaque_4x"])));
+
 	// transparent
 	D3D12_GRAPHICS_PIPELINE_STATE_DESC transparentPsoDesc = opaquePsoDesc;
 	D3D12_RENDER_TARGET_BLEND_DESC transparencyBlendDesc;
@@ -988,6 +985,10 @@ void TreeBillboardsApp::BuildPSOs()
 	transparentPsoDesc.BlendState.RenderTarget[0] = transparencyBlendDesc;
 	HR(m_pd3dDevice->CreateGraphicsPipelineState(&transparentPsoDesc, IID_PPV_ARGS(&m_PSOs["transparent"])));
 
+	D3D12_GRAPHICS_PIPELINE_STATE_DESC transparent4xPsoDesc = transparentPsoDesc;
+	transparent4xPsoDesc.SampleDesc.Count = 4;
+	HR(m_pd3dDevice->CreateGraphicsPipelineState(&transparent4xPsoDesc, IID_PPV_ARGS(&m_PSOs["transparent_4x"])));
+
 	// alpha test
 	D3D12_GRAPHICS_PIPELINE_STATE_DESC alphaTestedPsoDesc = opaquePsoDesc;
 	alphaTestedPsoDesc.PS =
@@ -997,6 +998,10 @@ void TreeBillboardsApp::BuildPSOs()
 	};
 	alphaTestedPsoDesc.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;
 	HR(m_pd3dDevice->CreateGraphicsPipelineState(&alphaTestedPsoDesc, IID_PPV_ARGS(&m_PSOs["alphaTested"])));
+
+	D3D12_GRAPHICS_PIPELINE_STATE_DESC alphaTested4xPsoDesc = alphaTestedPsoDesc;
+	alphaTested4xPsoDesc.SampleDesc.Count = 4;
+	HR(m_pd3dDevice->CreateGraphicsPipelineState(&alphaTested4xPsoDesc, IID_PPV_ARGS(&m_PSOs["alphaTested_4x"])));
 
 	// tree sprite
 	D3D12_GRAPHICS_PIPELINE_STATE_DESC treeSpritePsoDesc = opaquePsoDesc;

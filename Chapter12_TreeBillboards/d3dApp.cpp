@@ -570,7 +570,8 @@ void D3DApp::CreateMsaaResource()
 
 	D3D12_CLEAR_VALUE msaaOptimizedClearValue = {};
 	msaaOptimizedClearValue.Format = m_BackBufferFormat;
-	memcpy(msaaOptimizedClearValue.Color, DirectX::Colors::LightBlue, sizeof(float) * 4);
+	float fogColor[4] = { 0.7f,0.7f,0.7f,1.0f };
+	memcpy(msaaOptimizedClearValue.Color, fogColor, sizeof(float) * 4);
 
 	HR(m_pd3dDevice->CreateCommittedResource(
 		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),

@@ -62,7 +62,7 @@ private:
 
 	std::vector<D3D12_INPUT_ELEMENT_DESC> m_InputLayout;
 
-	ComPtr<ID3D12PipelineState> m_PSO = nullptr;
+	std::unordered_map<std::string, ComPtr<ID3D12PipelineState>> m_PSOs;
 
 	XMFLOAT4X4 m_World = MathHelper::Identity4x4();
 	XMFLOAT4X4 m_View = MathHelper::Identity4x4();

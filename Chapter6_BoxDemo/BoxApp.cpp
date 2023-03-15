@@ -125,7 +125,7 @@ void BoxApp::Draw(const GameTimer& timer)
 	// Reuse memory
 	HR(m_DirectCmdListAlloc->Reset());
 
-	HR(m_CommandList->Reset(m_DirectCmdListAlloc.Get(), m_PSO.Get()));
+	HR(m_CommandList->Reset(m_DirectCmdListAlloc.Get(), m_PSOs["opaque"].Get()));
 
 	D3D12_CPU_DESCRIPTOR_HANDLE currentBackBufferView = CurrentBackBufferView();
 	D3D12_CPU_DESCRIPTOR_HANDLE currentDSBufferView = DepthStencilView();
@@ -147,6 +147,15 @@ void BoxApp::Draw(const GameTimer& timer)
 	m_CommandList->SetDescriptorHeaps(_countof(descriptorHeaps), descriptorHeaps);
 
 	m_CommandList->SetGraphicsRootSignature(m_RootSignature.Get());
+
+	if (m_LineMode) 
+	{
+		m_CommandList->SetPipelineState(m_PSOs["opaque_wire"].Get());
+	}
+	else if (m_FrontMode) 
+	{
+		m_CommandList->SetPipelineState(m_PSOs["opaque_front"].Get());
+	}
 
 	D3D12_VERTEX_BUFFER_VIEW vertexBufferView;
 	D3D12_INDEX_BUFFER_VIEW indexBufferView;
@@ -436,10 +445,6 @@ void BoxApp::BuildPSO()
 		m_PSByteCode->GetBufferSize()
 	};
 	psoDesc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
-	//// 线框模式
-	//psoDesc.RasterizerState.FillMode = D3D12_FILL_MODE_WIREFRAME;
-	//// 前向裁剪
-	//psoDesc.RasterizerState.CullMode = D3D12_CULL_MODE_FRONT;
 	psoDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
 	psoDesc.DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
 	psoDesc.SampleMask = UINT_MAX;
@@ -449,6 +454,15 @@ void BoxApp::BuildPSO()
 	psoDesc.SampleDesc.Count = m_4xMsaaState ? 4 : 1;
 	psoDesc.SampleDesc.Quality = m_4xMsaaState ? (m_4xMsaaQuality - 1) : 0;
 	psoDesc.DSVFormat = m_DepthStencilFormat;
-	HR(m_pd3dDevice->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&m_PSO)));
+	HR(m_pd3dDevice->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&m_PSOs["opaque"])));
 
+	// 线框模式
+	D3D12_GRAPHICS_PIPELINE_STATE_DESC wirePsoDesc = psoDesc;
+	wirePsoDesc.RasterizerState.FillMode = D3D12_FILL_MODE_WIREFRAME;
+	HR(m_pd3dDevice->CreateGraphicsPipelineState(&wirePsoDesc, IID_PPV_ARGS(&m_PSOs["opaque_wire"])));
+
+	// 前向裁剪
+	D3D12_GRAPHICS_PIPELINE_STATE_DESC frontPsoDesc = psoDesc;
+	frontPsoDesc.RasterizerState.CullMode = D3D12_CULL_MODE_FRONT;
+	HR(m_pd3dDevice->CreateGraphicsPipelineState(&frontPsoDesc, IID_PPV_ARGS(&m_PSOs["opaque_front"])));
 }
