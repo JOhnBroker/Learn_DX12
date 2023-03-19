@@ -151,6 +151,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="BlurFilter.cpp" />
     <ClCompile Include="d3dApp.cpp" />
     <ClCompile Include="d3dUtil.cpp" />
     <ClCompile Include="DDSTextureLoader.cpp" />
@@ -165,6 +166,7 @@
     <ClCompile Include="Waves.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="BlurFilter.h" />
     <ClInclude Include="d3dApp.h" />
     <ClInclude Include="d3dUtil.h" />
     <ClInclude Include="d3dx12.h" />

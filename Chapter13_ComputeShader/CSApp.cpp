@@ -34,11 +34,12 @@ bool CSApp::Initialize()
 	}
 
 	m_Waves = std::make_unique<Waves>(128, 128, 1.0f, 0.03f, 4.0f, 0.2f);
+	m_BlurFilter = std::make_unique<BlurFilter>(m_pd3dDevice.Get(),
+		m_ClientWidth, m_ClientHeight, DXGI_FORMAT_R8G8B8A8_UNORM);
 
 	BuildRootSignature();
 	BuildCSRootSignature();
 	BuildDescriptorHeaps();
-	BuildCSResource();
 	BuildShadersAndInputLayout();
 	BuildLandGeometry();
 	BuildWavesGeometry();
@@ -79,6 +80,11 @@ void CSApp::OnResize()
 
 	XMMATRIX P = XMMatrixPerspectiveFovLH(0.25f * MathHelper::Pi, AspectRatio(), 1.0f, 1000.0f);
 	XMStoreFloat4x4(&m_Proj, P);
+
+	if (m_BlurFilter != nullptr)
+	{
+		m_BlurFilter->OnResize(m_ClientWidth, m_ClientHeight);
+	}
 }
 
 void CSApp::Update(const GameTimer& timer)
@@ -93,8 +99,6 @@ void CSApp::Update(const GameTimer& timer)
 		const char* mode_strs[] = {
 			"Wireframe",
 			"Opaque",
-			"Exercise1",
-			"Exercise2",
 			"Blur",
 			"WavesCS",
 			"SobelFilter"
@@ -111,25 +115,19 @@ void CSApp::Update(const GameTimer& timer)
 			}
 			else if (curr_mode_item == 2) 
 			{
-				m_CurrMode = ShowMode::Exercise1;
-			}
-			else if (curr_mode_item == 3) 
-			{
-				m_CurrMode = ShowMode::Exercise2;
-			}
-			else if (curr_mode_item == 4) 
-			{
 				m_CurrMode = ShowMode::Blur;
 			}
-			else if (curr_mode_item == 5)
+			else if (curr_mode_item == 3)
 			{
 				m_CurrMode = ShowMode::WavesCS;
 			}
-			else if (curr_mode_item == 6)
+			else if (curr_mode_item == 4)
 			{
 				m_CurrMode = ShowMode::SobelFilter;
 			}
 		}
+		ImGui::Text("Blur count: %d", m_iBlurCount);
+		ImGui::SliderInt("##1", &m_iBlurCount, 1, 8, "");
 	}
 
 	if (ImGui::IsKeyDown(ImGuiKey_LeftArrow))
@@ -205,6 +203,11 @@ void CSApp::Draw(const GameTimer& timer)
 		DrawRenderItems(m_CommandList.Get(), m_RitemLayer[(int)RenderLayer::Opaque]);
 		DrawRenderItems(m_CommandList.Get(), m_RitemLayer[(int)RenderLayer::AlphaTested]);
 		DrawRenderItems(m_CommandList.Get(), m_RitemLayer[(int)RenderLayer::Transparent]);
+
+		m_CommandList->SetDescriptorHeaps(1, m_SRVHeap.GetAddressOf());
+		ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), m_CommandList.Get());
+		m_CommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(CurrentBackBuffer(),
+			D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
 		break;
 	case CSApp::ShowMode::Opaque:
 		DrawRenderItems(m_CommandList.Get(), m_RitemLayer[(int)RenderLayer::Opaque]);
@@ -212,29 +215,36 @@ void CSApp::Draw(const GameTimer& timer)
 		DrawRenderItems(m_CommandList.Get(), m_RitemLayer[(int)RenderLayer::AlphaTested]);
 		m_CommandList->SetPipelineState(m_PSOs["transparent"].Get());
 		DrawRenderItems(m_CommandList.Get(), m_RitemLayer[(int)RenderLayer::Transparent]);
+
+		m_CommandList->SetDescriptorHeaps(1, m_SRVHeap.GetAddressOf());
+		ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), m_CommandList.Get());
+		m_CommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(CurrentBackBuffer(),
+			D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
 		break;
-	case ShowMode::Exercise1:
-		if (false == m_bIsCompleteCS) 
-		{
-			DoComputeWork(m_CSExerceise1OutputBuffer.Get(), 1);
-			goto Exit0;
-		}
+	case ShowMode::Blur:
+		DrawRenderItems(m_CommandList.Get(), m_RitemLayer[(int)RenderLayer::Opaque]);
+		m_CommandList->SetPipelineState(m_PSOs["alphaTested"].Get());
+		DrawRenderItems(m_CommandList.Get(), m_RitemLayer[(int)RenderLayer::AlphaTested]);
+		m_CommandList->SetPipelineState(m_PSOs["transparent"].Get());
+		DrawRenderItems(m_CommandList.Get(), m_RitemLayer[(int)RenderLayer::Transparent]);
+
+		m_BlurFilter->OnProcess(m_CommandList.Get(), m_CSRootSignature.Get(), m_PSOs["horzBlur"].Get(),
+			m_PSOs["vertBlur"].Get(), CurrentBackBuffer(), m_iBlurCount);
+		m_CommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(CurrentBackBuffer(),
+			D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_COPY_DEST));
+
+		m_CommandList->CopyResource(CurrentBackBuffer(), m_BlurFilter->Output());
+
+		m_CommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(CurrentBackBuffer(),
+			D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_RENDER_TARGET));
+		m_CommandList->SetDescriptorHeaps(1, m_SRVHeap.GetAddressOf());
+		ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), m_CommandList.Get());
+		m_CommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(CurrentBackBuffer(),
+			D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
 		break;
-	case ShowMode::Exercise2:
-		if (false == m_bIsCompleteCS)
-		{
-			DoComputeWork(m_CSExerceise2AppendBuffer.Get(), 2);
-			goto Exit0;
-		}
+	case ShowMode::WavesCS:
 		break;
 	}
-
-	m_CommandList->SetDescriptorHeaps(1, m_SRVHeap.GetAddressOf());
-	ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), m_CommandList.Get());
-
-	render2present = CD3DX12_RESOURCE_BARRIER::Transition(CurrentBackBuffer(),
-		D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT);
-	m_CommandList->ResourceBarrier(1, &render2present);
 
 	HR(m_CommandList->Close());
 	
@@ -249,70 +259,6 @@ void CSApp::Draw(const GameTimer& timer)
 
 Exit0:
 	return;
-}
-
-void CSApp::DoComputeWork(ComPtr<ID3D12Resource> output, int type) 
-{
-	struct Data 
-	{
-		float norm;
-	};
-
-	if (type == 1)
-	{
-		m_CommandList->SetPipelineState(m_PSOs["exercise1"].Get());
-		m_CommandList->SetComputeRootShaderResourceView(0, m_CSExercise1Input->GetGPUVirtualAddress());
-		m_CommandList->SetComputeRootUnorderedAccessView(1, m_CSExerceise1OutputBuffer->GetGPUVirtualAddress());
-	}
-	else if (type == 2) 
-	{
-		m_CommandList->SetPipelineState(m_PSOs["exercise2"].Get());
-		m_CommandList->SetComputeRootUnorderedAccessView(2, m_CSExerceise2ConsumeBuffer->GetGPUVirtualAddress());
-		m_CommandList->SetComputeRootUnorderedAccessView(3, m_CSExerceise2AppendBuffer->GetGPUVirtualAddress());
-	}
-
-	m_CommandList->Dispatch(2, 1, 1);
-
-	m_CommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(
-		output.Get(), D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_COPY_SOURCE));
-
-	m_CommandList->CopyResource(m_CSExerceise1ReadbackBuffer.Get(), output.Get());
-
-	m_CommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(
-		output.Get(), D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_COMMON));
-
-	m_CommandList->SetDescriptorHeaps(1, m_SRVHeap.GetAddressOf());
-	ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), m_CommandList.Get());
-
-	m_CommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(CurrentBackBuffer(),
-		D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
-
-	HR(m_CommandList->Close());
-
-	ID3D12CommandList* cmdsLists[] = { m_CommandList.Get() };
-	m_CommandQueue->ExecuteCommandLists(_countof(cmdsLists), cmdsLists);
-
-	HR(m_pSwapChain->Present(0, 0));
-	m_CurrentBackBuffer = (m_CurrentBackBuffer + 1) % SwapChainBufferCount;
-	m_CurrFrameResource->Fence = ++m_CurrentFence;
-
-	m_CommandQueue->Signal(m_Fence.Get(), m_CurrentFence);
-
-	FlushCommandQueue();
-
-	Data* mappedData = nullptr;
-	HR(m_CSExerceise1ReadbackBuffer->Map(0, nullptr, reinterpret_cast<void**>(&mappedData)));
-
-	std::ofstream fout("results.txt");
-
-	for (int i = 0; i < 64; ++i)
-	{
-		fout << "(" << mappedData[i].norm << ")" << std::endl;
-	}
-
-	m_CSExerceise1ReadbackBuffer->Unmap(0, nullptr);
-
-	m_bIsCompleteCS = true;
 }
 
 void CSApp::OnMouseMove(WPARAM btnState, int x, int y)
@@ -409,19 +355,6 @@ void CSApp::AnimateMaterials(const GameTimer& gt)
 	waterMat->m_MatTransform(3, 0) = tu;
 	waterMat->m_MatTransform(3, 1) = tv;
 	waterMat->m_NumFramesDirty = g_numFrameResources;
-}
-
-void CSApp::RotationMaterials(const GameTimer& gt)
-{
-	// rotate box
-	auto boxMat = m_Materials["wirefence"].get();
-
-	static float phi = 0.0f;
-	phi += 0.001f;
-
-	XMMATRIX texRotation = XMMatrixTranslation(-0.5f, -0.5f, 0.0f) * XMMatrixRotationZ(phi) * XMMatrixTranslation(+0.5f, +0.5f, 0.0f);
-	XMStoreFloat4x4(&boxMat->m_MatTransform, texRotation);
-	boxMat->m_NumFramesDirty = g_numFrameResources;
 }
 
 void CSApp::UpdateMaterialCBs(const GameTimer& gt)
@@ -562,16 +495,19 @@ void CSApp::BuildRootSignature()
 void CSApp::BuildCSRootSignature()
 {
 	HRESULT hReturn = E_FAIL;
-	CD3DX12_ROOT_PARAMETER slotRootParameter[4];
+	CD3DX12_DESCRIPTOR_RANGE srvTable;
+	srvTable.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0);
+	CD3DX12_DESCRIPTOR_RANGE uavTable;
+	uavTable.Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 0);
 
-	slotRootParameter[0].InitAsShaderResourceView(0);
-	slotRootParameter[1].InitAsUnorderedAccessView(0);
-	slotRootParameter[2].InitAsUnorderedAccessView(1);
-	slotRootParameter[3].InitAsUnorderedAccessView(2);
+	CD3DX12_ROOT_PARAMETER slotRootParameter[3];
+	slotRootParameter[0].InitAsConstants(12, 0);
+	slotRootParameter[1].InitAsDescriptorTable(1, &srvTable);
+	slotRootParameter[2].InitAsDescriptorTable(1, &uavTable);
 
 	CD3DX12_ROOT_SIGNATURE_DESC rootSigDesc(
 		_countof(slotRootParameter), slotRootParameter,
-		0, nullptr, D3D12_ROOT_SIGNATURE_FLAG_NONE);
+		0, nullptr, D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
 
 	ComPtr<ID3DBlob> serializedRootSig = nullptr;
 	ComPtr<ID3DBlob> errorBlob = nullptr;
@@ -593,6 +529,9 @@ void CSApp::BuildCSRootSignature()
 
 void CSApp::BuildDescriptorHeaps()
 {
+	const int textureDescriptorCount = 3;
+	const int blurDescriptorCount = 4;
+
 	D3D12_DESCRIPTOR_HEAP_DESC srvHeapDesc = {};
 	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
 	ComPtr<ID3D12Resource> grassTex;
@@ -600,7 +539,7 @@ void CSApp::BuildDescriptorHeaps()
 	ComPtr<ID3D12Resource> fenceTex;
 
 	// SRV Heap
-	srvHeapDesc.NumDescriptors = 5;
+	srvHeapDesc.NumDescriptors = textureDescriptorCount + blurDescriptorCount;
 	srvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
 	srvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
 	HR(m_pd3dDevice->CreateDescriptorHeap(&srvHeapDesc, IID_PPV_ARGS(&m_SrvDescriptorHeap)));
@@ -626,6 +565,10 @@ void CSApp::BuildDescriptorHeaps()
 	srvDesc.Format = fenceTex->GetDesc().Format;
 	m_pd3dDevice->CreateShaderResourceView(fenceTex.Get(), &srvDesc, hDescriptor);
 
+	m_BlurFilter->BuildDescriptors(
+		CD3DX12_CPU_DESCRIPTOR_HANDLE(m_SrvDescriptorHeap->GetCPUDescriptorHandleForHeapStart(), 3, m_CBVSRVDescriptorSize),
+		CD3DX12_GPU_DESCRIPTOR_HANDLE(m_SrvDescriptorHeap->GetGPUDescriptorHandleForHeapStart(), 3, m_CBVSRVDescriptorSize),
+		m_CBVSRVDescriptorSize);
 }
 
 void CSApp::BuildLandGeometry()
@@ -777,96 +720,6 @@ void CSApp::BuildBoxGeometry()
 	m_Geometries[geo->Name] = std::move(geo);
 }
 
-void CSApp::BuildCSResource()
-{
-	const int nDataElements = 64;
-	struct Data
-	{
-		XMFLOAT3 vec;
-	};
-	std::vector<Data> data(nDataElements);
-
-	for (int i = 0; i < nDataElements; ++i) 
-	{
-		data[i].vec.x = MathHelper::RandF(1.0f, 5.7f);
-		data[i].vec.y = MathHelper::RandF(1.0f, 5.7f);
-		data[i].vec.z = MathHelper::RandF(1.0f, 5.7f);
-	}
-
-	UINT64 byteSize = data.size() * sizeof(Data);
-
-	// Exercise 1
-	m_CSExercise1Input = d3dUtil::CreateDefaultBuffer(
-		m_pd3dDevice.Get(),m_CommandList.Get(),
-		data.data(), byteSize, m_CSExerceise1UploadBuffer);
-
-	HR(m_pd3dDevice->CreateCommittedResource(
-		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),D3D12_HEAP_FLAG_NONE,
-		&CD3DX12_RESOURCE_DESC::Buffer(byteSize, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS),
-		D3D12_RESOURCE_STATE_UNORDERED_ACCESS, nullptr, IID_PPV_ARGS(&m_CSExerceise1OutputBuffer)));
-
-	HR(m_pd3dDevice->CreateCommittedResource(
-		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_READBACK), D3D12_HEAP_FLAG_NONE,
-		&CD3DX12_RESOURCE_DESC::Buffer(byteSize),
-		D3D12_RESOURCE_STATE_COPY_DEST, nullptr, IID_PPV_ARGS(&m_CSExerceise1ReadbackBuffer)));
-
-	// Exercise 2
-	// Create ConsumeStructuredBuffer
-	D3D12_RESOURCE_DESC consumeDesc = {};
-	consumeDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-	consumeDesc.Width = byteSize;
-	consumeDesc.Height = 1;
-	consumeDesc.DepthOrArraySize = 1;
-	consumeDesc.MipLevels = 1;
-	consumeDesc.Format = DXGI_FORMAT_UNKNOWN;
-	consumeDesc.SampleDesc.Count = 1;
-	consumeDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-	consumeDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
-
-	HR(m_pd3dDevice->CreateCommittedResource(
-		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),D3D12_HEAP_FLAG_NONE,
-		&consumeDesc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&m_CSExerceise2ConsumeBuffer)));
-
-	D3D12_UNORDERED_ACCESS_VIEW_DESC uav0Desc = {};
-	uav0Desc.Format = DXGI_FORMAT_UNKNOWN;
-	uav0Desc.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
-	uav0Desc.Buffer.FirstElement = 0;
-	uav0Desc.Buffer.NumElements = data.size();
-	uav0Desc.Buffer.StructureByteStride = sizeof(Data);
-
-	CD3DX12_CPU_DESCRIPTOR_HANDLE srvHandle(m_SrvDescriptorHeap->GetCPUDescriptorHandleForHeapStart());
-	srvHandle.Offset(3, m_CBVSRVDescriptorSize);
-	m_pd3dDevice->CreateUnorderedAccessView(m_CSExerceise2ConsumeBuffer.Get(), nullptr, &uav0Desc, srvHandle);
-
-	// Create AppendStructuredBuffer
-	D3D12_RESOURCE_DESC appendDesc = {};
-	appendDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-	appendDesc.Alignment = 0;
-	appendDesc.Width = byteSize; // size of buffer
-	appendDesc.Height = 1;
-	appendDesc.DepthOrArraySize = 1;
-	appendDesc.MipLevels = 1;
-	appendDesc.Format = DXGI_FORMAT_UNKNOWN;
-	appendDesc.SampleDesc.Count = 1;
-	appendDesc.SampleDesc.Quality = 0;
-	appendDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-	appendDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
-
-	HR(m_pd3dDevice->CreateCommittedResource(
-		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT), D3D12_HEAP_FLAG_NONE,
-		&appendDesc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&m_CSExerceise2AppendBuffer)));
-
-	D3D12_UNORDERED_ACCESS_VIEW_DESC uav1Desc = {};
-	uav1Desc.Format = DXGI_FORMAT_UNKNOWN;
-	uav1Desc.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
-	uav1Desc.Buffer.FirstElement = 0;
-	uav1Desc.Buffer.NumElements = data.size();
-	uav1Desc.Buffer.StructureByteStride = sizeof(Data);
-
-	srvHandle.Offset(1, m_CBVSRVDescriptorSize);
-	m_pd3dDevice->CreateUnorderedAccessView(m_CSExerceise2AppendBuffer.Get(), nullptr, &uav1Desc, srvHandle);
-}
-
 void CSApp::BuildShadersAndInputLayout()
 {
 	const D3D_SHADER_MACRO defines[] =
@@ -885,8 +738,8 @@ void CSApp::BuildShadersAndInputLayout()
 	m_Shaders["standardVS"]		= d3dUtil::CompileShader(L"..\\Shader\\Chapter13\\Default.hlsl", nullptr, "VS", "vs_5_1");
 	m_Shaders["opaquePS"]		= d3dUtil::CompileShader(L"..\\Shader\\Chapter13\\Default.hlsl", defines, "PS", "ps_5_1");
 	m_Shaders["alphaTestedPS"]	= d3dUtil::CompileShader(L"..\\Shader\\Chapter13\\Default.hlsl", alphaTestDefines, "PS", "ps_5_1");
-	m_Shaders["exercise1CS"]	= d3dUtil::CompileShader(L"..\\Shader\\Chapter13\\Exercises.hlsl", nullptr, "CS_Exe1", "cs_5_1");
-	m_Shaders["exercise2CS"]	= d3dUtil::CompileShader(L"..\\Shader\\Chapter13\\Exercises.hlsl", nullptr, "CS_Exe2", "cs_5_1");
+	m_Shaders["horzBlurCS"]		= d3dUtil::CompileShader(L"..\\Shader\\Chapter13\\Blur.hlsl", nullptr, "HorzBlurCS", "cs_5_1");
+	m_Shaders["vertBlurCS"]		= d3dUtil::CompileShader(L"..\\Shader\\Chapter13\\Blur.hlsl", nullptr, "VertBlurCS", "cs_5_1");
 
 	m_InputLayout =
 	{
@@ -957,25 +810,27 @@ void CSApp::BuildPSOs()
 	alphaTestedPsoDesc.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;
 	HR(m_pd3dDevice->CreateGraphicsPipelineState(&alphaTestedPsoDesc, IID_PPV_ARGS(&m_PSOs["alphaTested"])));
 
-	// Exercis 1
-	D3D12_COMPUTE_PIPELINE_STATE_DESC exercise1PsoDesc = {};
-	exercise1PsoDesc.pRootSignature = m_CSRootSignature.Get();
-	exercise1PsoDesc.CS =
+	// HorzBlur
+	D3D12_COMPUTE_PIPELINE_STATE_DESC horzBlurPso = {};
+	horzBlurPso.pRootSignature = m_CSRootSignature.Get();
+	horzBlurPso.CS =
 	{
-		reinterpret_cast<BYTE*>(m_Shaders["exercise1CS"]->GetBufferPointer()),
-		m_Shaders["exercise1CS"]->GetBufferSize()
+		reinterpret_cast<BYTE*>(m_Shaders["horzBlurCS"]->GetBufferPointer()),
+		m_Shaders["horzBlurCS"]->GetBufferSize()
 	};
-	exercise1PsoDesc.Flags = D3D12_PIPELINE_STATE_FLAG_NONE;
-	HR(m_pd3dDevice->CreateComputePipelineState(&exercise1PsoDesc, IID_PPV_ARGS(&m_PSOs["exercise1"])));
+	horzBlurPso.Flags = D3D12_PIPELINE_STATE_FLAG_NONE;
+	HR(m_pd3dDevice->CreateComputePipelineState(&horzBlurPso, IID_PPV_ARGS(&m_PSOs["horzBlur"])));
 	
-	// Exercis 2
-	D3D12_COMPUTE_PIPELINE_STATE_DESC exercise2PsoDesc = exercise1PsoDesc;
-	exercise2PsoDesc.CS =
+	// VertBlur
+	D3D12_COMPUTE_PIPELINE_STATE_DESC vertBlurPso = {};
+	vertBlurPso.pRootSignature = m_CSRootSignature.Get();
+	vertBlurPso.CS =
 	{
-		reinterpret_cast<BYTE*>(m_Shaders["exercise2CS"]->GetBufferPointer()),
-		m_Shaders["exercise2CS"]->GetBufferSize()
+		reinterpret_cast<BYTE*>(m_Shaders["vertBlurCS"]->GetBufferPointer()),
+		m_Shaders["vertBlurCS"]->GetBufferSize()
 	};
-	HR(m_pd3dDevice->CreateComputePipelineState(&exercise2PsoDesc, IID_PPV_ARGS(&m_PSOs["exercise2"])));
+	vertBlurPso.Flags = D3D12_PIPELINE_STATE_FLAG_NONE;
+	HR(m_pd3dDevice->CreateComputePipelineState(&vertBlurPso, IID_PPV_ARGS(&m_PSOs["vertBlur"])));
 }
 
 void CSApp::BuildFrameResources()

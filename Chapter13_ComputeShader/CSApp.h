@@ -12,6 +12,8 @@
 #include "Material.h"
 #include "Texture.h"
 
+#include "BlurFilter.h"
+
 #define STATICSAMPLERCOUNT 6
 
 using namespace DirectX;
@@ -51,7 +53,7 @@ enum class RenderLayer :int
 class CSApp : public D3DApp
 {
 public:
-	enum class ShowMode { Wireframe, Opaque, Exercise1, Exercise2, Blur, WavesCS, SobelFilter};
+	enum class ShowMode { Wireframe, Opaque, Blur, WavesCS, SobelFilter};
 public:
 	CSApp(HINSTANCE hInstance);
 	CSApp(HINSTANCE hInstance, int width, int height);
@@ -66,16 +68,14 @@ public:
 	virtual void OnResize() override;
 	virtual void Update(const GameTimer& timer) override;
 	virtual void Draw(const GameTimer& timer) override;
-	void DoComputeWork(ComPtr<ID3D12Resource> output, int type);
 
 	virtual void OnMouseMove(WPARAM btnState, int x, int y) override;
 	virtual void OnMouseUp(WPARAM btnState, int x, int y) override;
 	virtual void OnMouseDown(WPARAM btnState, int x, int y) override;
 
 	void UpdateCamera(const GameTimer& gt);
-	void UpdateObjectCBs(const GameTimer& gt);
 	void AnimateMaterials(const GameTimer& gt);
-	void RotationMaterials(const GameTimer& gt);
+	void UpdateObjectCBs(const GameTimer& gt);
 	void UpdateMaterialCBs(const GameTimer& gt);
 	void UpdateMainPassCB(const GameTimer& gt);
 	void UpdateWaves(const GameTimer& gt);
@@ -85,11 +85,9 @@ public:
 	void BuildDescriptorHeaps();
 	void BuildShadersAndInputLayout();
 	void BuildPSOs();
-
 	void BuildLandGeometry();
 	void BuildWavesGeometry();
 	void BuildBoxGeometry();
-	void BuildCSResource();
 	void BuildFrameResources();
 	void BuildMaterials();
 	void BuildRenderItems();
@@ -120,14 +118,6 @@ private:
 	std::unordered_map<std::string, ComPtr<ID3DBlob>> m_Shaders;
 	std::unordered_map<std::string, ComPtr<ID3D12PipelineState>>m_PSOs;
 
-	// CS Resource
-	ComPtr<ID3D12Resource> m_CSExercise1Input = nullptr;			// SRV输入资源
-	ComPtr<ID3D12Resource> m_CSExerceise1UploadBuffer = nullptr;	// 上传Buffer
-	ComPtr<ID3D12Resource> m_CSExerceise1OutputBuffer = nullptr;	// UAV输出资源
-	ComPtr<ID3D12Resource> m_CSExerceise1ReadbackBuffer = nullptr;	
-	ComPtr<ID3D12Resource> m_CSExerceise2ConsumeBuffer = nullptr;	// SRV输入资源
-	ComPtr<ID3D12Resource> m_CSExerceise2AppendBuffer = nullptr;	// UAV输出资源
-
 	std::vector<D3D12_INPUT_ELEMENT_DESC> m_InputLayout;
 
 	RenderItem* m_WavesRitem = nullptr;
@@ -135,6 +125,7 @@ private:
 	std::vector<RenderItem*> m_RitemLayer[(int)RenderLayer::Count];
 
 	std::unique_ptr<Waves> m_Waves;
+	std::unique_ptr<BlurFilter> m_BlurFilter;
 
 	PassConstants m_MainPassCB;
 
@@ -156,6 +147,7 @@ private:
 	// ImGui operable item
 	ShowMode m_CurrMode = ShowMode::Opaque;
 	XMFLOAT3 m_BoxTexScale = { 1.0f,1.0f,1.0f };
+	int m_iBlurCount = 4;
 
 };
 
