@@ -159,6 +159,7 @@
     <ClCompile Include="FrameResource.cpp" />
     <ClCompile Include="GameTimer.cpp" />
     <ClCompile Include="GeometryGenerator.cpp" />
+    <ClCompile Include="GpuWaves.cpp" />
     <ClCompile Include="ImguiManager.cpp" />
     <ClCompile Include="Main.cpp" />
     <ClCompile Include="MathHelper.cpp" />
@@ -175,6 +176,7 @@
     <ClInclude Include="FrameResource.h" />
     <ClInclude Include="GameTimer.h" />
     <ClInclude Include="GeometryGenerator.h" />
+    <ClInclude Include="GpuWaves.h" />
     <ClInclude Include="ImguiManager.h" />
     <ClInclude Include="Light.h" />
     <ClInclude Include="Material.h" />

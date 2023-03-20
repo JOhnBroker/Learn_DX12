@@ -13,6 +13,7 @@
 #include "LightingUtil.hlsl"
 
 Texture2D gDiffuseMap : register(t0);
+Texture2D gDisplacementMap : register(t1);
 
 SamplerState gsamPointWrap			: register(s0);
 SamplerState gsamPointClamp			: register(s1);
@@ -27,7 +28,9 @@ cbuffer cbPerObject : register(b0)
 {
 	float4x4 gWorld;	
     float4x4 gTexTransform;
-    float4x4 gRotationTex;
+    float2 gDisplacementMapTexelSize;
+    float gGridSpatialStep;
+    float gPad0;
 };
 
 cbuffer cbMaterial : register(b1)
@@ -47,7 +50,7 @@ cbuffer cbPass : register(b2)
 	float4x4 gViewProj;
 	float4x4 gInvViewProj;
 	float3 gEyePosW;
-	float gPad0;
+	float gPad1;
 	float2 gRenderTargetSize;
 	float2 gInvRenderTargetSize;
 	float gNearZ;
@@ -60,7 +63,7 @@ cbuffer cbPass : register(b2)
     float4 gFogColor;
     float gFogStart;
     float gFogRange;
-    float2 gPad1;
+    float2 gPad2;
 	
 	Light gLights[MaxLights];
 };
@@ -84,6 +87,19 @@ VertexOut VS (VertexIn vin)
 {
 	VertexOut vout = (VertexOut)0.0f;
 
+#ifdef DISPLACEMENT_MAP
+    vin.PosL.y += gDisplacementMap.SampleLevel(gsamLinearWrap, vin.TexC, 1.0f).r;
+	
+	// Estimate normal using finite difference.
+    float du = gDisplacementMapTexelSize.x;
+    float dv = gDisplacementMapTexelSize.y;
+    float l = gDisplacementMap.SampleLevel(gsamLinearWrap, vin.TexC - float2(du, 0.0f), 0.0f).r;
+    float r = gDisplacementMap.SampleLevel(gsamLinearWrap, vin.TexC + float2(du, 0.0f), 0.0f).r;
+    float t = gDisplacementMap.SampleLevel(gsamLinearWrap, vin.TexC - float2(0.0f, dv), 0.0f).r;
+    float b = gDisplacementMap.SampleLevel(gsamLinearWrap, vin.TexC + float2(0.0f, dv), 0.0f).r;
+    vin.NormalL = normalize(float3(-r + l, 2.0f * gGridSpatialStep, b - t));
+#endif
+	
 	float4 posW = mul( float4(vin.PosL,1.0f), gWorld);
 	vout.PosW = posW.xyz;
 	vout.PosH = mul(posW,gViewProj);

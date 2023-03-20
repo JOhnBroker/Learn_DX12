@@ -13,6 +13,7 @@
 #include "Texture.h"
 
 #include "BlurFilter.h"
+#include "GpuWaves.h"
 
 #define STATICSAMPLERCOUNT 6
 
@@ -117,6 +118,7 @@ private:
 	std::unordered_map<std::string, std::unique_ptr<Texture>> m_Textures;
 	std::unordered_map<std::string, ComPtr<ID3DBlob>> m_Shaders;
 	std::unordered_map<std::string, ComPtr<ID3D12PipelineState>>m_PSOs;
+	std::unordered_map<std::string, ComPtr<ID3D12RootSignature>>m_RootSignatures;
 
 	std::vector<D3D12_INPUT_ELEMENT_DESC> m_InputLayout;
 
@@ -125,6 +127,7 @@ private:
 	std::vector<RenderItem*> m_RitemLayer[(int)RenderLayer::Count];
 
 	std::unique_ptr<Waves> m_Waves;
+	std::unique_ptr<GpuWaves> m_GpuWaves;
 	std::unique_ptr<BlurFilter> m_BlurFilter;
 
 	PassConstants m_MainPassCB;

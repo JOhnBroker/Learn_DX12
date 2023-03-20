@@ -40,6 +40,9 @@
     <ClCompile Include="BlurFilter.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
+    <ClCompile Include="GpuWaves.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="d3dApp.h">
@@ -96,9 +99,9 @@
     <ClInclude Include="BlurFilter.h">
       <Filter>头文件</Filter>
     </ClInclude>
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="imgui.ini" />
+    <ClInclude Include="GpuWaves.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="源文件">
@@ -107,5 +110,8 @@
     <Filter Include="头文件">
       <UniqueIdentifier>{4a443243-b2a7-4c56-9f50-3ad248ddb0a9}</UniqueIdentifier>
     </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="imgui.ini" />
   </ItemGroup>
 </Project>
