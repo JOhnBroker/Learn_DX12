@@ -27,6 +27,9 @@ struct RenderItem
 	XMFLOAT4X4 World = MathHelper::Identity4x4();
 	XMFLOAT4X4 TexTransform = MathHelper::Identity4x4();
 
+	DirectX::XMFLOAT2 DisplacementMapTexelSize = { 1.0f,1.0f };
+	float GridSpatialStep = 1.0f;
+
 	int NumFramesDirty = g_numFrameResources;
 
 	UINT ObjCBIndex = -1;
@@ -48,6 +51,7 @@ enum class RenderLayer :int
 	Opaque = 0,
 	Transparent,
 	AlphaTested,
+	GpuWaves,
 	Count
 };
 
@@ -109,8 +113,6 @@ private:
 	FrameResource* m_CurrFrameResource = nullptr;
 	int m_CurrFrameResourceIndex = 0;
 
-	ComPtr<ID3D12RootSignature> m_RootSignature = nullptr;
-	ComPtr<ID3D12RootSignature> m_CSRootSignature = nullptr;
 	ComPtr<ID3D12DescriptorHeap> m_SrvDescriptorHeap = nullptr;
 
 	std::unordered_map<std::string, std::unique_ptr<MeshGeometry>> m_Geometries;

@@ -34,6 +34,8 @@ bool CSApp::Initialize()
 	}
 
 	m_Waves = std::make_unique<Waves>(128, 128, 1.0f, 0.03f, 4.0f, 0.2f);
+	m_GpuWaves = std::make_unique<GpuWaves>(m_pd3dDevice.Get(),
+		m_CommandList.Get(), 256, 256, 0.25f, 0.03f, 2.0f, 0.2f);
 	m_BlurFilter = std::make_unique<BlurFilter>(m_pd3dDevice.Get(),
 		m_ClientWidth, m_ClientHeight, DXGI_FORMAT_R8G8B8A8_UNORM);
 
@@ -191,7 +193,7 @@ void CSApp::Draw(const GameTimer& timer)
 	ID3D12DescriptorHeap* descriptorHeaps[] = { m_SrvDescriptorHeap.Get() };
 	m_CommandList->SetDescriptorHeaps(_countof(descriptorHeaps), descriptorHeaps);
 
-	m_CommandList->SetGraphicsRootSignature(m_RootSignature.Get());
+	m_CommandList->SetGraphicsRootSignature(m_RootSignatures["wavesRender"].Get());
 
 	auto passCB = m_CurrFrameResource->PassCB->Resource();
 	m_CommandList->SetGraphicsRootConstantBufferView(3, passCB->GetGPUVirtualAddress());
@@ -228,7 +230,7 @@ void CSApp::Draw(const GameTimer& timer)
 		m_CommandList->SetPipelineState(m_PSOs["transparent"].Get());
 		DrawRenderItems(m_CommandList.Get(), m_RitemLayer[(int)RenderLayer::Transparent]);
 
-		m_BlurFilter->OnProcess(m_CommandList.Get(), m_CSRootSignature.Get(), m_PSOs["horzBlur"].Get(),
+		m_BlurFilter->OnProcess(m_CommandList.Get(), m_RootSignatures["blur"].Get(), m_PSOs["horzBlur"].Get(),
 			m_PSOs["vertBlur"].Get(), CurrentBackBuffer(), m_iBlurCount);
 		m_CommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(CurrentBackBuffer(),
 			D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_COPY_DEST));
@@ -243,6 +245,21 @@ void CSApp::Draw(const GameTimer& timer)
 			D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
 		break;
 	case ShowMode::WavesCS:
+		m_CommandList->SetGraphicsRootDescriptorTable(4, m_GpuWaves->DisplacementMap());
+
+		DrawRenderItems(m_CommandList.Get(), m_RitemLayer[(int)RenderLayer::Opaque]);
+		m_CommandList->SetPipelineState(m_PSOs["alphaTested"].Get());
+		DrawRenderItems(m_CommandList.Get(), m_RitemLayer[(int)RenderLayer::AlphaTested]);
+		m_CommandList->SetPipelineState(m_PSOs["transparent"].Get());
+		DrawRenderItems(m_CommandList.Get(), m_RitemLayer[(int)RenderLayer::Transparent]);
+		m_CommandList->SetPipelineState(m_PSOs["wavesRender"].Get());
+		DrawRenderItems(m_CommandList.Get(), m_RitemLayer[(int)RenderLayer::GpuWaves]);
+
+		m_CommandList->SetDescriptorHeaps(1, m_SRVHeap.GetAddressOf());
+		ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), m_CommandList.Get());
+		m_CommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(CurrentBackBuffer(),
+			D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
+
 		break;
 	}
 
@@ -325,6 +342,8 @@ void CSApp::UpdateObjectCBs(const GameTimer& gt)
 			ObjectConstants objConstants;
 			XMStoreFloat4x4(&objConstants.World, XMMatrixTranspose(world));
 			XMStoreFloat4x4(&objConstants.TexTransform, XMMatrixTranspose(texTansform));
+			objConstants.DisplacementMapTexelSize = obj->DisplacementMapTexelSize;
+			objConstants.GridSpatialStep = obj->GridSpatialStep;
 
 			currObjectCB->CopyData(obj->ObjCBIndex, objConstants);
 
@@ -423,108 +442,207 @@ void CSApp::UpdateWaves(const GameTimer& gt)
 {
 	static float t_base = 0.0f;
 
-	if ((m_Timer.TotalTime() - t_base) >= 0.25f) 
+	if (m_CurrMode == ShowMode::Opaque) 
 	{
-		t_base += 0.25f;
-		int i = MathHelper::Rand(4, m_Waves->GetRowCount() - 5);
-		int j = MathHelper::Rand(4, m_Waves->GetColCount() - 5);
+		if ((m_Timer.TotalTime() - t_base) >= 0.25f)
+		{
+			t_base += 0.25f;
+			int i = MathHelper::Rand(4, m_Waves->GetRowCount() - 5);
+			int j = MathHelper::Rand(4, m_Waves->GetColCount() - 5);
 
-		float r = MathHelper::RandF(0.2f, 0.5f);
+			float r = MathHelper::RandF(0.2f, 0.5f);
 
-		m_Waves->Disturb(i, j, r);
+			m_Waves->Disturb(i, j, r);
+		}
+
+		m_Waves->Update(gt.DeltaTime());
+
+		auto currWavesVB = m_CurrFrameResource->WavesVB.get();
+		for (int i = 0; i < m_Waves->GetVertexCount(); ++i)
+		{
+			Vertex v;
+			v.Pos = m_Waves->Position(i);
+			v.Normal = m_Waves->Normal(i);
+
+			v.TexC.x = 0.5f + v.Pos.x / m_Waves->GetWidth();
+			v.TexC.y = 0.5f - v.Pos.z / m_Waves->GetDepth();
+
+			currWavesVB->CopyData(i, v);
+		}
+
+		m_WavesRitem->Geo->VertexBufferGPU = currWavesVB->Resource();
 	}
-
-	m_Waves->Update(gt.DeltaTime());
-
-	auto currWavesVB = m_CurrFrameResource->WavesVB.get();
-	for (int i = 0; i < m_Waves->GetVertexCount(); ++i) 
+	else if (m_CurrMode == ShowMode::WavesCS) 
 	{
-		Vertex v;
-		v.Pos = m_Waves->Position(i);
-		v.Normal = m_Waves->Normal(i);
+		if (m_Timer.TotalTime() - t_base >= 0.25f) 
+		{
+			t_base += 0.25f;
 
-		v.TexC.x = 0.5f + v.Pos.x / m_Waves->GetWidth();
-		v.TexC.y = 0.5f - v.Pos.z / m_Waves->GetDepth();
+			int i = MathHelper::Rand(4, m_GpuWaves->RowCount() - 5);
+			int j = MathHelper::Rand(4, m_GpuWaves->ColumnCount() - 5);
 
-		currWavesVB->CopyData(i, v);
+			float r = MathHelper::RandF(1.0f, 2.0f);
+			m_GpuWaves->Disturb(m_CommandList.Get(), m_RootSignatures["wavesSim"].Get(), m_PSOs["wavesDisturb"].Get(), i, j, r);
+		}
+		m_GpuWaves->Update(gt, m_CommandList.Get(), m_RootSignatures["wavesSim"].Get(), m_PSOs["wavesUpdate"].Get());
 	}
-
-	m_WavesRitem->Geo->VertexBufferGPU = currWavesVB->Resource();
 }
 
 void CSApp::BuildRootSignature()
 {
+	#pragma region Opaque
 	HRESULT hReturn = E_FAIL;
-	CD3DX12_DESCRIPTOR_RANGE texTable;
-	CD3DX12_ROOT_PARAMETER slotRootParameter[4];
-
-	texTable.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0);
-
-	// 创建根描述符表
-	slotRootParameter[0].InitAsDescriptorTable(1, &texTable, D3D12_SHADER_VISIBILITY_PIXEL);
-	slotRootParameter[1].InitAsConstantBufferView(0);
-	slotRootParameter[2].InitAsConstantBufferView(1);
-	slotRootParameter[3].InitAsConstantBufferView(2);
-
-	auto staticSamplers = GetStaticSamplers();
-
-	// 一个根签名由一组根参数组成
-	CD3DX12_ROOT_SIGNATURE_DESC rootSigDesc(_countof(slotRootParameter), slotRootParameter,
-		(UINT)staticSamplers.size(), staticSamplers.data(),
-		D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
-
-	// 序列化处理
-	ComPtr<ID3DBlob> serializedRootSig = nullptr;
-	ComPtr<ID3DBlob> errorBlob = nullptr;
-	hReturn = D3D12SerializeRootSignature(&rootSigDesc, D3D_ROOT_SIGNATURE_VERSION_1,
-		serializedRootSig.GetAddressOf(), errorBlob.GetAddressOf());
-
-	if (errorBlob != nullptr) 
 	{
-		::OutputDebugStringA((char*)errorBlob->GetBufferPointer());
-	}
-	HR(hReturn);
+		CD3DX12_DESCRIPTOR_RANGE texTable;
+		CD3DX12_ROOT_PARAMETER slotRootParameter[4];
 
-	HR(m_pd3dDevice->CreateRootSignature(
-		0, 
-		serializedRootSig->GetBufferPointer(),
-		serializedRootSig->GetBufferSize(), 
-		IID_PPV_ARGS(m_RootSignature.GetAddressOf())));
+		texTable.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0);
+
+		// 创建根描述符表
+		slotRootParameter[0].InitAsDescriptorTable(1, &texTable, D3D12_SHADER_VISIBILITY_PIXEL);
+		slotRootParameter[1].InitAsConstantBufferView(0);
+		slotRootParameter[2].InitAsConstantBufferView(1);
+		slotRootParameter[3].InitAsConstantBufferView(2);
+
+		auto staticSamplers = GetStaticSamplers();
+
+		// 一个根签名由一组根参数组成
+		CD3DX12_ROOT_SIGNATURE_DESC rootSigDesc(_countof(slotRootParameter), slotRootParameter,
+			(UINT)staticSamplers.size(), staticSamplers.data(),
+			D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
+
+		// 序列化处理
+		ComPtr<ID3DBlob> serializedRootSig = nullptr;
+		ComPtr<ID3DBlob> errorBlob = nullptr;
+		hReturn = D3D12SerializeRootSignature(&rootSigDesc, D3D_ROOT_SIGNATURE_VERSION_1,
+			serializedRootSig.GetAddressOf(), errorBlob.GetAddressOf());
+
+		if (errorBlob != nullptr) 
+		{
+			::OutputDebugStringA((char*)errorBlob->GetBufferPointer());
+		}
+		HR(hReturn);
+
+		HR(m_pd3dDevice->CreateRootSignature(
+			0, 
+			serializedRootSig->GetBufferPointer(),
+			serializedRootSig->GetBufferSize(), 
+			IID_PPV_ARGS(m_RootSignatures["opaque"].GetAddressOf())));
+	}
+	#pragma endregion
+
+	#pragma region GpuWaves
+	{
+		CD3DX12_DESCRIPTOR_RANGE srvTable;
+		srvTable.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0);
+		CD3DX12_DESCRIPTOR_RANGE displacementMapTable;
+		displacementMapTable.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 1);
+
+		CD3DX12_ROOT_PARAMETER slotRootParameter[5];
+		slotRootParameter[0].InitAsDescriptorTable(1, &srvTable, D3D12_SHADER_VISIBILITY_ALL);
+		slotRootParameter[1].InitAsConstantBufferView(0);
+		slotRootParameter[2].InitAsConstantBufferView(1);
+		slotRootParameter[3].InitAsConstantBufferView(2);
+		slotRootParameter[4].InitAsDescriptorTable(1, &displacementMapTable, D3D12_SHADER_VISIBILITY_ALL);
+
+		auto staticSamplers = GetStaticSamplers();
+
+		CD3DX12_ROOT_SIGNATURE_DESC rootSigDesc(_countof(slotRootParameter), slotRootParameter,
+			(UINT)staticSamplers.size(), staticSamplers.data(), D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
+
+		ComPtr<ID3DBlob> serializedRootSig = nullptr;
+		ComPtr<ID3DBlob> errorBlob = nullptr;
+		hReturn = D3D12SerializeRootSignature(&rootSigDesc, D3D_ROOT_SIGNATURE_VERSION_1,
+			serializedRootSig.GetAddressOf(), errorBlob.GetAddressOf());
+
+		if (errorBlob != nullptr)
+		{
+			::OutputDebugStringA((char*)errorBlob->GetBufferPointer());
+		}
+		HR(hReturn);
+
+		HR(m_pd3dDevice->CreateRootSignature(
+			0,
+			serializedRootSig->GetBufferPointer(),
+			serializedRootSig->GetBufferSize(),
+			IID_PPV_ARGS(m_RootSignatures["wavesRender"].GetAddressOf())));
+	}
+	#pragma endregion
 }
 
 void CSApp::BuildCSRootSignature()
 {
 	HRESULT hReturn = E_FAIL;
-	CD3DX12_DESCRIPTOR_RANGE srvTable;
-	srvTable.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0);
-	CD3DX12_DESCRIPTOR_RANGE uavTable;
-	uavTable.Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 0);
-
-	CD3DX12_ROOT_PARAMETER slotRootParameter[3];
-	slotRootParameter[0].InitAsConstants(12, 0);
-	slotRootParameter[1].InitAsDescriptorTable(1, &srvTable);
-	slotRootParameter[2].InitAsDescriptorTable(1, &uavTable);
-
-	CD3DX12_ROOT_SIGNATURE_DESC rootSigDesc(
-		_countof(slotRootParameter), slotRootParameter,
-		0, nullptr, D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
-
-	ComPtr<ID3DBlob> serializedRootSig = nullptr;
-	ComPtr<ID3DBlob> errorBlob = nullptr;
-	hReturn = D3D12SerializeRootSignature(&rootSigDesc, D3D_ROOT_SIGNATURE_VERSION_1,
-		serializedRootSig.GetAddressOf(), errorBlob.GetAddressOf());
-
-	if (errorBlob != nullptr)
+	#pragma region BlurPSO
 	{
-		::OutputDebugStringA((char*)errorBlob->GetBufferPointer());
-	}
-	HR(hReturn);
+		CD3DX12_DESCRIPTOR_RANGE srvTable;
+		srvTable.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0);
+		CD3DX12_DESCRIPTOR_RANGE uavTable;
+		uavTable.Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 0);
 
-	HR(m_pd3dDevice->CreateRootSignature(
-		0,
-		serializedRootSig->GetBufferPointer(),
-		serializedRootSig->GetBufferSize(),
-		IID_PPV_ARGS(m_CSRootSignature.GetAddressOf())));
+		CD3DX12_ROOT_PARAMETER slotRootParameter[3];
+		slotRootParameter[0].InitAsConstants(12, 0);
+		slotRootParameter[1].InitAsDescriptorTable(1, &srvTable);
+		slotRootParameter[2].InitAsDescriptorTable(1, &uavTable);
+
+		CD3DX12_ROOT_SIGNATURE_DESC rootSigDesc(
+			_countof(slotRootParameter), slotRootParameter,
+			0, nullptr, D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
+
+		ComPtr<ID3DBlob> serializedRootSig = nullptr;
+		ComPtr<ID3DBlob> errorBlob = nullptr;
+		hReturn = D3D12SerializeRootSignature(&rootSigDesc, D3D_ROOT_SIGNATURE_VERSION_1,
+			serializedRootSig.GetAddressOf(), errorBlob.GetAddressOf());
+
+		if (errorBlob != nullptr)
+		{
+			::OutputDebugStringA((char*)errorBlob->GetBufferPointer());
+		}
+		HR(hReturn);
+
+		HR(m_pd3dDevice->CreateRootSignature(
+			0,
+			serializedRootSig->GetBufferPointer(),
+			serializedRootSig->GetBufferSize(),
+			IID_PPV_ARGS(m_RootSignatures["blur"].GetAddressOf())));
+	}
+	#pragma endregion
+
+	{
+		CD3DX12_DESCRIPTOR_RANGE uavTable0;
+		uavTable0.Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 0);
+		CD3DX12_DESCRIPTOR_RANGE uavTable1;
+		uavTable1.Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 1);
+		CD3DX12_DESCRIPTOR_RANGE uavTable2;
+		uavTable2.Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 2);
+
+		CD3DX12_ROOT_PARAMETER slotRootParameter[4];
+		slotRootParameter[0].InitAsConstants(6, 0);
+		slotRootParameter[1].InitAsDescriptorTable(1,&uavTable0);
+		slotRootParameter[2].InitAsDescriptorTable(1,&uavTable1);
+		slotRootParameter[3].InitAsDescriptorTable(1,&uavTable2);
+
+		CD3DX12_ROOT_SIGNATURE_DESC rootSigDesc(_countof(slotRootParameter), slotRootParameter,
+			0, nullptr, D3D12_ROOT_SIGNATURE_FLAG_NONE);
+
+		ComPtr<ID3DBlob> serializedRootSig = nullptr;
+		ComPtr<ID3DBlob> errorBlob = nullptr;
+		hReturn = D3D12SerializeRootSignature(&rootSigDesc, D3D_ROOT_SIGNATURE_VERSION_1,
+			serializedRootSig.GetAddressOf(), errorBlob.GetAddressOf());
+
+		if (errorBlob != nullptr)
+		{
+			::OutputDebugStringA((char*)errorBlob->GetBufferPointer());
+		}
+		HR(hReturn);
+
+		HR(m_pd3dDevice->CreateRootSignature(
+			0,
+			serializedRootSig->GetBufferPointer(),
+			serializedRootSig->GetBufferSize(),
+			IID_PPV_ARGS(m_RootSignatures["wavesSim"].GetAddressOf())));
+	}
+
 }
 
 void CSApp::BuildDescriptorHeaps()
@@ -539,7 +657,7 @@ void CSApp::BuildDescriptorHeaps()
 	ComPtr<ID3D12Resource> fenceTex;
 
 	// SRV Heap
-	srvHeapDesc.NumDescriptors = textureDescriptorCount + blurDescriptorCount;
+	srvHeapDesc.NumDescriptors = textureDescriptorCount + blurDescriptorCount + m_GpuWaves->DescriptorCount();
 	srvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
 	srvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
 	HR(m_pd3dDevice->CreateDescriptorHeap(&srvHeapDesc, IID_PPV_ARGS(&m_SrvDescriptorHeap)));
@@ -566,8 +684,13 @@ void CSApp::BuildDescriptorHeaps()
 	m_pd3dDevice->CreateShaderResourceView(fenceTex.Get(), &srvDesc, hDescriptor);
 
 	m_BlurFilter->BuildDescriptors(
-		CD3DX12_CPU_DESCRIPTOR_HANDLE(m_SrvDescriptorHeap->GetCPUDescriptorHandleForHeapStart(), 3, m_CBVSRVDescriptorSize),
-		CD3DX12_GPU_DESCRIPTOR_HANDLE(m_SrvDescriptorHeap->GetGPUDescriptorHandleForHeapStart(), 3, m_CBVSRVDescriptorSize),
+		CD3DX12_CPU_DESCRIPTOR_HANDLE(m_SrvDescriptorHeap->GetCPUDescriptorHandleForHeapStart(), textureDescriptorCount, m_CBVSRVDescriptorSize),
+		CD3DX12_GPU_DESCRIPTOR_HANDLE(m_SrvDescriptorHeap->GetGPUDescriptorHandleForHeapStart(), textureDescriptorCount, m_CBVSRVDescriptorSize),
+		m_CBVSRVDescriptorSize);
+
+	m_GpuWaves->BuildDescriptors(
+		CD3DX12_CPU_DESCRIPTOR_HANDLE(m_SrvDescriptorHeap->GetCPUDescriptorHandleForHeapStart(), textureDescriptorCount + blurDescriptorCount, m_CBVSRVDescriptorSize),
+		CD3DX12_GPU_DESCRIPTOR_HANDLE(m_SrvDescriptorHeap->GetGPUDescriptorHandleForHeapStart(), textureDescriptorCount + blurDescriptorCount, m_CBVSRVDescriptorSize),
 		m_CBVSRVDescriptorSize);
 }
 
@@ -621,57 +744,106 @@ void CSApp::BuildLandGeometry()
 
 void CSApp::BuildWavesGeometry()
 {
-	std::vector<std::uint16_t> indices(3 * m_Waves->GetTriangleCount());
-	assert(m_Waves->GetVertexCount() < 0x0000ffff);
-
-	int r = m_Waves->GetRowCount();
-	int c = m_Waves->GetColCount();
-	int k = 0;
-
-	for (int i = 0; i < r - 1; ++i) 
+	// Cpu wave
 	{
-		for (int j = 0; j < c - 1; ++j) 
+		std::vector<std::uint16_t> indices(3 * m_Waves->GetTriangleCount());
+		assert(m_Waves->GetVertexCount() < 0x0000ffff);
+
+		int r = m_Waves->GetRowCount();
+		int c = m_Waves->GetColCount();
+		int k = 0;
+
+		for (int i = 0; i < r - 1; ++i) 
 		{
-			indices[k] = i * c + j;
-			indices[k + 1] = i * c + j + 1;
-			indices[k + 2] = (i + 1) * c + j;
+			for (int j = 0; j < c - 1; ++j) 
+			{
+				indices[k] = i * c + j;
+				indices[k + 1] = i * c + j + 1;
+				indices[k + 2] = (i + 1) * c + j;
 
-			indices[k + 5] = i * c + j + 1;
-			indices[k + 3] = (i + 1) * c + j + 1;
-			indices[k + 4] = (i + 1) * c + j;
+				indices[k + 5] = i * c + j + 1;
+				indices[k + 3] = (i + 1) * c + j + 1;
+				indices[k + 4] = (i + 1) * c + j;
 
-			k += 6;
+				k += 6;
+			}
 		}
+
+		UINT vbByteSize = m_Waves->GetVertexCount() * sizeof(Vertex);
+		UINT ibByteSize = (UINT)indices.size() * sizeof(std::uint16_t);
+
+		auto geo = std::make_unique<MeshGeometry>();
+		geo->Name = "waterGeo";
+
+		geo->VertexBufferCPU = nullptr;
+		geo->VertexBufferGPU = nullptr;
+
+		HR(D3DCreateBlob(ibByteSize, &geo->IndexBufferCPU));
+		CopyMemory(geo->IndexBufferCPU->GetBufferPointer(), indices.data(), ibByteSize);
+
+		geo->IndexBufferGPU = d3dUtil::CreateDefaultBuffer(m_pd3dDevice.Get(),
+			m_CommandList.Get(), indices.data(), ibByteSize, geo->IndexBufferUploader);
+
+		geo->VertexByteStride = sizeof(Vertex);
+		geo->VertexBufferByteSize = vbByteSize;
+		geo->IndexFormat = DXGI_FORMAT_R16_UINT;
+		geo->IndexBufferByteSize = ibByteSize;
+
+		SubmeshGeometry submesh;
+		submesh.IndexCount = (UINT)indices.size();
+		submesh.StartIndexLocation = 0;
+		submesh.BaseVertexLocation = 0;
+
+		geo->DrawArgs["grid"] = submesh;
+
+		m_Geometries["waterGeo"] = std::move(geo);
 	}
 
-	UINT vbByteSize = m_Waves->GetVertexCount() * sizeof(Vertex);
-	UINT ibByteSize = (UINT)indices.size() * sizeof(std::uint16_t);
+	// Gpu wave
+	{
+		GeometryGenerator geoGen;
+		GeometryGenerator::MeshData grid = geoGen.CreateGrid(160.0f, 160.0f, m_GpuWaves->RowCount(), m_GpuWaves->ColumnCount());
 
-	auto geo = std::make_unique<MeshGeometry>();
-	geo->Name = "waterGeo";
+		std::vector<Vertex> vertices(grid.Vertices.size());
+		std::vector<std::uint32_t> indices = grid.Indices32;
+		for (size_t i = 0; i < grid.Vertices.size(); ++i) 
+		{
+			vertices[i].Pos = grid.Vertices[i].Position;
+			vertices[i].Normal = grid.Vertices[i].Normal;
+			vertices[i].TexC = grid.Vertices[i].TexC;
+		}
 
-	geo->VertexBufferCPU = nullptr;
-	geo->VertexBufferGPU = nullptr;
+		UINT vbByteSize = m_GpuWaves->VertexCount() * sizeof(Vertex);
+		UINT ibByteSize = indices.size() * sizeof(std::uint32_t);
 
-	HR(D3DCreateBlob(ibByteSize, &geo->IndexBufferCPU));
-	CopyMemory(geo->IndexBufferCPU->GetBufferPointer(), indices.data(), ibByteSize);
+		auto geo = std::make_unique<MeshGeometry>();
+		geo->Name = "gpuWaterGeo";
 
-	geo->IndexBufferGPU = d3dUtil::CreateDefaultBuffer(m_pd3dDevice.Get(),
-		m_CommandList.Get(), indices.data(), ibByteSize, geo->IndexBufferUploader);
+		HR(D3DCreateBlob(vbByteSize, &geo->VertexBufferCPU));
+		CopyMemory(geo->VertexBufferCPU->GetBufferPointer(), vertices.data(), vbByteSize);
+		
+		HR(D3DCreateBlob(ibByteSize, &geo->IndexBufferCPU));
+		CopyMemory(geo->IndexBufferCPU->GetBufferPointer(), indices.data(), ibByteSize);
 
-	geo->VertexByteStride = sizeof(Vertex);
-	geo->VertexBufferByteSize = vbByteSize;
-	geo->IndexFormat = DXGI_FORMAT_R16_UINT;
-	geo->IndexBufferByteSize = ibByteSize;
+		geo->VertexBufferGPU = d3dUtil::CreateDefaultBuffer(m_pd3dDevice.Get(),
+			m_CommandList.Get(), vertices.data(), vbByteSize, geo->VertexBufferUploader);
+		geo->IndexBufferGPU = d3dUtil::CreateDefaultBuffer(m_pd3dDevice.Get(),
+			m_CommandList.Get(), indices.data(), ibByteSize, geo->IndexBufferUploader);
 
-	SubmeshGeometry submesh;
-	submesh.IndexCount = (UINT)indices.size();
-	submesh.StartIndexLocation = 0;
-	submesh.BaseVertexLocation = 0;
+		geo->VertexBufferByteSize = vbByteSize;
+		geo->VertexByteStride = sizeof(Vertex);
+		geo->IndexFormat = DXGI_FORMAT_R32_UINT;
+		geo->IndexBufferByteSize = ibByteSize;
 
-	geo->DrawArgs["grid"] = submesh;
+		SubmeshGeometry submesh;
+		submesh.IndexCount = (UINT)indices.size();
+		submesh.BaseVertexLocation = 0;
+		submesh.StartIndexLocation = 0;
 
-	m_Geometries["waterGeo"] = std::move(geo);
+		geo->DrawArgs["grid"] = submesh;
+
+		m_Geometries[geo->Name] = std::move(geo);
+	}
 }
 
 void CSApp::BuildBoxGeometry()
@@ -735,11 +907,21 @@ void CSApp::BuildShadersAndInputLayout()
 		NULL, NULL
 	};
 
+	const D3D_SHADER_MACRO waveDefines[] =
+	{
+		"DISPLACEMENT_MAP","1",
+		NULL,NULL
+	};
+
 	m_Shaders["standardVS"]		= d3dUtil::CompileShader(L"..\\Shader\\Chapter13\\Default.hlsl", nullptr, "VS", "vs_5_1");
+	m_Shaders["wavesVS"]		= d3dUtil::CompileShader(L"..\\Shader\\Chapter13\\Default.hlsl", waveDefines, "VS", "vs_5_1");
 	m_Shaders["opaquePS"]		= d3dUtil::CompileShader(L"..\\Shader\\Chapter13\\Default.hlsl", defines, "PS", "ps_5_1");
 	m_Shaders["alphaTestedPS"]	= d3dUtil::CompileShader(L"..\\Shader\\Chapter13\\Default.hlsl", alphaTestDefines, "PS", "ps_5_1");
 	m_Shaders["horzBlurCS"]		= d3dUtil::CompileShader(L"..\\Shader\\Chapter13\\Blur.hlsl", nullptr, "HorzBlurCS", "cs_5_1");
 	m_Shaders["vertBlurCS"]		= d3dUtil::CompileShader(L"..\\Shader\\Chapter13\\Blur.hlsl", nullptr, "VertBlurCS", "cs_5_1");
+	m_Shaders["wavesUpdateCS"]	= d3dUtil::CompileShader(L"..\\Shader\\Chapter13\\WaveSim.hlsl", nullptr, "UpdateWaveCS", "cs_5_1");
+	m_Shaders["wavesDisturbCS"] = d3dUtil::CompileShader(L"..\\Shader\\Chapter13\\WaveSim.hlsl", nullptr, "DisturbWavesCS", "cs_5_1");
+
 
 	m_InputLayout =
 	{
@@ -755,7 +937,7 @@ void CSApp::BuildPSOs()
 	D3D12_GRAPHICS_PIPELINE_STATE_DESC opaquePsoDesc;
 	ZeroMemory(&opaquePsoDesc, sizeof(D3D12_GRAPHICS_PIPELINE_STATE_DESC));
 	opaquePsoDesc.InputLayout = { m_InputLayout.data(),(UINT)m_InputLayout.size() };
-	opaquePsoDesc.pRootSignature = m_RootSignature.Get();
+	opaquePsoDesc.pRootSignature = m_RootSignatures["wavesRender"].Get();
 	opaquePsoDesc.VS =
 	{
 		reinterpret_cast<BYTE*>(m_Shaders["standardVS"]->GetBufferPointer()),
@@ -812,7 +994,7 @@ void CSApp::BuildPSOs()
 
 	// HorzBlur
 	D3D12_COMPUTE_PIPELINE_STATE_DESC horzBlurPso = {};
-	horzBlurPso.pRootSignature = m_CSRootSignature.Get();
+	horzBlurPso.pRootSignature = m_RootSignatures["blur"].Get();
 	horzBlurPso.CS =
 	{
 		reinterpret_cast<BYTE*>(m_Shaders["horzBlurCS"]->GetBufferPointer()),
@@ -823,7 +1005,7 @@ void CSApp::BuildPSOs()
 	
 	// VertBlur
 	D3D12_COMPUTE_PIPELINE_STATE_DESC vertBlurPso = {};
-	vertBlurPso.pRootSignature = m_CSRootSignature.Get();
+	vertBlurPso.pRootSignature = m_RootSignatures["blur"].Get();
 	vertBlurPso.CS =
 	{
 		reinterpret_cast<BYTE*>(m_Shaders["vertBlurCS"]->GetBufferPointer()),
@@ -831,6 +1013,38 @@ void CSApp::BuildPSOs()
 	};
 	vertBlurPso.Flags = D3D12_PIPELINE_STATE_FLAG_NONE;
 	HR(m_pd3dDevice->CreateComputePipelineState(&vertBlurPso, IID_PPV_ARGS(&m_PSOs["vertBlur"])));
+	
+	// Draw waves
+	D3D12_GRAPHICS_PIPELINE_STATE_DESC wavesRenderPso = transparentPsoDesc;
+	wavesRenderPso.VS =
+	{
+		reinterpret_cast<BYTE*>(m_Shaders["wavesVS"]->GetBufferPointer()),
+		m_Shaders["wavesVS"]->GetBufferSize()
+	};
+	HR(m_pd3dDevice->CreateGraphicsPipelineState(&wavesRenderPso, IID_PPV_ARGS(&m_PSOs["wavesRender"])));
+
+	// WaveUpdate
+	D3D12_COMPUTE_PIPELINE_STATE_DESC wavesUpdatePso = {};
+	wavesUpdatePso.pRootSignature = m_RootSignatures["wavesSim"].Get();
+	wavesUpdatePso.CS =
+	{
+		reinterpret_cast<BYTE*>(m_Shaders["wavesUpdateCS"]->GetBufferPointer()),
+		m_Shaders["wavesUpdateCS"]->GetBufferSize()
+	};
+	wavesUpdatePso.Flags = D3D12_PIPELINE_STATE_FLAG_NONE;
+	HR(m_pd3dDevice->CreateComputePipelineState(&wavesUpdatePso, IID_PPV_ARGS(&m_PSOs["wavesUpdate"])));
+
+	// WaveDisturb
+	D3D12_COMPUTE_PIPELINE_STATE_DESC wavesDisturbPso = {};
+	wavesDisturbPso.pRootSignature = m_RootSignatures["wavesSim"].Get();
+	wavesDisturbPso.CS =
+	{
+		reinterpret_cast<BYTE*>(m_Shaders["wavesDisturbCS"]->GetBufferPointer()),
+		m_Shaders["wavesDisturbCS"]->GetBufferSize()
+	};
+	wavesDisturbPso.Flags = D3D12_PIPELINE_STATE_FLAG_NONE;
+	HR(m_pd3dDevice->CreateComputePipelineState(&wavesDisturbPso, IID_PPV_ARGS(&m_PSOs["wavesDisturb"])));
+
 }
 
 void CSApp::BuildFrameResources()
@@ -889,10 +1103,26 @@ void CSApp::BuildRenderItems()
 	m_WavesRitem = wavesRitem.get();
 	m_RitemLayer[(int)RenderLayer::Transparent].push_back(wavesRitem.get());
 
+	auto gpuWavesRitem = std::make_unique<RenderItem>();
+	gpuWavesRitem->World = MathHelper::Identity4x4();
+	XMStoreFloat4x4(&gpuWavesRitem->TexTransform, XMMatrixScaling(5.0f, 5.0f, 1.0f));
+	gpuWavesRitem->DisplacementMapTexelSize.x = 1.0f / m_GpuWaves->ColumnCount();
+	gpuWavesRitem->DisplacementMapTexelSize.y = 1.0f / m_GpuWaves->RowCount();
+	gpuWavesRitem->GridSpatialStep = m_GpuWaves->SpatialStep();
+	gpuWavesRitem->ObjCBIndex = 1;
+	gpuWavesRitem->Mat = m_Materials["water"].get();
+	gpuWavesRitem->Geo = m_Geometries["gpuWaterGeo"].get();
+	gpuWavesRitem->PrimitiveType = D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+	gpuWavesRitem->IndexCount = gpuWavesRitem->Geo->DrawArgs["grid"].IndexCount;
+	gpuWavesRitem->StartIndexLocation = gpuWavesRitem->Geo->DrawArgs["grid"].StartIndexLocation;
+	gpuWavesRitem->BaseVertexLocation = gpuWavesRitem->Geo->DrawArgs["grid"].BaseVertexLocation;
+
+	m_RitemLayer[(int)RenderLayer::GpuWaves].push_back(gpuWavesRitem.get());
+
 	auto gridRitem = std::make_unique<RenderItem>();
 	gridRitem->World = MathHelper::Identity4x4();
 	XMStoreFloat4x4(&gridRitem->TexTransform, XMMatrixScaling(5.0f, 5.0f, 1.0f));
-	gridRitem->ObjCBIndex = 1;
+	gridRitem->ObjCBIndex = 2;
 	gridRitem->Mat = m_Materials["grass"].get();
 	gridRitem->Geo = m_Geometries["landGeo"].get();
 	gridRitem->PrimitiveType = D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
@@ -905,7 +1135,7 @@ void CSApp::BuildRenderItems()
 	auto boxRitem = std::make_unique<RenderItem>();
 	XMStoreFloat4x4(&boxRitem->World, XMMatrixTranslation(3.0f, 2.0f, -9.0f));
 	//XMStoreFloat4x4(&boxRitem->TexTransform, XMMatrixScaling(2.0f, 2.0f, 2.0f));
-	boxRitem->ObjCBIndex = 2;
+	boxRitem->ObjCBIndex = 3;
 	boxRitem->Mat = m_Materials["wirefence"].get();
 	boxRitem->Geo = m_Geometries["boxGeo"].get();
 	boxRitem->PrimitiveType = D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
@@ -916,6 +1146,7 @@ void CSApp::BuildRenderItems()
 	m_RitemLayer[(int)RenderLayer::AlphaTested].push_back(boxRitem.get());
 
 	m_AllRitems.push_back(std::move(wavesRitem));
+	m_AllRitems.push_back(std::move(gpuWavesRitem));
 	m_AllRitems.push_back(std::move(gridRitem));
 	m_AllRitems.push_back(std::move(boxRitem));
 }
