@@ -145,7 +145,7 @@ void GpuWaves::BuildResource(ID3D12GraphicsCommandList* cmdList)
 		D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_COPY_DEST));
 	UpdateSubresources(cmdList, m_CurrSol.Get(), m_CurrUploadBuffer.Get(), 0, 0, num2DSubresources, &subResourceData);
 	cmdList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_CurrSol.Get(),
-		D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_UNORDERED_ACCESS));
+		D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_GENERIC_READ));
 
 	cmdList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_NextSol.Get(),
 		D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_UNORDERED_ACCESS));
@@ -193,10 +193,13 @@ void GpuWaves::Update(const GameTimer& gt, ID3D12GraphicsCommandList* cmdList, I
 
 	if (t >= m_fTimeStep) 
 	{
-		cmdList->SetComputeRoot32BitConstants(0, 3, &m_K, 0);
+		cmdList->SetComputeRoot32BitConstants(0, 3, m_K, 0);
 		cmdList->SetComputeRootDescriptorTable(1, m_PrevSolUav);
 		cmdList->SetComputeRootDescriptorTable(2, m_CurrSolUav);
 		cmdList->SetComputeRootDescriptorTable(3, m_NextSolUav);
+
+		cmdList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_CurrSol.Get(),
+			D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_UNORDERED_ACCESS));
 
 		UINT numGroupsX = m_NumCols / 16;
 		UINT numGroupsY = m_NumRows / 16;
@@ -239,4 +242,7 @@ void GpuWaves::Disturb(ID3D12GraphicsCommandList* cmdList, ID3D12RootSignature* 
 		D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_UNORDERED_ACCESS));
 
 	cmdList->Dispatch(1, 1, 1);
+
+	cmdList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_CurrSol.Get(),
+		D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_GENERIC_READ));
 }

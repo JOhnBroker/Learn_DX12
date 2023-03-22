@@ -14,7 +14,7 @@ RWTexture2D<float> gCurrSolInput : register(u1);
 RWTexture2D<float> gOutput : register(u2);
 
 [numthreads(16,16,1)]
-void UpdateWaveCS(int3 dtid : SV_DispatchThreadID)
+void UpdateWavesCS(int3 dtid : SV_DispatchThreadID)
 {
     int x = dtid.x;
     int y = dtid.y;

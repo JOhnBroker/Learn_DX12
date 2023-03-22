@@ -84,6 +84,7 @@ public:
 	void UpdateMaterialCBs(const GameTimer& gt);
 	void UpdateMainPassCB(const GameTimer& gt);
 	void UpdateWaves(const GameTimer& gt);
+	void UpdateWavesGpu(const GameTimer& gt);
 
 	void BuildRootSignature();
 	void BuildCSRootSignature();

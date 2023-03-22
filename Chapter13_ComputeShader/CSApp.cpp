@@ -161,7 +161,10 @@ void CSApp::Update(const GameTimer& timer)
 	UpdateObjectCBs(timer);
 	UpdateMaterialCBs(timer);
 	UpdateMainPassCB(timer);
-	UpdateWaves(timer);
+	if (m_CurrMode != ShowMode::WavesCS) 
+	{
+		UpdateWaves(timer);
+	}
 }
 
 void CSApp::Draw(const GameTimer& timer)
@@ -239,19 +242,22 @@ void CSApp::Draw(const GameTimer& timer)
 
 		m_CommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(CurrentBackBuffer(),
 			D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_RENDER_TARGET));
+
 		m_CommandList->SetDescriptorHeaps(1, m_SRVHeap.GetAddressOf());
 		ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), m_CommandList.Get());
+
 		m_CommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(CurrentBackBuffer(),
 			D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
 		break;
 	case ShowMode::WavesCS:
+		UpdateWavesGpu(timer);
+		m_CommandList->SetGraphicsRootSignature(m_RootSignatures["wavesRender"].Get());
 		m_CommandList->SetGraphicsRootDescriptorTable(4, m_GpuWaves->DisplacementMap());
 
+		m_CommandList->SetPipelineState(m_PSOs["opaque"].Get());
 		DrawRenderItems(m_CommandList.Get(), m_RitemLayer[(int)RenderLayer::Opaque]);
 		m_CommandList->SetPipelineState(m_PSOs["alphaTested"].Get());
 		DrawRenderItems(m_CommandList.Get(), m_RitemLayer[(int)RenderLayer::AlphaTested]);
-		m_CommandList->SetPipelineState(m_PSOs["transparent"].Get());
-		DrawRenderItems(m_CommandList.Get(), m_RitemLayer[(int)RenderLayer::Transparent]);
 		m_CommandList->SetPipelineState(m_PSOs["wavesRender"].Get());
 		DrawRenderItems(m_CommandList.Get(), m_RitemLayer[(int)RenderLayer::GpuWaves]);
 
@@ -441,51 +447,50 @@ void CSApp::UpdateMainPassCB(const GameTimer& gt)
 void CSApp::UpdateWaves(const GameTimer& gt)
 {
 	static float t_base = 0.0f;
-
-	if (m_CurrMode == ShowMode::Opaque) 
+	if ((m_Timer.TotalTime() - t_base) >= 0.25f)
 	{
-		if ((m_Timer.TotalTime() - t_base) >= 0.25f)
-		{
-			t_base += 0.25f;
-			int i = MathHelper::Rand(4, m_Waves->GetRowCount() - 5);
-			int j = MathHelper::Rand(4, m_Waves->GetColCount() - 5);
+		t_base += 0.25f;
+		int i = MathHelper::Rand(4, m_Waves->GetRowCount() - 5);
+		int j = MathHelper::Rand(4, m_Waves->GetColCount() - 5);
 
-			float r = MathHelper::RandF(0.2f, 0.5f);
+		float r = MathHelper::RandF(0.2f, 0.5f);
 
-			m_Waves->Disturb(i, j, r);
-		}
-
-		m_Waves->Update(gt.DeltaTime());
-
-		auto currWavesVB = m_CurrFrameResource->WavesVB.get();
-		for (int i = 0; i < m_Waves->GetVertexCount(); ++i)
-		{
-			Vertex v;
-			v.Pos = m_Waves->Position(i);
-			v.Normal = m_Waves->Normal(i);
-
-			v.TexC.x = 0.5f + v.Pos.x / m_Waves->GetWidth();
-			v.TexC.y = 0.5f - v.Pos.z / m_Waves->GetDepth();
-
-			currWavesVB->CopyData(i, v);
-		}
-
-		m_WavesRitem->Geo->VertexBufferGPU = currWavesVB->Resource();
+		m_Waves->Disturb(i, j, r);
 	}
-	else if (m_CurrMode == ShowMode::WavesCS) 
+
+	m_Waves->Update(gt.DeltaTime());
+
+	auto currWavesVB = m_CurrFrameResource->WavesVB.get();
+	for (int i = 0; i < m_Waves->GetVertexCount(); ++i)
 	{
-		if (m_Timer.TotalTime() - t_base >= 0.25f) 
-		{
-			t_base += 0.25f;
+		Vertex v;
+		v.Pos = m_Waves->Position(i);
+		v.Normal = m_Waves->Normal(i);
 
-			int i = MathHelper::Rand(4, m_GpuWaves->RowCount() - 5);
-			int j = MathHelper::Rand(4, m_GpuWaves->ColumnCount() - 5);
+		v.TexC.x = 0.5f + v.Pos.x / m_Waves->GetWidth();
+		v.TexC.y = 0.5f - v.Pos.z / m_Waves->GetDepth();
 
-			float r = MathHelper::RandF(1.0f, 2.0f);
-			m_GpuWaves->Disturb(m_CommandList.Get(), m_RootSignatures["wavesSim"].Get(), m_PSOs["wavesDisturb"].Get(), i, j, r);
-		}
-		m_GpuWaves->Update(gt, m_CommandList.Get(), m_RootSignatures["wavesSim"].Get(), m_PSOs["wavesUpdate"].Get());
+		currWavesVB->CopyData(i, v);
 	}
+
+	m_WavesRitem->Geo->VertexBufferGPU = currWavesVB->Resource();
+}
+
+void CSApp::UpdateWavesGpu(const GameTimer& gt)
+{
+	static float t_base = 0.0f;
+
+	if (m_Timer.TotalTime() - t_base >= 0.25f)
+	{
+		t_base += 0.25f;
+
+		int i = MathHelper::Rand(4, m_GpuWaves->RowCount() - 5);
+		int j = MathHelper::Rand(4, m_GpuWaves->ColumnCount() - 5);
+
+		float r = MathHelper::RandF(1.0f, 2.0f);
+		m_GpuWaves->Disturb(m_CommandList.Get(), m_RootSignatures["wavesSim"].Get(), m_PSOs["wavesDisturb"].Get(), i, j, r);
+	}
+	m_GpuWaves->Update(gt, m_CommandList.Get(), m_RootSignatures["wavesSim"].Get(), m_PSOs["wavesUpdate"].Get());
 }
 
 void CSApp::BuildRootSignature()
@@ -919,7 +924,7 @@ void CSApp::BuildShadersAndInputLayout()
 	m_Shaders["alphaTestedPS"]	= d3dUtil::CompileShader(L"..\\Shader\\Chapter13\\Default.hlsl", alphaTestDefines, "PS", "ps_5_1");
 	m_Shaders["horzBlurCS"]		= d3dUtil::CompileShader(L"..\\Shader\\Chapter13\\Blur.hlsl", nullptr, "HorzBlurCS", "cs_5_1");
 	m_Shaders["vertBlurCS"]		= d3dUtil::CompileShader(L"..\\Shader\\Chapter13\\Blur.hlsl", nullptr, "VertBlurCS", "cs_5_1");
-	m_Shaders["wavesUpdateCS"]	= d3dUtil::CompileShader(L"..\\Shader\\Chapter13\\WaveSim.hlsl", nullptr, "UpdateWaveCS", "cs_5_1");
+	m_Shaders["wavesUpdateCS"]	= d3dUtil::CompileShader(L"..\\Shader\\Chapter13\\WaveSim.hlsl", nullptr, "UpdateWavesCS", "cs_5_1");
 	m_Shaders["wavesDisturbCS"] = d3dUtil::CompileShader(L"..\\Shader\\Chapter13\\WaveSim.hlsl", nullptr, "DisturbWavesCS", "cs_5_1");
 
 
