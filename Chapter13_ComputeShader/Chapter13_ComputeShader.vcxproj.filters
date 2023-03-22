@@ -43,6 +43,12 @@
     <ClCompile Include="GpuWaves.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
+    <ClCompile Include="SobelFilter.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="RenderTarget.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="d3dApp.h">
@@ -100,6 +106,12 @@
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="GpuWaves.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="SobelFilter.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="RenderTarget.h">
       <Filter>头文件</Filter>
     </ClInclude>
   </ItemGroup>

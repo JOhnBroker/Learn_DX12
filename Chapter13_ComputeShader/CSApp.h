@@ -13,7 +13,9 @@
 #include "Texture.h"
 
 #include "BlurFilter.h"
+#include "SobelFilter.h"
 #include "GpuWaves.h"
+#include "RenderTarget.h"
 
 #define STATICSAMPLERCOUNT 6
 
@@ -132,6 +134,9 @@ private:
 	std::unique_ptr<Waves> m_Waves;
 	std::unique_ptr<GpuWaves> m_GpuWaves;
 	std::unique_ptr<BlurFilter> m_BlurFilter;
+	std::unique_ptr<SobelFilter> m_SobelFilter;
+
+	std::unique_ptr<RenderTarget> m_OffScreenRT = nullptr;
 
 	PassConstants m_MainPassCB;
 

@@ -164,6 +164,8 @@
     <ClCompile Include="Main.cpp" />
     <ClCompile Include="MathHelper.cpp" />
     <ClCompile Include="CSApp.cpp" />
+    <ClCompile Include="RenderTarget.cpp" />
+    <ClCompile Include="SobelFilter.cpp" />
     <ClCompile Include="Waves.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -181,6 +183,8 @@
     <ClInclude Include="Light.h" />
     <ClInclude Include="Material.h" />
     <ClInclude Include="MathHelper.h" />
+    <ClInclude Include="RenderTarget.h" />
+    <ClInclude Include="SobelFilter.h" />
     <ClInclude Include="Texture.h" />
     <ClInclude Include="CSApp.h" />
     <ClInclude Include="UploadBuffer.h" />
