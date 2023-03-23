@@ -7,7 +7,7 @@ SobelFilter::SobelFilter(ID3D12Device* device, UINT width, UINT height, DXGI_FOR
 	m_uiHeight = height;
 	m_Format = format;
 
-	BuildDescriptors();
+	BuildResource();
 }
 
 CD3DX12_GPU_DESCRIPTOR_HANDLE SobelFilter::OutputSrv()

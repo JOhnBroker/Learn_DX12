@@ -286,7 +286,8 @@ void CSApp::Draw(const GameTimer& timer)
 			D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
 		break;
 	case ShowMode::SobelFilter:
-	{
+
+		// draw opaque to offscreen
 		DrawRenderItems(m_CommandList.Get(), m_RitemLayer[(int)RenderLayer::Opaque]);
 		m_CommandList->SetPipelineState(m_PSOs["alphaTested"].Get());
 		DrawRenderItems(m_CommandList.Get(), m_RitemLayer[(int)RenderLayer::AlphaTested]);
@@ -295,29 +296,25 @@ void CSApp::Draw(const GameTimer& timer)
 
 		m_CommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_OffScreenRT->Resource(),
 			D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_GENERIC_READ));
-		
-		// TODO
-		m_SobelFilter->OnProcess(m_CommandList.Get(), m_RootSignatures[""].Get(), m_PSOs["sobel"].Get(), m_OffScreenRT->GetSrv());
-
+		// sobel process
+		m_SobelFilter->OnProcess(m_CommandList.Get(), m_RootSignatures["sobel"].Get(), m_PSOs["sobel"].Get(), m_OffScreenRT->GetSrv());
 		m_CommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(CurrentBackBuffer(),
 			D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET));
 
-		m_CommandList->SetGraphicsRootSignature(m_RootSignatures[""].Get());
-		m_CommandList->SetPipelineState(m_PSOs[""].Get());
+		// composite
+		m_CommandList->OMSetRenderTargets(1, &CurrentBackBufferView(), true, &DepthStencilView());
+		m_CommandList->SetGraphicsRootSignature(m_RootSignatures["sobel"].Get());
+		m_CommandList->SetPipelineState(m_PSOs["composite"].Get());
 		m_CommandList->SetGraphicsRootDescriptorTable(0, m_OffScreenRT->GetSrv());
 		m_CommandList->SetGraphicsRootDescriptorTable(1, m_SobelFilter->OutputSrv());
-		//draw full screen
-
-		m_CommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(CurrentBackBuffer(),
-			D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
+		DrawFullScreenQuad(m_CommandList.Get());
 
 		m_CommandList->SetDescriptorHeaps(1, m_SRVHeap.GetAddressOf());
 		ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), m_CommandList.Get());
 
-		m_CommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_OffScreenRT->Resource(),
-			D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_PRESENT));
+		m_CommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(CurrentBackBuffer(),
+			D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
 		break;
-	}
 	}
 
 	HR(m_CommandList->Close());
@@ -1034,11 +1031,11 @@ void CSApp::BuildShadersAndInputLayout()
 	m_Shaders["alphaTestedPS"]	= d3dUtil::CompileShader(L"..\\Shader\\Chapter13\\Default.hlsl", alphaTestDefines, "PS", "ps_5_1");
 	m_Shaders["horzBlurCS"]		= d3dUtil::CompileShader(L"..\\Shader\\Chapter13\\Blur.hlsl", nullptr, "HorzBlurCS", "cs_5_1");
 	m_Shaders["vertBlurCS"]		= d3dUtil::CompileShader(L"..\\Shader\\Chapter13\\Blur.hlsl", nullptr, "VertBlurCS", "cs_5_1");
-	m_Shaders["wavesUpdateCS"]	= d3dUtil::CompileShader(L"..\\Shader\\Chapter13\\WaveSim.hlsl", nullptr, "UpdateWaveCS", "cs_5_1");
+	m_Shaders["wavesUpdateCS"]	= d3dUtil::CompileShader(L"..\\Shader\\Chapter13\\WaveSim.hlsl", nullptr, "UpdateWavesCS", "cs_5_1");
 	m_Shaders["wavesDisturbCS"] = d3dUtil::CompileShader(L"..\\Shader\\Chapter13\\WaveSim.hlsl", nullptr, "DisturbWavesCS", "cs_5_1");
-	m_Shaders["compositeVS"]	= d3dUtil::CompileShader(L"..\\Shader\\Chapter13\\Composite.hlsl", nullptr, "VS", "vs_5_1");
-	m_Shaders["compositePS"]	= d3dUtil::CompileShader(L"..\\Shader\\Chapter13\\Composite.hlsl", nullptr, "PS", "ps_5_1");
-	m_Shaders["sobelCS"]		= d3dUtil::CompileShader(L"..\\Shader\\Chapter13\\WaveSim.hlsl", nullptr, "SobelCS", "cs_5_1");
+	m_Shaders["compositeVS"]	= d3dUtil::CompileShader(L"..\\Shader\\Chapter13\\SobelVS.hlsl", nullptr, "VS", "vs_5_1");
+	m_Shaders["compositePS"]	= d3dUtil::CompileShader(L"..\\Shader\\Chapter13\\SobelVS.hlsl", nullptr, "PS", "ps_5_1");
+	m_Shaders["sobelCS"]		= d3dUtil::CompileShader(L"..\\Shader\\Chapter13\\Sobel.hlsl", nullptr, "SobelCS", "cs_5_1");
 
 
 	m_InputLayout =
@@ -1175,12 +1172,12 @@ void CSApp::BuildPSOs()
 		reinterpret_cast<BYTE*>(m_Shaders["compositeVS"]->GetBufferPointer()),
 		m_Shaders["compositeVS"]->GetBufferSize()
 	};
-	compositePso.VS =
+	compositePso.PS =
 	{
 		reinterpret_cast<BYTE*>(m_Shaders["compositePS"]->GetBufferPointer()),
 		m_Shaders["compositePS"]->GetBufferSize()
 	};
-	HR(m_pd3dDevice->CreateComputePipelineState(&wavesDisturbPso, IID_PPV_ARGS(&m_PSOs["composite"])));
+	HR(m_pd3dDevice->CreateGraphicsPipelineState(&compositePso, IID_PPV_ARGS(&m_PSOs["composite"])));
 
 	// Sobel
 	D3D12_COMPUTE_PIPELINE_STATE_DESC sobelPso = {};
@@ -1335,6 +1332,16 @@ void CSApp::DrawRenderItems(ID3D12GraphicsCommandList* cmdList, const std::vecto
 
 		cmdList->DrawIndexedInstanced(ri->IndexCount, 1, ri->StartIndexLocation, ri->BaseVertexLocation, 0);
 	}
+}
+
+void CSApp::DrawFullScreenQuad(ID3D12GraphicsCommandList* cmdList)
+{
+	// use SV_VertexID
+	cmdList->IASetVertexBuffers(0, 1, nullptr);
+	cmdList->IASetIndexBuffer(nullptr);
+	cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+	cmdList->DrawInstanced(6, 1, 0, 0);
 }
 
 std::array<const CD3DX12_STATIC_SAMPLER_DESC, STATICSAMPLERCOUNT> CSApp::GetStaticSamplers()

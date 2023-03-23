@@ -75,11 +75,16 @@ void RenderTarget::BuildResource()
 	texDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
 	texDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
 
+	D3D12_CLEAR_VALUE optimizedClearValue = {};
+	optimizedClearValue.Format = m_Format;
+	float fogColor[4] = { 0.7f,0.7f,0.7f,1.0f };
+	memcpy(optimizedClearValue.Color, fogColor, sizeof(float) * 4);
+
 	HR(m_d3dDevice->CreateCommittedResource(
 		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
 		D3D12_HEAP_FLAG_NONE,
 		&texDesc,
 		D3D12_RESOURCE_STATE_GENERIC_READ,
-		nullptr,
+		&optimizedClearValue,
 		IID_PPV_ARGS(&m_OffscreenTex)));
 }
