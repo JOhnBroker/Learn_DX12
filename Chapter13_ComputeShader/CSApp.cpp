@@ -924,7 +924,7 @@ void CSApp::BuildShadersAndInputLayout()
 	m_Shaders["alphaTestedPS"]	= d3dUtil::CompileShader(L"..\\Shader\\Chapter13\\Default.hlsl", alphaTestDefines, "PS", "ps_5_1");
 	m_Shaders["horzBlurCS"]		= d3dUtil::CompileShader(L"..\\Shader\\Chapter13\\Blur.hlsl", nullptr, "HorzBlurCS", "cs_5_1");
 	m_Shaders["vertBlurCS"]		= d3dUtil::CompileShader(L"..\\Shader\\Chapter13\\Blur.hlsl", nullptr, "VertBlurCS", "cs_5_1");
-	m_Shaders["wavesUpdateCS"]	= d3dUtil::CompileShader(L"..\\Shader\\Chapter13\\WaveSim.hlsl", nullptr, "UpdateWavesCS", "cs_5_1");
+	m_Shaders["wavesUpdateCS"]	= d3dUtil::CompileShader(L"..\\Shader\\Chapter13\\WaveSim.hlsl", nullptr, "UpdateWaveCS", "cs_5_1");
 	m_Shaders["wavesDisturbCS"] = d3dUtil::CompileShader(L"..\\Shader\\Chapter13\\WaveSim.hlsl", nullptr, "DisturbWavesCS", "cs_5_1");
 
 
