@@ -1,5 +1,5 @@
-#ifndef LIGHTWAVEAPP_H
-#define LIGHTWAVEAPP_H
+#ifndef BLENDAPP_H
+#define BLENDAPP_H
 
 #include <d3dApp.h>
 #include <array>

@@ -357,12 +357,14 @@ void CSApp::BuildPSOs()
 	
 	// 创建Exercise2的PSO会报错，暂时注释
 	//// Exercise 2
-	//D3D12_COMPUTE_PIPELINE_STATE_DESC exercise2PsoDesc = exercise1PsoDesc;
+	//D3D12_COMPUTE_PIPELINE_STATE_DESC exercise2PsoDesc = {};
+	//exercise2PsoDesc.pRootSignature = m_RootSignature.Get();
 	//exercise2PsoDesc.CS =
 	//{
 	//	reinterpret_cast<BYTE*>(m_Shaders["exercise2CS"]->GetBufferPointer()),
 	//	m_Shaders["exercise2CS"]->GetBufferSize()
 	//};
+	//exercise2PsoDesc.Flags = D3D12_PIPELINE_STATE_FLAG_NONE;
 	//HR(m_pd3dDevice->CreateComputePipelineState(&exercise2PsoDesc, IID_PPV_ARGS(&m_PSOs["exercise2"])));
 }
 

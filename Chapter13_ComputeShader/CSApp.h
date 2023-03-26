@@ -1,5 +1,5 @@
-#ifndef LIGHTWAVEAPP_H
-#define LIGHTWAVEAPP_H
+#ifndef CSAPP_H
+#define CSAPP_H
 
 #include <d3dApp.h>
 #include <array>

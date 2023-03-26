@@ -1,5 +1,5 @@
-#ifndef WAVES_H
-#define WAVES_H
+#ifndef WAVES
+#define WAVES
 
 #include <vector>
 #include <DirectXMath.h>

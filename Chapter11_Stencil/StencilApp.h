@@ -1,5 +1,5 @@
-#ifndef LIGHTWAVEAPP_H
-#define LIGHTWAVEAPP_H
+#ifndef STENCILAPP_H
+#define STENCILAPP_H
 
 #include <d3dApp.h>
 #include <array>

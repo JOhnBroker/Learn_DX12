@@ -1,5 +1,5 @@
-#ifndef LIGHTWAVEAPP_H
-#define LIGHTWAVEAPP_H
+#ifndef TREEBILLBOARDSAPP_H
+#define TREEBILLBOARDSAPP_H
 
 #include <d3dApp.h>
 #include <array>
