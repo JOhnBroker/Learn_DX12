@@ -52,32 +52,41 @@ cbuffer cbPass : register(b2)
 	Light gLights[MaxLights];
 };
 
-struct VertexIn
+struct Basic_VertexIn
 {
 	float3 PosL		:	POSITION;
 };
 
-struct VertexOut
+struct Basic_VertexOut
 {
 	float3 PosL 	:	POSITION;
 };
 
-VertexOut VS (VertexIn vin)
+struct Sphere_VertexIn
 {
-	VertexOut vout;
+    float3 PosL     : POSITION;
+    float3 Normal   : NORMAL;
+    float2 TexC     : TEXCOORD;
+};
+
+// Quad
+
+Basic_VertexOut Basic_VS(Basic_VertexIn vin)
+{
+    Basic_VertexOut vout;
     vout.PosL = vin.PosL;
 	return vout;
 }
 
-struct PatchTess
+struct Basic_PatchTess
 {
     float EdgeTess[4] : SV_TessFactor;
     float InsideTess[2] : SV_InsideTessFactor;
 };
 
-PatchTess ConstantHS(InputPatch<VertexOut, 4> patch, uint patchID : SV_PrimitiveID)
+Basic_PatchTess Basic_ConstantHS(InputPatch<Basic_VertexOut, 4> patch, uint patchID : SV_PrimitiveID)
 {
-    PatchTess pt;
+    Basic_PatchTess pt;
 	
     float3 centerL = 0.25f * (patch[0].PosL + patch[1].PosL + 
 		patch[2].PosL + patch[3].PosL);
@@ -100,42 +109,41 @@ PatchTess ConstantHS(InputPatch<VertexOut, 4> patch, uint patchID : SV_Primitive
     return pt;
 }
 
-struct HullOut
+struct Basic_HullOut
 {
-    float3 PosL : POSITIONT;
+    float3 PosL : POSITION;
 };
-
 
 [domain("quad")]
 [partitioning("integer")]
 [outputtopology("triangle_cw")]
 [outputcontrolpoints(4)]
-[patchconstantfunc("ConstantHS")]
+[patchconstantfunc("Basic_ConstantHS")]
 [maxtessfactor(64.0f)]
-HullOut HS(InputPatch<VertexOut, 4> p, uint i : SV_OutputControlPointID,
+Basic_HullOut Basic_HS(InputPatch<Basic_VertexOut, 4> p, uint i : SV_OutputControlPointID,
 	uint patchID : SV_PrimitiveID)
 {
-    HullOut hout;
+    Basic_HullOut hout;
     hout.PosL = p[i].PosL;
     return hout;
 }
 
-struct DomainOut
+struct Basic_DomainOut
 {
     float4 PosH : SV_Position;
 };
 
 [domain("quad")]
-DomainOut DS(PatchTess patchTess, float2 uv : SV_DomainLocation,
-	const OutputPatch<HullOut, 4> quad)
+Basic_DomainOut Basic_DS(Basic_PatchTess patchTess, float2 uv : SV_DomainLocation,
+	const OutputPatch<Basic_HullOut, 4> quad)
 {
-    DomainOut dout;
+    Basic_DomainOut dout;
 	
     float3 v1 = lerp(quad[0].PosL, quad[1].PosL, uv.x);
     float3 v2 = lerp(quad[2].PosL, quad[3].PosL, uv.x);
     float3 p = lerp(v1, v2, uv.y);
 	
-    p.y = 0.3f * (p.z * sin(p.x), p.x * cos(p.z));
+    p.y = 0.3f * (p.z * sin(p.x) + p.x * cos(p.z));
 	
     float4 posW = mul(float4(p, 1.0f), gWorld);
     dout.PosH = mul(posW, gViewProj);
@@ -143,7 +151,73 @@ DomainOut DS(PatchTess patchTess, float2 uv : SV_DomainLocation,
     return dout;
 }
 
-float4 PS (VertexOut pin) : SV_Target
+float4 Basic_PS(Basic_DomainOut pin) : SV_Target
+{
+    return float4(1.0f, 1.0f, 1.0f, 1.0f);
+}
+
+
+// Sphere
+
+Sphere_VertexIn Sphere_VS(Sphere_VertexIn vin)
+{
+    Sphere_VertexIn vout;
+    vout.PosL = vin.PosL;
+    vout.Normal = vin.PosL;
+    vout.TexC = vout.TexC;
+    return vout;    
+}
+
+struct Sphere_PatchTess
+{
+    float EdgeTess[3] : SV_TessFactor;
+    float InsideTess[1] : SV_InsideTessFactor;
+};
+
+Sphere_PatchTess Sphere_ConstantHS(InputPatch<Sphere_VertexIn, 3> patch,
+    uint patchID : SV_PrimitiveID)
+{
+    Sphere_PatchTess pt;
+    
+    return pt;
+}
+
+struct Sphere_HullOut
+{
+    float3 PosL : POSITION;
+    float3 Normal : NORMAL;
+    float2 TexC : TEXCOORD;
+};
+
+[domain("triangle")]
+[partitioning("integer")]
+[outputtopology("triangle_cw")]
+//todo : with other nessary property
+Sphere_HullOut Sphere_HS(InputPatch<Sphere_VertexIn, 3> patch,
+    uint id : SV_OutputControlPointID,
+    uint patchID : SV_PrimitiveID)
+{
+    Sphere_HullOut hout;
+    return hout;
+}
+
+struct Sphere_DomainOut
+{
+    float4 PosH     : SV_Position;
+    float3 NormalW  : NORMAL;
+    float2 TexC     : TEXCOORD;
+};
+
+[domain("triangle")]
+Sphere_DomainOut Sphere_DS(Sphere_PatchTess patchTess,
+    float2 uv : SV_DomainLocation, 
+    const OutputPatch<Sphere_HullOut, 3> tri)
+{
+    Sphere_DomainOut dout;
+    return dout;
+}
+
+float4 Sphere_PS() : SV_Target
 {
     return float4(1.0f, 1.0f, 1.0f, 1.0f);
 }

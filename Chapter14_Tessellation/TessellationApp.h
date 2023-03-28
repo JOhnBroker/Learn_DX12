@@ -75,14 +75,15 @@ public:
 	virtual void OnMouseDown(WPARAM btnState, int x, int y) override;
 
 	void UpdateCamera(const GameTimer& gt);
-	void UpdateObjects(const GameTimer& gt);
-	void UpdateMaterials(const GameTimer& gt);
-	void UpdateMainPass(const GameTimer& gt);
+	void UpdateObjectCBs(const GameTimer& gt);
+	void UpdateMaterialCBs(const GameTimer& gt);
+	void UpdateMainPassCB(const GameTimer& gt);
 
 	void BuildRootSignature();
 	void BuildDescriptorHeaps();
 	void BuildShadersAndInputLayout();
 	void BuildQuadPatchGeometry();
+	void BuildSpherePatchGeometry();
 	void BuildPSOs();
 	void BuildFrameResources();
 	void BuildMaterials();
@@ -103,8 +104,8 @@ private:
 	ComPtr<ID3D12RootSignature> m_RootSignature = nullptr;
 	ComPtr<ID3D12DescriptorHeap> m_SrvDescriptorHeap = nullptr;
 
-	std::unordered_map<std::string, ComPtr<MeshGeometry>>m_Geometries;
-	std::unordered_map<std::string, ComPtr<Material>> m_Materials;
+	std::unordered_map<std::string, std::unique_ptr<MeshGeometry>>m_Geometries;
+	std::unordered_map<std::string, std::unique_ptr<Material>> m_Materials;
 	std::unordered_map<std::string, std::unique_ptr<Texture>>m_Textures;
 	std::unordered_map<std::string, ComPtr<ID3DBlob>> m_Shaders;
 	std::unordered_map<std::string, ComPtr<ID3D12PipelineState>>m_PSOs;
@@ -124,6 +125,9 @@ private:
 	float m_Theta = 1.24f * XM_PI;
 	float m_Phi = 0.42f * XM_PI;
 	float m_Radius = 12.0f;
+
+	float m_SunTheta = 1.25f * XM_PI;
+	float m_SunPhi = XM_PIDIV4;
 
 	POINT m_LastMousePos;
 	
