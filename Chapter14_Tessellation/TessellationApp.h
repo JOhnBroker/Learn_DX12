@@ -42,8 +42,8 @@ struct RenderItem
 
 enum class RenderLayer :int
 {
-	Opaque = 0,
-	AlphaTested,
+	Basic = 0,
+	Sphere,
 	Count
 };
 
@@ -110,7 +110,7 @@ private:
 	std::unordered_map<std::string, ComPtr<ID3DBlob>> m_Shaders;
 	std::unordered_map<std::string, ComPtr<ID3D12PipelineState>>m_PSOs;
 
-	std::vector<D3D12_INPUT_ELEMENT_DESC> m_InputLayout;
+	std::unordered_map<std::string, std::vector<D3D12_INPUT_ELEMENT_DESC>> m_InputLayouts;
 
 	std::vector<std::unique_ptr<RenderItem>> m_AllRitems;
 	std::vector<RenderItem*> m_RitemLayer[(int)RenderLayer::Count];

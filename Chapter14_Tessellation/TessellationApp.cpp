@@ -161,7 +161,8 @@ void TessellationApp::Draw(const GameTimer& timer)
 	auto passCB = m_CurrFrameResource->PassCB->Resource();
 	m_CommandList->SetGraphicsRootConstantBufferView(3, passCB->GetGPUVirtualAddress());
 
-	DrawRenderItems(m_CommandList.Get(), m_RitemLayer[(int)RenderLayer::Opaque]);
+	// Todo
+	DrawRenderItems(m_CommandList.Get(), m_RitemLayer[(int)RenderLayer::Basic]);
 
 	m_CommandList->SetDescriptorHeaps(1, m_SRVHeap.GetAddressOf());
 	ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), m_CommandList.Get());
@@ -374,10 +375,20 @@ void TessellationApp::BuildShadersAndInputLayout()
 	m_Shaders["basicHS"]	= d3dUtil::CompileShader(L"..\\Shader\\Chapter14\\Tesselator.hlsl", nullptr, "Basic_HS", "hs_5_1");
 	m_Shaders["basicDS"]	= d3dUtil::CompileShader(L"..\\Shader\\Chapter14\\Tesselator.hlsl", nullptr, "Basic_DS", "ds_5_1");
 	m_Shaders["basicPS"]	= d3dUtil::CompileShader(L"..\\Shader\\Chapter14\\Tesselator.hlsl", nullptr, "Basic_PS", "ps_5_1");
+	m_Shaders["sphereVS"] = d3dUtil::CompileShader(L"..\\Shader\\Chapter14\\Tesselator.hlsl", nullptr, "Sphere_VS", "vs_5_1");
+	m_Shaders["sphereHS"] = d3dUtil::CompileShader(L"..\\Shader\\Chapter14\\Tesselator.hlsl", nullptr, "Sphere_HS", "hs_5_1");
+	m_Shaders["sphereDS"] = d3dUtil::CompileShader(L"..\\Shader\\Chapter14\\Tesselator.hlsl", nullptr, "Sphere_DS", "ds_5_1");
+	m_Shaders["spherePS"] = d3dUtil::CompileShader(L"..\\Shader\\Chapter14\\Tesselator.hlsl", nullptr, "Sphere_PS", "ps_5_1");
 
-	m_InputLayout =
+	m_InputLayouts["basic"] =
 	{
 		{"POSITION",0,DXGI_FORMAT_R32G32B32_FLOAT,0,0,D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA,0}
+	};
+	m_InputLayouts["sphere"] =
+	{
+		{"POSITION",0,DXGI_FORMAT_R32G32B32_FLOAT,0,0,D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA,0},
+		{"NORMAL"  ,0,DXGI_FORMAT_R32G32B32_FLOAT,0,12,D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA,0},
+		{"TEXCOORD"  ,0,DXGI_FORMAT_R32G32_FLOAT,0,24,D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA,0}
 	};
 }
 
@@ -473,7 +484,7 @@ void TessellationApp::BuildPSOs()
 	D3D12_GRAPHICS_PIPELINE_STATE_DESC opaquePsoDesc;
 	ZeroMemory(&opaquePsoDesc, sizeof(D3D12_GRAPHICS_PIPELINE_STATE_DESC));
 
-	opaquePsoDesc.InputLayout = { m_InputLayout.data(),(UINT)m_InputLayout.size() };
+	opaquePsoDesc.InputLayout = { m_InputLayouts["basic"].data(),(UINT)m_InputLayouts["basic"].size()};
 	opaquePsoDesc.pRootSignature = m_RootSignature.Get();
 	opaquePsoDesc.VS =
 	{
@@ -507,6 +518,32 @@ void TessellationApp::BuildPSOs()
 	opaquePsoDesc.SampleDesc.Quality = 0;
 	opaquePsoDesc.DSVFormat = m_DepthStencilFormat;
 	HR(m_pd3dDevice->CreateGraphicsPipelineState(&opaquePsoDesc, IID_PPV_ARGS(&m_PSOs["basic"])));
+
+	D3D12_GRAPHICS_PIPELINE_STATE_DESC spherePsoDesc = opaquePsoDesc;
+	spherePsoDesc.InputLayout = { m_InputLayouts["sphere"].data(),(UINT)m_InputLayouts["sphere"].size() };
+	spherePsoDesc.pRootSignature = m_RootSignature.Get();
+	spherePsoDesc.VS =
+	{
+		reinterpret_cast<BYTE*>(m_Shaders["sphereVS"]->GetBufferPointer()),
+		m_Shaders["sphereVS"]->GetBufferSize()
+	};
+	spherePsoDesc.HS =
+	{
+		reinterpret_cast<BYTE*>(m_Shaders["sphereHS"]->GetBufferPointer()),
+		m_Shaders["sphereHS"]->GetBufferSize()
+	};
+	spherePsoDesc.DS =
+	{
+		reinterpret_cast<BYTE*>(m_Shaders["sphereDS"]->GetBufferPointer()),
+		m_Shaders["sphereDS"]->GetBufferSize()
+	};
+	spherePsoDesc.PS =
+	{
+		reinterpret_cast<BYTE*>(m_Shaders["spherePS"]->GetBufferPointer()),
+		m_Shaders["spherePS"]->GetBufferSize()
+	};
+	spherePsoDesc.RasterizerState.FillMode = D3D12_FILL_MODE_SOLID;
+	HR(m_pd3dDevice->CreateGraphicsPipelineState(&spherePsoDesc, IID_PPV_ARGS(&m_PSOs["sphere"])));
 }
 
 void TessellationApp::BuildFrameResources()
@@ -545,9 +582,23 @@ void TessellationApp::BuildRenderItems()
 	quadRitem->StartIndexLocation = quadRitem->Geo->DrawArgs["quad"].StartIndexLocation;
 	quadRitem->BaseVertexLocation = quadRitem->Geo->DrawArgs["quad"].BaseVertexLocation;
 	
-	m_RitemLayer[(int)RenderLayer::Opaque].push_back(quadRitem.get());
+	m_RitemLayer[(int)RenderLayer::Basic].push_back(quadRitem.get());
+
+	auto sphereRitem = std::make_unique<RenderItem>();
+	sphereRitem->World = MathHelper::Identity4x4();
+	sphereRitem->TexTransform = MathHelper::Identity4x4();
+	sphereRitem->ObjCBIndex = 1;
+	sphereRitem->Mat = m_Materials["white"].get();
+	sphereRitem->Geo = m_Geometries["spherePatchGeo"].get();
+	sphereRitem->PrimitiveType = D3D11_PRIMITIVE_TOPOLOGY_3_CONTROL_POINT_PATCHLIST;
+	sphereRitem->IndexCount = sphereRitem->Geo->DrawArgs["sphere"].IndexCount;
+	sphereRitem->StartIndexLocation = sphereRitem->Geo->DrawArgs["sphere"].StartIndexLocation;
+	sphereRitem->BaseVertexLocation = sphereRitem->Geo->DrawArgs["sphere"].BaseVertexLocation;
+
+	m_RitemLayer[(int)RenderLayer::Sphere].push_back(sphereRitem.get());
 
 	m_AllRitems.push_back(std::move(quadRitem));
+	m_AllRitems.push_back(std::move(sphereRitem));
 }
 
 void TessellationApp::DrawRenderItems(ID3D12GraphicsCommandList* cmdList, const std::vector<RenderItem*>& ritems)

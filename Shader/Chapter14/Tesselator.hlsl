@@ -179,6 +179,23 @@ Sphere_PatchTess Sphere_ConstantHS(InputPatch<Sphere_VertexIn, 3> patch,
 {
     Sphere_PatchTess pt;
     
+    float3 centerL = 0.33f * (patch[0].PosL +
+        patch[1].PosL + patch[2].PosL);
+    float3 centerW = mul(float4(centerL, 1.0f), gWorld).xyz;
+    
+    float d = distance(centerW, gEyePosW);
+    
+    const float d0 = 20.0f;
+    const float d1 = 100.0f;
+    float tess = 64.0f * saturate((d1 - d) / (d1 - d0));
+    
+    pt.EdgeTess[0] = tess;
+    pt.EdgeTess[1] = tess;
+    pt.EdgeTess[2] = tess;
+    
+    pt.InsideTess[0] = tess;
+    pt.InsideTess[1] = tess;
+    
     return pt;
 }
 
@@ -189,35 +206,70 @@ struct Sphere_HullOut
     float2 TexC : TEXCOORD;
 };
 
-[domain("triangle")]
+[domain("tri")]
 [partitioning("integer")]
 [outputtopology("triangle_cw")]
-//todo : with other nessary property
+[outputcontrolpoints(3)]
+[patchconstantfunc("Sphere_ConstantHS")]
+[maxtessfactor(64.0f)]
 Sphere_HullOut Sphere_HS(InputPatch<Sphere_VertexIn, 3> patch,
     uint id : SV_OutputControlPointID,
     uint patchID : SV_PrimitiveID)
 {
     Sphere_HullOut hout;
+    hout.PosL = patch[id].PosL;
+    hout.Normal = patch[id].Normal;
+    hout.TexC = patch[id].TexC;
     return hout;
 }
 
 struct Sphere_DomainOut
 {
+    float3 PosW     : POSITION;
     float4 PosH     : SV_Position;
     float3 NormalW  : NORMAL;
     float2 TexC     : TEXCOORD;
 };
 
-[domain("triangle")]
+[domain("tri")]
 Sphere_DomainOut Sphere_DS(Sphere_PatchTess patchTess,
-    float2 uv : SV_DomainLocation, 
+    float3 uvw : SV_DomainLocation, 
     const OutputPatch<Sphere_HullOut, 3> tri)
 {
     Sphere_DomainOut dout;
+    
+    float3 pos = normalize(tri[0].PosL * uvw.x + tri[1].PosL * uvw.y + tri[2].PosL * uvw.z);
+    float3 normal = tri[0].Normal * uvw.x + tri[1].Normal * uvw.y + tri[2].Normal * uvw.z;
+    float2 texC = tri[0].TexC * uvw.x + tri[1].TexC * uvw.y + tri[2].TexC * uvw.z;
+    
+    float4 posW = mul(float4(pos, 1.0f), gWorld);
+    dout.PosW = pos;
+    dout.PosH = mul(posW, gViewProj);
+    dout.NormalW = normalize(mul(normal, (float3x3) gWorld));
+    dout.TexC = mul(float4(texC, 0.0f, 1.0f), gMatTransform).xy;
+    
     return dout;
 }
 
-float4 Sphere_PS() : SV_Target
+float4 Sphere_PS(Sphere_DomainOut pin) : SV_Target
 {
-    return float4(1.0f, 1.0f, 1.0f, 1.0f);
+    float4 diffuseColor = gDiffuseMap.Sample(gsamAnisotropicWrap, pin.TexC) * gDiffuseAlbedo;
+	
+    pin.NormalW = normalize(pin.NormalW);
+	
+    float3 toEyeW = gEyePosW - pin.PosW;
+    float distToEye = length(toEyeW);
+    toEyeW /= distToEye;
+    float4 ambient = gAmbientLight * diffuseColor;
+
+    const float shininess = 1.0f - gRoughness;
+    Material mat = { diffuseColor, gFresnelR0, shininess };
+    float3 shadowFactor = 1.0f;
+    float4 directLight = ComputeLighting(gLights, mat, pin.PosW, pin.NormalW, toEyeW, shadowFactor);
+
+    float4 litColor = ambient + directLight;
+	
+    litColor.a = diffuseColor.a;
+    
+    return litColor;
 }
