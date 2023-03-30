@@ -1,3 +1,15 @@
+#ifndef NUM_DIR_LIGHT
+	#define NUM_DIR_LIGHT 1
+#endif
+
+#ifndef NUM_POINT_LIGHT
+	#define NUM_POINT_LIGHT 0
+#endif
+
+#ifndef NUM_SPOT_LIGHT
+	#define NUM_SPOT_LIGHT 0
+#endif
+
 #include "LightingUtil.hlsl"
 
 Texture2D gDiffuseMap : register(t0);
@@ -163,8 +175,8 @@ Sphere_VertexIn Sphere_VS(Sphere_VertexIn vin)
 {
     Sphere_VertexIn vout;
     vout.PosL = vin.PosL;
-    vout.Normal = vin.PosL;
-    vout.TexC = vout.TexC;
+    vout.Normal = vin.Normal;
+    vout.TexC = vin.TexC;
     return vout;    
 }
 
@@ -185,16 +197,15 @@ Sphere_PatchTess Sphere_ConstantHS(InputPatch<Sphere_VertexIn, 3> patch,
     
     float d = distance(centerW, gEyePosW);
     
-    const float d0 = 20.0f;
-    const float d1 = 100.0f;
-    float tess = 64.0f * saturate((d1 - d) / (d1 - d0));
+    const float d0 = 5.0f;
+    const float d1 = 30.0f;
+    float tess = 10.0f * saturate((d1 - d) / (d1 - d0));
     
     pt.EdgeTess[0] = tess;
     pt.EdgeTess[1] = tess;
     pt.EdgeTess[2] = tess;
     
     pt.InsideTess[0] = tess;
-    pt.InsideTess[1] = tess;
     
     return pt;
 }

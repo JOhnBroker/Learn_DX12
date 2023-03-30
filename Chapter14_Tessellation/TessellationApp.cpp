@@ -37,6 +37,7 @@ bool TessellationApp::Initialize()
 	BuildDescriptorHeaps();
 	BuildShadersAndInputLayout();
 	BuildQuadPatchGeometry();
+	BuildSpherePatchGeometry();
 	BuildMaterials();
 	BuildRenderItems();
 	BuildFrameResources();
@@ -162,7 +163,18 @@ void TessellationApp::Draw(const GameTimer& timer)
 	m_CommandList->SetGraphicsRootConstantBufferView(3, passCB->GetGPUVirtualAddress());
 
 	// Todo
-	DrawRenderItems(m_CommandList.Get(), m_RitemLayer[(int)RenderLayer::Basic]);
+	switch (m_CurrMode)
+	{
+	case ShowMode::Basic:
+		DrawRenderItems(m_CommandList.Get(), m_RitemLayer[(int)RenderLayer::Basic]);
+		break;
+	case ShowMode::Sphere:
+		m_CommandList->SetPipelineState(m_PSOs["sphere"].Get());
+		DrawRenderItems(m_CommandList.Get(), m_RitemLayer[(int)RenderLayer::Sphere]);
+		break;
+	default:
+		break;
+	}	
 
 	m_CommandList->SetDescriptorHeaps(1, m_SRVHeap.GetAddressOf());
 	ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), m_CommandList.Get());
@@ -437,7 +449,7 @@ void TessellationApp::BuildQuadPatchGeometry()
 void TessellationApp::BuildSpherePatchGeometry()
 {
 	GeometryGenerator geoGen;
-	GeometryGenerator::MeshData sphere = geoGen.CreateGeosphere(5.0f, 0);
+	GeometryGenerator::MeshData sphere = geoGen.CreateGeosphere(1.0f, 0);
 
 	std::vector<Vertex> vertices(sphere.Vertices.size());
 	std::vector<std::uint16_t> indices = sphere.GetIndices16();
@@ -563,7 +575,7 @@ void TessellationApp::BuildMaterials()
 	white->m_DiffuseSrvHeapIndex = 0;
 	white->m_DiffuseAlbedo = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
 	white->m_FresnelR0 = XMFLOAT3(0.01f, 0.01f, 0.01f);
-	white->m_Roughness = 0.25f;
+	white->m_Roughness = 0.5f;
 
 	m_Materials[white->m_Name] = std::move(white);
 
@@ -585,7 +597,7 @@ void TessellationApp::BuildRenderItems()
 	m_RitemLayer[(int)RenderLayer::Basic].push_back(quadRitem.get());
 
 	auto sphereRitem = std::make_unique<RenderItem>();
-	sphereRitem->World = MathHelper::Identity4x4();
+	XMStoreFloat4x4(&sphereRitem->World, XMMatrixScaling(2.0f, 2.0f, 2.0f));
 	sphereRitem->TexTransform = MathHelper::Identity4x4();
 	sphereRitem->ObjCBIndex = 1;
 	sphereRitem->Mat = m_Materials["white"].get();
