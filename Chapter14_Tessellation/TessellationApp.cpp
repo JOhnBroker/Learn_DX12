@@ -179,6 +179,7 @@ void TessellationApp::Draw(const GameTimer& timer)
 		DrawRenderItems(m_CommandList.Get(), m_RitemLayer[(int)RenderLayer::Sphere]);
 		break;
 	case ShowMode::Bezier:
+		m_CommandList->SetPipelineState(m_PSOs["bezier"].Get());
 		DrawRenderItems(m_CommandList.Get(), m_RitemLayer[(int)RenderLayer::Bezier]);
 		break;
 	default:
@@ -511,7 +512,7 @@ void TessellationApp::BuildBezierPatchGeometry()
 		XMFLOAT3(-10.0f,-10.0f,+15.0f),
 		XMFLOAT3(-5.0f,0.0f,+15.0f),
 		XMFLOAT3(+5.0f,0.0f,+15.0f),
-		XMFLOAT3(-10.0f,0.0f,+15.0f),
+		XMFLOAT3(+10.0f,0.0f,+15.0f),
 
 		XMFLOAT3(-15.0f,0.0f, +5.0f),
 		XMFLOAT3(-5.0f, 0.0f, +5.0f),
@@ -633,6 +634,7 @@ void TessellationApp::BuildPSOs()
 	HR(m_pd3dDevice->CreateGraphicsPipelineState(&spherePsoDesc, IID_PPV_ARGS(&m_PSOs["sphere"])));
 
 	D3D12_GRAPHICS_PIPELINE_STATE_DESC bezierPsoDesc = opaquePsoDesc;
+	bezierPsoDesc.InputLayout = { m_InputLayouts["sphere"].data(),(UINT)m_InputLayouts["sphere"].size() };
 	bezierPsoDesc.pRootSignature = m_RootSignature.Get();
 	bezierPsoDesc.VS =
 	{

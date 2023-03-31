@@ -67,11 +67,15 @@ cbuffer cbPass : register(b2)
 struct VertexIn
 {
 	float3 PosL		:	POSITION;
+    float3 Normal	:	NORMAL;
+    float2 TexCL	:	TEXCOORD;
 };
 
 struct VertexOut
 {
 	float3 PosL 	:	POSITION;
+    float3 Normal	:	NORMAL;
+    float2 TexCL	:	TEXCOORD;
 };
 
 struct PatchTess
@@ -82,12 +86,17 @@ struct PatchTess
 
 struct HullOut
 {
-    float3 PosL : POSITION;
+    float3 PosL		: POSITION;
+    float3 Normal	: NORMAL;
+    float2 TexCL	: TEXCOORD;
 };
 
 struct DomainOut
 {
-    float4 PosH : SV_Position;
+    float4 PosH		: SV_Position;
+    float3 PosW		: POSITION;
+    float3 NormalW	: NORMAL;
+    float2 TexC		: TEXCOORD;
 };
 
 float4 BernsteinBasis(float t)
@@ -182,22 +191,42 @@ DomainOut DS(PatchTess patchTess, float2 uv : SV_DomainLocation,
     float4 basisU = BernsteinBasis(uv.x);
     float4 basisV = BernsteinBasis(uv.y);
     
-	//float4 dbasicU = dBernsteinBasis(uv.x);
-    //float4 dbasicV = dBernsteinBasis(uv.y);
-    //float3 dpdu = CubicBezierSum(bezPatch, dbasicU, basisV);
-    //float3 dpdv = CubicBezierSum(bezPatch, basisU, dbasicV);
+	float4 dbasicU = dBernsteinBasis(uv.x);
+    float4 dbasicV = dBernsteinBasis(uv.y);
+    float3 dpdu = CubicBezierSum(bezPatch, dbasicU, basisV);
+    float3 dpdv = CubicBezierSum(bezPatch, basisU, dbasicV);
 	
     float3 p = CubicBezierSum(bezPatch, basisU, basisV);
-    //float3 nor = cross(dpdu, dpdv);
+    float3 nor = cross(dpdu, dpdv);
 	
     float4 posW = mul(float4(p, 1.0f), gWorld);
-    //float3 norW = normalize(mul(nor, (float3x3) gWorld));
     dout.PosH = mul(posW, gViewProj);
+    dout.PosW = posW.xyz;
+    dout.NormalW = normalize(mul(nor, (float3x3) gWorld));
+    dout.TexC = float2(0.0f, 0.0f);
 	
     return dout;
 }
 
 float4 PS(DomainOut pin) : SV_Target
 {
-    return float4(1.0f, 1.0f, 1.0f, 1.0f);
+    float4 diffuseColor = (0.8f, 0.8f, 0.8f, 1.0f);
+	
+    pin.NormalW = normalize(pin.NormalW);
+	
+    float3 toEyeW = gEyePosW - pin.PosW;
+    float distToEye = length(toEyeW);
+    toEyeW /= distToEye;
+    float4 ambient = gAmbientLight * diffuseColor;
+
+    const float shininess = 1.0f - gRoughness;
+    Material mat = { diffuseColor, gFresnelR0, shininess };
+    float3 shadowFactor = 1.0f;
+    float4 directLight = ComputeLighting(gLights, mat, pin.PosW, pin.NormalW, toEyeW, shadowFactor);
+
+    float4 litColor = ambient + directLight;
+	
+    litColor.a = diffuseColor.a;
+    
+    return litColor;
 }
