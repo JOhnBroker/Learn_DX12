@@ -38,6 +38,7 @@ bool TessellationApp::Initialize()
 	BuildShadersAndInputLayout();
 	BuildQuadPatchGeometry();
 	BuildSpherePatchGeometry();
+	BuildBezierPatchGeometry();
 	BuildMaterials();
 	BuildRenderItems();
 	BuildFrameResources();
@@ -88,7 +89,8 @@ void TessellationApp::Update(const GameTimer& timer)
 		static int curr_mode_item = static_cast<int>(m_CurrMode);
 		const char* mode_strs[] = {
 			"Basic",
-			"Sphere"
+			"Sphere",
+			"Bezier"
 		};
 		if (ImGui::Combo("Mode", &curr_mode_item, mode_strs, ARRAYSIZE(mode_strs)))
 		{
@@ -99,6 +101,10 @@ void TessellationApp::Update(const GameTimer& timer)
 			else if (curr_mode_item == 1) 
 			{
 				m_CurrMode = ShowMode::Sphere;
+			}
+			else if (curr_mode_item == 2) 
+			{
+				m_CurrMode = ShowMode::Bezier;
 			}
 		}
 	}
@@ -171,6 +177,9 @@ void TessellationApp::Draw(const GameTimer& timer)
 	case ShowMode::Sphere:
 		m_CommandList->SetPipelineState(m_PSOs["sphere"].Get());
 		DrawRenderItems(m_CommandList.Get(), m_RitemLayer[(int)RenderLayer::Sphere]);
+		break;
+	case ShowMode::Bezier:
+		DrawRenderItems(m_CommandList.Get(), m_RitemLayer[(int)RenderLayer::Bezier]);
 		break;
 	default:
 		break;
@@ -387,10 +396,14 @@ void TessellationApp::BuildShadersAndInputLayout()
 	m_Shaders["basicHS"]	= d3dUtil::CompileShader(L"..\\Shader\\Chapter14\\Tesselator.hlsl", nullptr, "Basic_HS", "hs_5_1");
 	m_Shaders["basicDS"]	= d3dUtil::CompileShader(L"..\\Shader\\Chapter14\\Tesselator.hlsl", nullptr, "Basic_DS", "ds_5_1");
 	m_Shaders["basicPS"]	= d3dUtil::CompileShader(L"..\\Shader\\Chapter14\\Tesselator.hlsl", nullptr, "Basic_PS", "ps_5_1");
-	m_Shaders["sphereVS"] = d3dUtil::CompileShader(L"..\\Shader\\Chapter14\\Tesselator.hlsl", nullptr, "Sphere_VS", "vs_5_1");
-	m_Shaders["sphereHS"] = d3dUtil::CompileShader(L"..\\Shader\\Chapter14\\Tesselator.hlsl", nullptr, "Sphere_HS", "hs_5_1");
-	m_Shaders["sphereDS"] = d3dUtil::CompileShader(L"..\\Shader\\Chapter14\\Tesselator.hlsl", nullptr, "Sphere_DS", "ds_5_1");
-	m_Shaders["spherePS"] = d3dUtil::CompileShader(L"..\\Shader\\Chapter14\\Tesselator.hlsl", nullptr, "Sphere_PS", "ps_5_1");
+	m_Shaders["sphereVS"]	= d3dUtil::CompileShader(L"..\\Shader\\Chapter14\\Tesselator.hlsl", nullptr, "Sphere_VS", "vs_5_1");
+	m_Shaders["sphereHS"]	= d3dUtil::CompileShader(L"..\\Shader\\Chapter14\\Tesselator.hlsl", nullptr, "Sphere_HS", "hs_5_1");
+	m_Shaders["sphereDS"]	= d3dUtil::CompileShader(L"..\\Shader\\Chapter14\\Tesselator.hlsl", nullptr, "Sphere_DS", "ds_5_1");
+	m_Shaders["spherePS"]	= d3dUtil::CompileShader(L"..\\Shader\\Chapter14\\Tesselator.hlsl", nullptr, "Sphere_PS", "ps_5_1");
+	m_Shaders["bezierVS"]	= d3dUtil::CompileShader(L"..\\Shader\\Chapter14\\Bezier.hlsl", nullptr, "VS", "vs_5_1");
+	m_Shaders["bezierHS"]	= d3dUtil::CompileShader(L"..\\Shader\\Chapter14\\Bezier.hlsl", nullptr, "HS", "hs_5_1");
+	m_Shaders["bezierDS"]	= d3dUtil::CompileShader(L"..\\Shader\\Chapter14\\Bezier.hlsl", nullptr, "DS", "ds_5_1");
+	m_Shaders["bezierPS"]	= d3dUtil::CompileShader(L"..\\Shader\\Chapter14\\Bezier.hlsl", nullptr, "PS", "ps_5_1");
 
 	m_InputLayouts["basic"] =
 	{
@@ -491,6 +504,68 @@ void TessellationApp::BuildSpherePatchGeometry()
 	m_Geometries[geo->Name] = std::move(geo);
 }
 
+void TessellationApp::BuildBezierPatchGeometry()
+{
+	std::array<XMFLOAT3, 16> vertices =
+	{
+		XMFLOAT3(-10.0f,-10.0f,+15.0f),
+		XMFLOAT3(-5.0f,0.0f,+15.0f),
+		XMFLOAT3(+5.0f,0.0f,+15.0f),
+		XMFLOAT3(-10.0f,0.0f,+15.0f),
+
+		XMFLOAT3(-15.0f,0.0f, +5.0f),
+		XMFLOAT3(-5.0f, 0.0f, +5.0f),
+		XMFLOAT3(+5.0f, 20.0f,+5.0f),
+		XMFLOAT3(+15.0f,0.0f, +5.0f),
+
+		XMFLOAT3(-15.0f,0.0f,-5.0f),
+		XMFLOAT3(-5.0f, 0.0f,-5.0f),
+		XMFLOAT3(+5.0f, 0.0f,-5.0f),
+		XMFLOAT3(+15.0f,0.0f,-5.0f),
+
+		XMFLOAT3(-10.0f,10.0f,-15.0f),
+		XMFLOAT3(-5.0f,0.0f,-15.0f),
+		XMFLOAT3(+5.0f,0.0f,-15.0f),
+		XMFLOAT3(+25.0f,10.0f,-15.0f)
+	};
+	std::array<std::uint16_t, 16>indices =
+	{
+		0,1,2,3,
+		4,5,6,7,
+		8,9,10,11,
+		12,13,14,15
+	};
+
+	const UINT vbByteSize = (UINT)vertices.size() * sizeof(XMFLOAT3);
+	const UINT ibByteSize = (UINT)indices.size() * sizeof(std::uint16_t);
+
+	auto geo = std::make_unique<MeshGeometry>();
+	geo->Name = "bezierPatchGeo";
+
+	HR(D3DCreateBlob(vbByteSize, &geo->VertexBufferCPU));
+	CopyMemory(geo->VertexBufferCPU->GetBufferPointer(), vertices.data(), vbByteSize);
+	HR(D3DCreateBlob(ibByteSize, &geo->IndexBufferCPU));
+	CopyMemory(geo->IndexBufferCPU->GetBufferPointer(), indices.data(), ibByteSize);
+
+	geo->VertexBufferGPU = d3dUtil::CreateDefaultBuffer(m_pd3dDevice.Get(), m_CommandList.Get(),
+		vertices.data(), vbByteSize, geo->VertexBufferUploader);
+	geo->IndexBufferGPU = d3dUtil::CreateDefaultBuffer(m_pd3dDevice.Get(), m_CommandList.Get(),
+		indices.data(), ibByteSize, geo->IndexBufferUploader);
+
+	geo->VertexByteStride = sizeof(XMFLOAT3);
+	geo->VertexBufferByteSize = vbByteSize;
+	geo->IndexFormat = DXGI_FORMAT_R16_UINT;
+	geo->IndexBufferByteSize = ibByteSize;
+
+	SubmeshGeometry submesh;
+	submesh.BaseVertexLocation = 0;
+	submesh.StartIndexLocation = 0;
+	submesh.IndexCount = indices.size();
+	geo->DrawArgs["quad"] = submesh;
+
+	m_Geometries[geo->Name] = std::move(geo);
+}
+
 void TessellationApp::BuildPSOs()
 {
 	D3D12_GRAPHICS_PIPELINE_STATE_DESC opaquePsoDesc;
@@ -556,6 +631,31 @@ void TessellationApp::BuildPSOs()
 	};
 	spherePsoDesc.RasterizerState.FillMode = D3D12_FILL_MODE_SOLID;
 	HR(m_pd3dDevice->CreateGraphicsPipelineState(&spherePsoDesc, IID_PPV_ARGS(&m_PSOs["sphere"])));
+
+	D3D12_GRAPHICS_PIPELINE_STATE_DESC bezierPsoDesc = opaquePsoDesc;
+	bezierPsoDesc.pRootSignature = m_RootSignature.Get();
+	bezierPsoDesc.VS =
+	{
+		reinterpret_cast<BYTE*>(m_Shaders["bezierVS"]->GetBufferPointer()),
+		m_Shaders["bezierVS"]->GetBufferSize()
+	};
+	bezierPsoDesc.HS =
+	{
+		reinterpret_cast<BYTE*>(m_Shaders["bezierHS"]->GetBufferPointer()),
+		m_Shaders["bezierHS"]->GetBufferSize()
+	};
+	bezierPsoDesc.DS =
+	{
+		reinterpret_cast<BYTE*>(m_Shaders["bezierDS"]->GetBufferPointer()),
+		m_Shaders["bezierDS"]->GetBufferSize()
+	};
+	bezierPsoDesc.PS =
+	{
+		reinterpret_cast<BYTE*>(m_Shaders["bezierPS"]->GetBufferPointer()),
+		m_Shaders["bezierPS"]->GetBufferSize()
+	};
+	bezierPsoDesc.RasterizerState.FillMode = D3D12_FILL_MODE_SOLID;
+	HR(m_pd3dDevice->CreateGraphicsPipelineState(&bezierPsoDesc, IID_PPV_ARGS(&m_PSOs["bezier"])));
 }
 
 void TessellationApp::BuildFrameResources()
@@ -609,8 +709,22 @@ void TessellationApp::BuildRenderItems()
 
 	m_RitemLayer[(int)RenderLayer::Sphere].push_back(sphereRitem.get());
 
+	auto bezierRitem = std::make_unique<RenderItem>();
+	bezierRitem->World = MathHelper::Identity4x4();
+	bezierRitem->TexTransform = MathHelper::Identity4x4();
+	bezierRitem->ObjCBIndex = 2;
+	bezierRitem->Mat = m_Materials["white"].get();
+	bezierRitem->Geo = m_Geometries["bezierPatchGeo"].get();
+	bezierRitem->PrimitiveType = D3D11_PRIMITIVE_TOPOLOGY_16_CONTROL_POINT_PATCHLIST;
+	bezierRitem->IndexCount = bezierRitem->Geo->DrawArgs["quad"].IndexCount;
+	bezierRitem->StartIndexLocation = bezierRitem->Geo->DrawArgs["quad"].StartIndexLocation;
+	bezierRitem->BaseVertexLocation = bezierRitem->Geo->DrawArgs["quad"].BaseVertexLocation;
+
+	m_RitemLayer[(int)RenderLayer::Bezier].push_back(bezierRitem.get());
+
 	m_AllRitems.push_back(std::move(quadRitem));
 	m_AllRitems.push_back(std::move(sphereRitem));
+	m_AllRitems.push_back(std::move(bezierRitem));
 }
 
 void TessellationApp::DrawRenderItems(ID3D12GraphicsCommandList* cmdList, const std::vector<RenderItem*>& ritems)

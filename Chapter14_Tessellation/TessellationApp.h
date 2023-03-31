@@ -44,13 +44,14 @@ enum class RenderLayer :int
 {
 	Basic = 0,
 	Sphere,
+	Bezier,
 	Count
 };
 
 class TessellationApp : public D3DApp
 {
 public:
-	enum class ShowMode { Basic, Sphere };
+	enum class ShowMode { Basic, Sphere, Bezier };
 	struct Data
 	{
 		XMFLOAT3 vec;
@@ -84,6 +85,7 @@ public:
 	void BuildShadersAndInputLayout();
 	void BuildQuadPatchGeometry();
 	void BuildSpherePatchGeometry();
+	void BuildBezierPatchGeometry();
 	void BuildPSOs();
 	void BuildFrameResources();
 	void BuildMaterials();
