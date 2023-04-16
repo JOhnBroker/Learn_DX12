@@ -9,7 +9,7 @@
 #ifndef D3DUTIL_H
 #define D3DUTIL_H
 
-#include <WinMin.h>
+#include <windows.h>
 #include <wrl.h>
 #include <dxgi1_4.h>
 #include <d3d12.h>
