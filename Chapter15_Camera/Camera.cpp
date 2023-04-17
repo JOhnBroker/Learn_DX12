@@ -163,7 +163,7 @@ void FirstPersonCamera::RotateY(float rad)
 {
     XMFLOAT3 rotation = m_Transform.GetRotation();
     rotation.y = XMScalarModAngle(rotation.y + rad);
-    m_Transform.SetPosition(rotation);
+    m_Transform.SetRotation(rotation);
 }
 
 ThirdPersonCamera::~ThirdPersonCamera()

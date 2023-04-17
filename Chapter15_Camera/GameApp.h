@@ -39,6 +39,8 @@ struct RenderItem
 class GameApp : public D3DApp
 {
 public:
+	enum class CameraMode { FirstPerson, ThirdPerson, Free };
+public:
 	GameApp(HINSTANCE hInstance);
 	GameApp(HINSTANCE hInstance, int width, int height);
 	GameApp(const GameApp& rhs) = delete;
@@ -98,14 +100,8 @@ private:
 
 	UINT m_PassCbvOffset = 0;
 
-	XMFLOAT3 m_EyePos = { 0.0f,0.0f,0.0f };
-	XMFLOAT4X4 m_View = MathHelper::Identity4x4();
-	XMFLOAT4X4 m_Proj = MathHelper::Identity4x4();
-
-	float m_Theta = 1.5f * XM_PI;
-	float m_Phi = 0.2f * XM_PI;
-	float m_Radius = 15.0f;
 	std::shared_ptr<Camera> m_pCamera;
+	CameraMode m_CameraMode = CameraMode::ThirdPerson;
 
 	float m_SunTheta = 1.25f * XM_PI;
 	float m_SunPhi = XM_PIDIV4;

@@ -95,6 +95,19 @@ DirectX::XMMATRIX Transform::GetLocalToWorldMatrixXM() const
 	return World;
 }
 
+DirectX::XMFLOAT4X4 Transform::GetWorldToLocalMatrix() const
+{
+	XMFLOAT4X4 res;
+	XMStoreFloat4x4(&res, GetWorldToLocalMateixXM());
+	return res;
+}
+
+DirectX::XMMATRIX Transform::GetWorldToLocalMateixXM() const
+{
+	XMMATRIX InvWorld = XMMatrixInverse(nullptr, GetLocalToWorldMatrixXM());
+	return InvWorld;
+}
+
 void Transform::SetScale(const DirectX::XMFLOAT3& scale)
 {
 	m_Scale = scale;
@@ -158,7 +171,7 @@ void Transform::RotateAround(const DirectX::XMFLOAT3& point, const DirectX::XMFL
 
 void Transform::Translate(const DirectX::XMFLOAT3& direction, float magnitude)
 {
-	XMVECTOR directionVec = XMLoadFloat3(&direction);
+	XMVECTOR directionVec = XMVector3Normalize(XMLoadFloat3(&direction));
 	XMVECTOR newPosition = XMVectorMultiplyAdd(XMVectorReplicate(magnitude), directionVec, XMLoadFloat3(&m_Position));
 	XMStoreFloat3(&m_Position, newPosition);
 }

@@ -37,6 +37,9 @@ public:
 	DirectX::XMFLOAT4X4 GetLocalToWorldMatrix()const;
 	DirectX::XMMATRIX GetLocalToWorldMatrixXM()const;
 
+	DirectX::XMFLOAT4X4 GetWorldToLocalMatrix()const;
+	DirectX::XMMATRIX GetWorldToLocalMateixXM()const;
+
 	void SetScale(const DirectX::XMFLOAT3& scale);
 	void SetScale(float x, float y, float z);
 	void SetRotation(const DirectX::XMFLOAT3& eulerAnglesInRadian);

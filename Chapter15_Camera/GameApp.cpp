@@ -54,12 +54,25 @@ bool GameApp::InitResource()
 
 	FlushCommandQueue();
 
-	auto camera = std::make_shared<FirstPersonCamera>();
-	m_pCamera = camera;
-	camera->SetViewPort(0.0f, 0.0f, (float)m_ClientWidth, (float)m_ClientHeight);
-	camera->LookAt(XMFLOAT3(), XMFLOAT3(0.0f, 0.0f, 1.0f), XMFLOAT3(0.0f, 1.0f, 0.0f));
+	if (m_CameraMode == CameraMode::FirstPerson || m_CameraMode == CameraMode::Free)
+	{
+		auto camera = std::make_shared<FirstPersonCamera>();
+		m_pCamera = camera;
+		camera->SetViewPort(0.0f, 0.0f, (float)m_ClientWidth, (float)m_ClientHeight);
+		camera->SetFrustum(0.25f * MathHelper::Pi, AspectRatio(), 1.0f, 1000.0f);
+		camera->LookTo(XMFLOAT3(0.0f, -5.0f, 2.0f), XMFLOAT3(0.0f, 0.0f, -1.0f), XMFLOAT3(0.0f, 1.0f, 0.0f));
+	}
+	else if (m_CameraMode == CameraMode::ThirdPerson) 
+	{
+		auto camera = std::make_shared<ThirdPersonCamera>();
+		m_pCamera = camera;
+		camera->SetViewPort(0.0f, 0.0f, (float)m_ClientWidth, (float)m_ClientHeight);
+		camera->SetFrustum(0.25f * MathHelper::Pi, AspectRatio(), 1.0f, 1000.0f);
+		camera->SetTarget(XMFLOAT3(0.0f, 0.0f, 0.0f));
+		camera->SetDistance(5.0f);
+		camera->SetDistanceMinMax(1.0f, 1000.0f);
+	} 
 
-	camera->SetFrustum(XM_PI / 3, AspectRatio(), 1.0f, 1000.0f);
 	bResult = true;
 
 	return bResult;
@@ -69,12 +82,19 @@ void GameApp::OnResize()
 {
 	D3DApp::OnResize();
 
-	XMMATRIX P = XMMatrixPerspectiveFovLH(0.25f * MathHelper::Pi, AspectRatio(), 1.0f, 1000.0f);
-	XMStoreFloat4x4(&m_Proj, P);
+	if (m_pCamera) 
+	{
+		m_pCamera->SetFrustum(0.25f * MathHelper::Pi, AspectRatio(), 1.0f, 1000.0f);
+		m_pCamera->SetViewPort(0.0f, 0.0f, (float)m_ClientWidth, (float)m_ClientHeight);
+	}
 }
 
 void GameApp::Update(const GameTimer& timer)
 {
+	auto cam3rd = std::dynamic_pointer_cast<ThirdPersonCamera>(m_pCamera);
+	auto cam1st = std::dynamic_pointer_cast<FirstPersonCamera>(m_pCamera);
+	UpdateCamera(timer);
+
 	// ImGui
 	ImGuiIO& io = ImGui::GetIO();
 	
@@ -83,6 +103,63 @@ void GameApp::Update(const GameTimer& timer)
 	{
 		ImGui::Checkbox("Wireframe", &m_IsWireframe);
 	}
+	static int curr_item = static_cast<int>(m_CameraMode);
+	static const char* modes[] = {
+			"First Person",
+			"Third Person",
+			"Free Camera"
+	};
+	if (ImGui::Combo("Camera Mode", &curr_item, modes, ARRAYSIZE(modes)))
+	{
+		if (curr_item == 0 && m_CameraMode != CameraMode::FirstPerson)
+		{
+			if (!cam1st)
+			{
+				cam1st = std::make_shared<FirstPersonCamera>();
+				cam1st->SetFrustum(XM_PI / 3, AspectRatio(), 0.5f, 1000.0f);
+				m_pCamera = cam1st;
+			}
+
+			cam1st->LookTo(XMFLOAT3(0.0f, -2.0f, 10.0f), 
+				XMFLOAT3(0.0f, 0.0f, -1.0f),
+				XMFLOAT3(0.0f, 1.0f, 0.0f));
+
+			m_CameraMode = CameraMode::FirstPerson;
+		}
+		else if (curr_item == 1 && m_CameraMode != CameraMode::ThirdPerson)
+		{
+			if (!cam3rd)
+			{
+				cam3rd = std::make_shared<ThirdPersonCamera>();
+				cam3rd->SetFrustum(XM_PI / 3, AspectRatio(), 0.5f, 1000.0f);
+				m_pCamera = cam3rd;
+			}
+			cam3rd->SetTarget(XMFLOAT3(0.0f, 0.0f, 0.0f));
+			cam3rd->SetDistance(8.0f);
+			cam3rd->SetDistanceMinMax(3.0f, 20.0f);
+
+			m_CameraMode = CameraMode::ThirdPerson;
+		}
+		else if (curr_item == 2 && m_CameraMode != CameraMode::Free)
+		{
+			if (!cam1st)
+			{
+				cam1st = std::make_shared<FirstPersonCamera>();
+				cam1st->SetFrustum(XM_PI / 3, AspectRatio(), 0.5f, 1000.0f);
+				m_pCamera = cam1st;
+			}
+			// 从箱子上方开始
+			cam1st->LookTo(XMFLOAT3(0.0f, -2.0f, 10.0f),
+				XMFLOAT3(0.0f, 0.0f, -1.0f),
+				XMFLOAT3(0.0f, 1.0f, 0.0f));
+
+			m_CameraMode = CameraMode::Free;
+		}
+	}
+	auto cameraPos = m_pCamera->GetPosition();
+	auto cameraLook = m_pCamera->GetLookAxis();
+	ImGui::Text("Camera Position\n%.2f %.2f %.2f", cameraPos.x, cameraPos.y, cameraPos.z);
+	ImGui::Text("Camera Look\n%.2f %.2f %.2f", cameraLook.x, cameraPos.y, cameraLook.z);
 
 	if (ImGui::IsKeyDown(ImGuiKey_LeftArrow))
 		m_SunTheta -= 1.0f * dt;
@@ -96,7 +173,6 @@ void GameApp::Update(const GameTimer& timer)
 	ImGui::End();
 	ImGui::Render();
 
-	UpdateCamera(timer);
 	m_CurrFrameResourceIndex = (m_CurrFrameResourceIndex + 1) % g_numFrameResources;
 	m_CurrFrameResource = m_FrameResources[m_CurrFrameResourceIndex].get();
 
@@ -176,22 +252,24 @@ void GameApp::Draw(const GameTimer& timer)
 
 void GameApp::OnMouseMove(WPARAM btnState, int x, int y)
 {
-	if ((btnState & MK_LBUTTON) != 0)
+	auto cam3rd = std::dynamic_pointer_cast<ThirdPersonCamera>(m_pCamera);
+	auto cam1st = std::dynamic_pointer_cast<FirstPersonCamera>(m_pCamera);
+
+	if ((btnState & MK_RBUTTON) != 0)
 	{
 		float dx = XMConvertToRadians(0.25f * static_cast<float>(x - m_LastMousePos.x));
 		float dy = XMConvertToRadians(0.25f * static_cast<float>(y - m_LastMousePos.y));
 
-		m_Theta += dx;
-		m_Phi += dy;
-		m_Phi = MathHelper::Clamp(m_Phi, 0.1f, MathHelper::Pi - 0.1f);
-	}
-	else if ((btnState & MK_RBUTTON) != 0)
-	{
-		float dx = 0.05f * static_cast<float>(x - m_LastMousePos.x);
-		float dy = 0.05f * static_cast<float>(y - m_LastMousePos.y);
-
-		m_Radius += dx - dy;
-		m_Radius = MathHelper::Clamp(m_Radius, 5.0f, 150.0f);
+		if (m_CameraMode == CameraMode::FirstPerson || m_CameraMode == CameraMode::Free)
+		{
+			cam1st->Pitch(dy * 0.01f);
+			cam1st->RotateY(dx * 0.01f);
+		}
+		else if (m_CameraMode == CameraMode::ThirdPerson) 
+		{
+			cam3rd->RotateX(dy * 0.01f);
+			cam3rd->RotateY(dx * 0.01f);
+		}
 	}
 	m_LastMousePos.x = x;
 	m_LastMousePos.y = y;
@@ -211,16 +289,48 @@ void GameApp::OnMouseDown(WPARAM btnState, int x, int y)
 
 void GameApp::UpdateCamera(const GameTimer& gt)
 {
-	m_EyePos.x = m_Radius * sinf(m_Phi) * cosf(m_Theta);
-	m_EyePos.z = m_Radius * sinf(m_Phi) * sinf(m_Theta);
-	m_EyePos.y = m_Radius * cosf(m_Phi);
+	auto cam3rd = std::dynamic_pointer_cast<ThirdPersonCamera>(m_pCamera);
+	auto cam1st = std::dynamic_pointer_cast<FirstPersonCamera>(m_pCamera);
 
-	XMVECTOR pos = XMVectorSet(m_EyePos.x, m_EyePos.y, m_EyePos.z, 1.0f);
-	XMVECTOR target = XMVectorZero();
-	XMVECTOR up = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
+	ImGuiIO& io = ImGui::GetIO();
+	if (m_CameraMode == CameraMode::FirstPerson || m_CameraMode == CameraMode::Free)
+	{
+		float d1 = 0.0f, d2 = 0.0f;
+		if (ImGui::IsKeyDown(ImGuiKey_W))
+			d1 += gt.DeltaTime();
+		if (ImGui::IsKeyDown(ImGuiKey_S))
+			d1 -= gt.DeltaTime();
+		if (ImGui::IsKeyDown(ImGuiKey_A))
+			d2 -= gt.DeltaTime();
+		if (ImGui::IsKeyDown(ImGuiKey_D))
+			d2 += gt.DeltaTime();
+		if (m_CameraMode == CameraMode::FirstPerson) 
+		{
+			cam1st->Walk(d1 * 6.0f);
+		}
+		else 
+		{
+			cam1st->MoveForward(d1 * 6.0f);
+		}
+		cam1st->Strafe(d2 * 6.0f);
 
-	XMMATRIX view = XMMatrixLookAtLH(pos, target, up);
-	XMStoreFloat4x4(&m_View, view);
+		if (ImGui::IsMouseDragging(ImGuiMouseButton_Right))
+		{
+			cam1st->Pitch(io.MouseDelta.y * 0.01f);
+			cam1st->RotateY(io.MouseDelta.x * 0.01f);
+		}
+	}
+	else if (m_CameraMode == CameraMode::ThirdPerson) 
+	{
+		cam3rd->SetTarget(XMFLOAT3(0.0f, 0.0f, 0.0f));
+
+		if (ImGui::IsMouseDragging(ImGuiMouseButton_Right))
+		{
+			cam3rd->RotateX(io.MouseDelta.y * 0.01f);
+			cam3rd->RotateY(io.MouseDelta.x * 0.01f);
+		}
+		cam3rd->Approach(-io.MouseWheel * 1.0f);
+	}
 }
 
 void GameApp::UpdateObjectCBs(const GameTimer& gt)
@@ -267,8 +377,8 @@ void GameApp::UpdateMaterialCBs(const GameTimer& gt)
 
 void GameApp::UpdateMainPassCB(const GameTimer& gt)
 {
-	XMMATRIX view = XMLoadFloat4x4(&m_View);
-	XMMATRIX proj = XMLoadFloat4x4(&m_Proj);
+	XMMATRIX view = m_pCamera->GetViewXM();
+	XMMATRIX proj = m_pCamera->GetProjXM();
 
 	XMMATRIX viewproj = XMMatrixMultiply(view, proj);
 	XMVECTOR dView = XMMatrixDeterminant(view);
@@ -284,7 +394,7 @@ void GameApp::UpdateMainPassCB(const GameTimer& gt)
 	XMStoreFloat4x4(&m_MainPassCB.InvProj, XMMatrixTranspose(invProj));
 	XMStoreFloat4x4(&m_MainPassCB.ViewProj, XMMatrixTranspose(viewproj));
 	XMStoreFloat4x4(&m_MainPassCB.InvViewProj, XMMatrixTranspose(invViewproj));
-	m_MainPassCB.EyePosW = m_EyePos;
+	m_MainPassCB.EyePosW = m_pCamera->GetPosition();
 	m_MainPassCB.RenderTargetSize = XMFLOAT2((float)m_ClientWidth, (float)m_ClientHeight);
 	m_MainPassCB.InvRenderTargetSize = XMFLOAT2(1.0f / m_ClientWidth, 1.0f / m_ClientHeight);
 	m_MainPassCB.NearZ = 1.0f;
