@@ -38,6 +38,7 @@ bool GameApp::InitResource()
 
 	HR(m_CommandList->Reset(m_DirectCmdListAlloc.Get(), nullptr));
 
+	m_pCamera;
 	m_Camera.SetPosition(0.0f, 2.0f, -15.0f);
 
 	BuildRootSignature();

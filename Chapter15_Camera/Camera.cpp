@@ -95,74 +95,6 @@ D3D12_VIEWPORT Camera::GetViewPort() const
     return m_ViewPort;
 }
 
-void Camera::LookAt(DirectX::FXMVECTOR pos, DirectX::FXMVECTOR target, DirectX::FXMVECTOR worldUp)
-{
-    XMVECTOR L = XMVector3Normalize(XMVectorSubtract(target, pos));
-    XMVECTOR R = XMVector3Normalize(XMVector3Cross(worldUp, L));
-    XMVECTOR U = XMVector3Cross(L, R);
-
-    XMStoreFloat3(&m_Position, pos);
-    XMStoreFloat3(&m_Look, L);
-    XMStoreFloat3(&m_Right, R);
-    XMStoreFloat3(&m_Up, U);
-
-    m_ViewDirty = true;
-}
-
-void Camera::LookAt(const DirectX::XMFLOAT3& pos, const DirectX::XMFLOAT3& target, const DirectX::XMFLOAT3& worldUp)
-{
-    XMVECTOR P = XMLoadFloat3(&pos);
-    XMVECTOR T = XMLoadFloat3(&target);
-    XMVECTOR U = XMLoadFloat3(&worldUp);
-
-    LookAt(P, T, U);
-
-    m_ViewDirty = true;
-}
-
-void Camera::Strafe(float d)
-{
-    // ◊Û”““∆∂Ø
-    XMVECTOR s = XMVectorReplicate(d);
-    XMVECTOR r = XMLoadFloat3(&m_Right);
-    XMVECTOR p = XMLoadFloat3(&m_Position);
-
-    XMStoreFloat3(&m_Position, XMVectorMultiplyAdd(s, r, p));
-    m_ViewDirty = true;
-}
-
-void Camera::Walk(float d)
-{
-    // «∞∫Û“∆∂Ø
-    XMVECTOR s = XMVectorReplicate(d);
-    XMVECTOR l = XMLoadFloat3(&m_Look);
-    XMVECTOR p = XMLoadFloat3(&m_Position);
-
-    XMStoreFloat3(&m_Position, XMVectorMultiplyAdd(s, l, p));
-    m_ViewDirty = true;
-}
-
-void Camera::Pitch(float angle)
-{
-    XMMATRIX R = XMMatrixRotationAxis(XMLoadFloat3(&m_Right), angle);
-
-    XMStoreFloat3(&m_Up, XMVector3TransformNormal(XMLoadFloat3(&m_Up), R));
-    XMStoreFloat3(&m_Look, XMVector3TransformNormal(XMLoadFloat3(&m_Look), R));
-
-    m_ViewDirty = true;
-}
-
-void Camera::RotateY(float angle)
-{
-    XMMATRIX R = XMMatrixRotationY(angle);
-
-    XMStoreFloat3(&m_Right, XMVector3TransformNormal(XMLoadFloat3(&m_Right), R));
-    XMStoreFloat3(&m_Up, XMVector3TransformNormal(XMLoadFloat3(&m_Up), R));
-    XMStoreFloat3(&m_Look, XMVector3TransformNormal(XMLoadFloat3(&m_Look), R));
-
-    m_ViewDirty = true;
-}
-
 void Camera::UpdateViewMatrix()
 {
     if (m_ViewDirty) 
@@ -233,4 +165,157 @@ void Camera::SetViewPort(float topLeftX, float topLeftY, float width, float heig
     m_ViewPort.Height = height;
     m_ViewPort.MinDepth = minDepth;
     m_ViewPort.MaxDepth = maxDepth;
+}
+
+FirstPersonCamera::FirstPersonCamera() 
+    :Camera()
+{
+}
+
+FirstPersonCamera::~FirstPersonCamera()
+{
+}
+
+void FirstPersonCamera::LookAt(DirectX::FXMVECTOR pos, DirectX::FXMVECTOR target, DirectX::FXMVECTOR worldUp)
+{
+	XMVECTOR L = XMVector3Normalize(XMVectorSubtract(target, pos));
+	XMVECTOR R = XMVector3Normalize(XMVector3Cross(worldUp, L));
+	XMVECTOR U = XMVector3Cross(L, R);
+
+	XMStoreFloat3(&m_Position, pos);
+	XMStoreFloat3(&m_Look, L);
+	XMStoreFloat3(&m_Right, R);
+	XMStoreFloat3(&m_Up, U);
+
+	m_ViewDirty = true;
+}
+
+void FirstPersonCamera::LookAt(const DirectX::XMFLOAT3& pos, const DirectX::XMFLOAT3& target, const DirectX::XMFLOAT3& worldUp)
+{
+	XMVECTOR P = XMLoadFloat3(&pos);
+	XMVECTOR T = XMLoadFloat3(&target);
+	XMVECTOR U = XMLoadFloat3(&worldUp);
+
+	LookAt(P, T, U);
+
+	m_ViewDirty = true;
+}
+
+void FirstPersonCamera::Strafe(float d)
+{
+	// Â∑¶Âè≥ÁßªÂä®
+	XMVECTOR s = XMVectorReplicate(d);
+	XMVECTOR r = XMLoadFloat3(&m_Right);
+	XMVECTOR p = XMLoadFloat3(&m_Position);
+
+	XMStoreFloat3(&m_Position, XMVectorMultiplyAdd(s, r, p));
+	m_ViewDirty = true;
+}
+
+void FirstPersonCamera::Walk(float d)
+{
+	// ÂâçÂêéÁßªÂä®
+	XMVECTOR s = XMVectorReplicate(d);
+	XMVECTOR l = XMLoadFloat3(&m_Look);
+	XMVECTOR p = XMLoadFloat3(&m_Position);
+
+	XMStoreFloat3(&m_Position, XMVectorMultiplyAdd(s, l, p));
+	m_ViewDirty = true;
+}
+
+void FirstPersonCamera::Pitch(float angle)
+{
+	XMMATRIX R = XMMatrixRotationAxis(XMLoadFloat3(&m_Right), angle);
+
+	XMStoreFloat3(&m_Up, XMVector3TransformNormal(XMLoadFloat3(&m_Up), R));
+	XMStoreFloat3(&m_Look, XMVector3TransformNormal(XMLoadFloat3(&m_Look), R));
+
+	m_ViewDirty = true;
+}
+
+void FirstPersonCamera::RotateY(float angle)
+{
+	XMMATRIX R = XMMatrixRotationY(angle);
+
+	XMStoreFloat3(&m_Right, XMVector3TransformNormal(XMLoadFloat3(&m_Right), R));
+	XMStoreFloat3(&m_Up, XMVector3TransformNormal(XMLoadFloat3(&m_Up), R));
+	XMStoreFloat3(&m_Look, XMVector3TransformNormal(XMLoadFloat3(&m_Look), R));
+
+	m_ViewDirty = true;
+}
+
+ThirdPersonCamera::ThirdPersonCamera() 
+    :Camera()
+{
+}
+
+ThirdPersonCamera::~ThirdPersonCamera()
+{
+}
+
+DirectX::XMFLOAT3 ThirdPersonCamera::GetTargetPosition() const
+{
+    return m_Target;
+}
+
+float ThirdPersonCamera::GetDistance() const
+{
+    return m_Distance;
+}
+
+void ThirdPersonCamera::RotateX(float angle)
+{
+	XMMATRIX R = XMMatrixRotationX(angle);
+
+	XMStoreFloat3(&m_Right, XMVector3TransformNormal(XMLoadFloat3(&m_Right), R));
+	XMStoreFloat3(&m_Up, XMVector3TransformNormal(XMLoadFloat3(&m_Up), R));
+	XMStoreFloat3(&m_Look, XMVector3TransformNormal(XMLoadFloat3(&m_Look), R));
+
+	m_ViewDirty = true;
+}
+
+void ThirdPersonCamera::RotateY(float angle)
+{
+	XMMATRIX R = XMMatrixRotationY(angle);
+
+	XMStoreFloat3(&m_Right, XMVector3TransformNormal(XMLoadFloat3(&m_Right), R));
+	XMStoreFloat3(&m_Up, XMVector3TransformNormal(XMLoadFloat3(&m_Up), R));
+	XMStoreFloat3(&m_Look, XMVector3TransformNormal(XMLoadFloat3(&m_Look), R));
+
+	m_ViewDirty = true;
+}
+
+void ThirdPersonCamera::Approach(float dist)
+{
+    m_Distance += dist;
+    if (m_Distance < m_MinDist) 
+    {
+        m_Distance = m_MinDist;
+    }
+    else if (m_Distance > m_MaxDist) 
+    {
+        m_Distance = m_MaxDist;
+    }
+	XMVECTOR s = XMVectorReplicate(m_Distance);
+	XMVECTOR l = XMLoadFloat3(&m_Look);
+	XMVECTOR p = XMLoadFloat3(&m_Position);
+
+	XMStoreFloat3(&m_Position, XMVectorMultiplyAdd(s, l, p));
+	m_ViewDirty = true;
+}
+
+void ThirdPersonCamera::SetTarget(const DirectX::XMFLOAT3& target)
+{
+    m_Target = target;
+}
+
+void ThirdPersonCamera::SetDistance(float dist)
+{
+    m_Distance = dist;
+}
+
+void ThirdPersonCamera::SetDistanceMinMax(float minDist, float maxDist)
+{
+    m_MinDist = minDist;
+    m_MaxDist = maxDist;
 }

@@ -98,7 +98,7 @@ private:
 
 	UINT m_PassCbvOffset = 0;
 
-	Camera m_Camera;
+	std::shared_ptr<Camera> m_pCamera = nullptr;
 
 	float m_SunTheta = 1.25f * XM_PI;
 	float m_SunPhi = XM_PIDIV4;

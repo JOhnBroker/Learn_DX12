@@ -7,7 +7,7 @@ class Camera
 {
 public:
 	Camera();
-	~Camera();
+	virtual ~Camera() = 0;
 
 	DirectX::XMFLOAT3 GetPosition() const;
 	DirectX::XMVECTOR GetPositionXM() const;
@@ -32,20 +32,6 @@ public:
 	void SetViewPort(float topLeftX, float topLeftY, float width, float height, float minDepth = 0.0f, float maxDepth = 1.0f);
 	D3D12_VIEWPORT GetViewPort() const;
 
-	void LookAt(DirectX::FXMVECTOR pos, DirectX::FXMVECTOR target, DirectX::FXMVECTOR worldUp);
-	void LookAt(const DirectX::XMFLOAT3& pos, const DirectX::XMFLOAT3& target, const DirectX::XMFLOAT3& worldUp);
-
-	void Strafe(float d);
-	void Walk(float d);
-	// 上下观察
-	// 正rad值向上观察
-	// 负rad值向下观察
-	void Pitch(float angle);
-	// 左右观察
-	// 正rad值向右观察
-	// 负rad值向左观察
-	void RotateY(float angle);
-
 	void UpdateViewMatrix();
 
 protected:
@@ -68,4 +54,50 @@ protected:
 	DirectX::XMFLOAT4X4 m_Proj = MathHelper::Identity4x4();
 
 };
+
+class FirstPersonCamera :public Camera
+{
+public:
+	FirstPersonCamera();
+	~FirstPersonCamera()override;
+
+	void LookAt(DirectX::FXMVECTOR pos, DirectX::FXMVECTOR target, DirectX::FXMVECTOR worldUp);
+	void LookAt(const DirectX::XMFLOAT3& pos, const DirectX::XMFLOAT3& target, const DirectX::XMFLOAT3& worldUp);
+
+	void Strafe(float d);
+	void Walk(float d);
+	// 上下观察
+	// 正rad值向上观察
+	// 负rad值向下观察
+	void Pitch(float angle);
+	// 左右观察
+	// 正rad值向右观察
+	// 负rad值向左观察
+	void RotateY(float angle);
+};
+
+class ThirdPersonCamera :public Camera 
+{
+public:
+	ThirdPersonCamera();
+	~ThirdPersonCamera()override;
+
+	DirectX::XMFLOAT3 GetTargetPosition()const;
+	float GetDistance()const;
+
+	void RotateX(float angle);
+	void RotateY(float angle);
+	void Approach(float dist);
+	void SetTarget(const DirectX::XMFLOAT3& target);
+	void SetDistance(float dist);
+	void SetDistanceMinMax(float minDist, float maxDist);
+
+private:
+	DirectX::XMFLOAT3 m_Target = {};
+	float m_Distance = 0.0f;
+	float m_MinDist = 0.0f, m_MaxDist = 0.0f;
+
+};
+
+
 #endif // !CAMERA_H
