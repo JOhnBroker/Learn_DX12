@@ -30,6 +30,7 @@
 #include <cassert>
 #include <d3dx12.h>
 #include <DXTrace.h>
+#include <DDSTextureLoader.h>
 #include "MathHelper.h"
 
 // 是否开启图形调试对象名称

@@ -35,4 +35,19 @@ struct Material
 	DirectX::XMFLOAT4X4 m_MatTransform = MathHelper::Identity4x4();
 };
 
+struct MaterialData
+{
+	DirectX::XMFLOAT4 DiffuseAlbedo = { 1.0f,1.0f,1.0f,1.0f };
+	DirectX::XMFLOAT3 FresnelR0 = { 0.01f,0.01f,0.01f };
+	float Roughness = 64.0f;
+
+	DirectX::XMFLOAT4X4 MatTransform = MathHelper::Identity4x4();
+
+	UINT DiffuseMapIndex = 0;
+	UINT MaterialPad0;
+	UINT MaterialPad1;
+	UINT MaterialPad2;
+
+};
+
 #endif //MATERIAL_H

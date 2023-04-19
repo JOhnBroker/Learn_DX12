@@ -85,8 +85,8 @@ public:
 	DirectX::XMFLOAT3 GetTargetPosition()const;
 	float GetDistance()const;
 
-	void RotateX(float angle);
-	void RotateY(float angle);
+	void RotateX(float rad);
+	void RotateY(float rad);
 	void Approach(float dist);
 	void SetTarget(const DirectX::XMFLOAT3& target);
 	void SetDistance(float dist);
@@ -94,9 +94,9 @@ public:
 
 private:
 	DirectX::XMFLOAT3 m_Target = {};
+	DirectX::XMFLOAT3 m_Rotation = {};	// 旋转欧拉角(弧度制)
 	float m_Distance = 0.0f;
 	float m_MinDist = 0.0f, m_MaxDist = 0.0f;
-
 };
 
 

@@ -12,6 +12,11 @@ const int g_numFrameResources = 3;
 struct ObjectConstants
 {
 	DirectX::XMFLOAT4X4 World = MathHelper::Identity4x4();
+	DirectX::XMFLOAT4X4 TexTransform = MathHelper::Identity4x4();
+	UINT MaterialIndex;
+	UINT ObjPad0;
+	UINT ObjPad1;
+	UINT ObjPad2;
 };
 
 struct PassConstants 
@@ -39,6 +44,7 @@ struct Vertex
 {
 	DirectX::XMFLOAT3 Pos;
 	DirectX::XMFLOAT3 Normal;
+	DirectX::XMFLOAT2 TexC;
 };
 
 struct FrameResource
@@ -52,8 +58,8 @@ public:
 	Microsoft::WRL::ComPtr<ID3D12CommandAllocator> CmdListAlloc;
 
 	std::unique_ptr<UploadBuffer<PassConstants>> PassCB = nullptr;
-	std::unique_ptr<UploadBuffer<MaterialConstants>> MaterialCB = nullptr;
 	std::unique_ptr<UploadBuffer<ObjectConstants>> ObjectCB = nullptr;
+	std::unique_ptr<UploadBuffer<MaterialData>> MaterialBuffer = nullptr;
 
 	UINT64 Fence = 0;
 };

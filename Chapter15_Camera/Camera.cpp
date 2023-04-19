@@ -263,26 +263,48 @@ float ThirdPersonCamera::GetDistance() const
     return m_Distance;
 }
 
-void ThirdPersonCamera::RotateX(float angle)
+void ThirdPersonCamera::RotateX(float rad)
 {
-	XMMATRIX R = XMMatrixRotationX(angle);
+    m_Rotation.x += rad;
+    if (m_Rotation.x < 0.0f) 
+    {
+        m_Rotation.x = 0.0f;
+    }
+    else if (m_Rotation.x > XM_PI / 3) 
+    {
+        m_Rotation.x = XM_PI / 3;
+    }
 
-	XMStoreFloat3(&m_Right, XMVector3TransformNormal(XMLoadFloat3(&m_Right), R));
-	XMStoreFloat3(&m_Up, XMVector3TransformNormal(XMLoadFloat3(&m_Up), R));
-	XMStoreFloat3(&m_Look, XMVector3TransformNormal(XMLoadFloat3(&m_Look), R));
+    SetPositionXM(m_Target);
+
+    XMMATRIX R = XMMatrixRotationRollPitchYawFromVector(XMLoadFloat3(&m_Rotation));
+    XMStoreFloat3(&m_Right, XMVector3Normalize(R.r[0]));
+    XMStoreFloat3(&m_Up, XMVector3Normalize(R.r[1]));
+    XMStoreFloat3(&m_Look, XMVector3Normalize(R.r[2]));
+    
+    XMVECTOR directionVec = XMLoadFloat3(&m_Look);
+    XMVECTOR newPosition = XMVectorMultiplyAdd(XMVectorReplicate(-m_Distance), directionVec, XMLoadFloat3(&m_Position));
+    XMStoreFloat3(&m_Position, newPosition);
 
 	m_ViewDirty = true;
 }
 
-void ThirdPersonCamera::RotateY(float angle)
+void ThirdPersonCamera::RotateY(float rad)
 {
-	XMMATRIX R = XMMatrixRotationY(angle);
+    m_Rotation.y += rad;
 
-	XMStoreFloat3(&m_Right, XMVector3TransformNormal(XMLoadFloat3(&m_Right), R));
-	XMStoreFloat3(&m_Up, XMVector3TransformNormal(XMLoadFloat3(&m_Up), R));
-	XMStoreFloat3(&m_Look, XMVector3TransformNormal(XMLoadFloat3(&m_Look), R));
+    SetPositionXM(m_Target);
 
-	m_ViewDirty = true;
+    XMMATRIX R = XMMatrixRotationRollPitchYawFromVector(XMLoadFloat3(&m_Rotation));
+    XMStoreFloat3(&m_Right, XMVector3Normalize(R.r[0]));
+    XMStoreFloat3(&m_Up, XMVector3Normalize(R.r[1]));
+    XMStoreFloat3(&m_Look, XMVector3Normalize(R.r[2]));
+
+    XMVECTOR directionVec = XMLoadFloat3(&m_Look);
+    XMVECTOR newPosition = XMVectorMultiplyAdd(XMVectorReplicate(-m_Distance), directionVec, XMLoadFloat3(&m_Position));
+    XMStoreFloat3(&m_Position, newPosition);
+
+    m_ViewDirty = true;
 }
 
 void ThirdPersonCamera::Approach(float dist)
@@ -296,11 +318,12 @@ void ThirdPersonCamera::Approach(float dist)
     {
         m_Distance = m_MaxDist;
     }
-	XMVECTOR s = XMVectorReplicate(m_Distance);
-	XMVECTOR l = XMLoadFloat3(&m_Look);
-	XMVECTOR p = XMLoadFloat3(&m_Position);
+    SetPositionXM(m_Target);
 
-	XMStoreFloat3(&m_Position, XMVectorMultiplyAdd(s, l, p));
+    XMVECTOR directionVec = XMLoadFloat3(&m_Look);
+    XMVECTOR newPosition = XMVectorMultiplyAdd(XMVectorReplicate(-m_Distance), directionVec, XMLoadFloat3(&m_Position));
+    XMStoreFloat3(&m_Position, newPosition);
+
 	m_ViewDirty = true;
 }
 
