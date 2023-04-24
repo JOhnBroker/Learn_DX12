@@ -12,6 +12,16 @@
 
 #include "LightingUtil.hlsl"
 
+struct InstanceData
+{
+    float4x4	World;
+    float4x4	TexTransform;
+    uint		MaterialIndex;
+    uint		ObjPad0;
+    uint		ObjPad1;
+    uint		ObjPad2;
+};
+
 struct MaterialData
 {
     float4		DiffuseAlbedo;
@@ -25,7 +35,8 @@ struct MaterialData
 };
 
 Texture2D gDiffuseMap[5] : register(t0);
-StructuredBuffer<MaterialData> gMaterialData : register(t0, space1);
+StructuredBuffer<InstanceData> gInstanceData : register(t0, space1);
+StructuredBuffer<MaterialData> gMaterialData : register(t1, space1);
 
 SamplerState gsamPointWrap			: register(s0);
 SamplerState gsamPointClamp			: register(s1);
@@ -36,17 +47,7 @@ SamplerState gsamAnisotropicClamp	: register(s5);
 
 // constant buffer
 
-cbuffer cbPerObject : register(b0)
-{
-	float4x4 gWorld;	
-    float4x4 gTexTransform;
-    uint gMaterialIndex;
-    uint gObjPad0;
-    uint gObjPad1;
-    uint gObjPad2;
-};
-
-cbuffer cbPass : register(b1)
+cbuffer cbPass : register(b0)
 {
 	float4x4 gView;
 	float4x4 gInvView;
@@ -80,22 +81,29 @@ struct VertexOut
 	float3 PosW		:	POSITION;
 	float3 NormalW	:	NORMAL;
     float2 TexC		:	TEXCOORD;
+	// nointerpolation is used so the index is not interpolated across the triangle.
+    nointerpolation uint MatIndex : MATINDEX;
 };
 
-VertexOut VS (VertexIn vin)
+VertexOut VS(VertexIn vin, uint instanceID : SV_InstanceID)
 {
 	VertexOut vout = (VertexOut)0.0f;
 
-    MaterialData matData = gMaterialData[gMaterialIndex];
+    InstanceData instData = gInstanceData[instanceID];
+    float4x4 world = instData.World;
+    float4x4 texTransform = instData.TexTransform;
+    uint matIndex = instData.MaterialIndex;
 	
-	float4 posW = mul( float4(vin.PosL,1.0f), gWorld);
+    MaterialData matData = gMaterialData[matIndex];
+	
+	float4 posW = mul( float4(vin.PosL,1.0f), world);
 	vout.PosW = posW.xyz;
-	vout.PosH = mul(posW,gViewProj);
+    vout.PosH = mul(posW, gViewProj);
 	
-    float4 texC = mul(float4(vin.TexC, 0.0f, 1.0f), gTexTransform);
+    float4 texC = mul(float4(vin.TexC, 0.0f, 1.0f), texTransform);
     vout.TexC = mul(texC, matData.MatTransform).xy;
 	
-	vout.NormalW = mul(vin.NormalL, (float3x3)gWorld);
+	vout.NormalW = mul(vin.NormalL, (float3x3)world);
 
 	return vout;
 }
@@ -103,7 +111,7 @@ VertexOut VS (VertexIn vin)
 
 float4 PS (VertexOut pin) : SV_Target
 {
-    MaterialData matData = gMaterialData[gMaterialIndex];
+    MaterialData matData = gMaterialData[pin.MatIndex];
     float4 diffuseAlbedo = matData.DiffuseAlbedo;
     float3 fresnelR0 = matData.FresnelR0;
     float roughness = matData.Roughness;
