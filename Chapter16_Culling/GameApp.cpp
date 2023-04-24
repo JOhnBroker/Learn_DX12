@@ -61,6 +61,7 @@ bool GameApp::InitResource()
 		camera->SetFrustum(0.25f * MathHelper::Pi, AspectRatio(), 1.0f, 1000.0f);
 		camera->SetViewPort(0.0f, 0.0f, (float)m_ClientWidth, (float)m_ClientHeight);
 		camera->LookAt(XMFLOAT3(0.0f, 2.0f, -15.0f), XMFLOAT3(0.0f, 0.0f, -1.0f), XMFLOAT3(0.0f, 1.0f, 0.0f));
+		BoundingFrustum::CreateFromMatrix(m_CamFrustum, m_pCamera->GetProjXM());
 	}
 	else if (m_CameraMode == CameraMode::ThirdPerson)
 	{
@@ -71,6 +72,7 @@ bool GameApp::InitResource()
 		camera->SetTarget(XMFLOAT3(0.0f, 0.0f, 1.0f));
 		camera->SetDistance(10.0f);
 		camera->SetDistanceMinMax(3.0f, 20.0f);
+		BoundingFrustum::CreateFromMatrix(m_CamFrustum, m_pCamera->GetProjXM());
 	}
 
 	LoadTexture("bricksTex", L"..\\Textures\\bricks.dds");
@@ -153,7 +155,7 @@ void GameApp::Update(const GameTimer& timer)
 		//auto cameraLook = m_pCamera->GetLookAxis();
 		//ImGui::Text("Camera Position\n%.2f %.2f %.2f", cameraPos.x, cameraPos.y, cameraPos.z);
 		//ImGui::Text("Camera Look\n%.2f %.2f %.2f", cameraLook.x, cameraPos.y, cameraLook.z);
-		ImGui::Text("SumObjectCount %d\n VisibleObjectCount %d", m_AllRitems.size(), m_CurrVisibleInstanceCount);
+		ImGui::Text("SumObjectCount %d\n VisibleObjectCount %d", m_AllRitems[0]->Instances.size(), m_CurrVisibleInstanceCount);
 	}
 	
 	if (ImGui::IsKeyDown(ImGuiKey_LeftArrow))
@@ -324,8 +326,8 @@ void GameApp::UpdateInstanceData(const GameTimer& gt)
 		for (UINT i = 0; i < (UINT)instanceData.size(); ++i)
 		{
 			// 在局部空间，进行视锥剔除
-			XMMATRIX world = XMLoadFloat4x4(&obj->World);
-			XMMATRIX texTransform = XMLoadFloat4x4(&obj->TexTransform);
+			XMMATRIX world = XMLoadFloat4x4(&instanceData[i].World);
+			XMMATRIX texTransform = XMLoadFloat4x4(&instanceData[i].TexTransform);
 
 			XMMATRIX invWorld = XMMatrixInverse(&XMMatrixDeterminant(world), world);
 			XMMATRIX viewToLocal = XMMatrixMultiply(invView, invWorld);
@@ -551,6 +553,60 @@ void GameApp::BuildSkullGeometry()
 
 }
 
+void GameApp::BuildShapeGeometry()
+{
+	GeometryGenerator geoGen;
+	GeometryGenerator::MeshData box = geoGen.CreateBox(1.0f, 1.0f, 1.0f, 0);
+
+	std::vector<Vertex> vertices(box.Vertices.size());
+	std::vector<std::uint16_t> indices;
+
+	UINT index = 0;
+	for (size_t i = 0; i < box.Vertices.size(); ++i, ++index)
+	{
+		vertices[index].Pos = box.Vertices[i].Position;
+		vertices[index].Normal = box.Vertices[i].Normal;
+		vertices[index].TexC = box.Vertices[i].TexC;
+	}
+
+	indices.insert(indices.end(), std::begin(box.GetIndices16()), std::end(box.GetIndices16()));
+
+	const UINT vbByteSize = (UINT)vertices.size() * sizeof(Vertex);
+	const UINT ibByteSize = (UINT)indices.size() * sizeof(std::uint16_t);
+
+	auto geo = std::make_unique<MeshGeometry>();
+	geo->Name = "shapeGeo";
+
+	HR(D3DCreateBlob(vbByteSize, &geo->VertexBufferCPU));
+	CopyMemory(geo->VertexBufferCPU->GetBufferPointer(), vertices.data(), vbByteSize);
+	HR(D3DCreateBlob(ibByteSize, &geo->IndexBufferCPU));
+	CopyMemory(geo->IndexBufferCPU->GetBufferPointer(), indices.data(), ibByteSize);
+
+	geo->VertexBufferGPU = d3dUtil::CreateDefaultBuffer(m_pd3dDevice.Get(), m_CommandList.Get(),
+		vertices.data(), vbByteSize, geo->VertexBufferUploader);
+
+	geo->IndexBufferGPU = d3dUtil::CreateDefaultBuffer(m_pd3dDevice.Get(), m_CommandList.Get(),
+		indices.data(), ibByteSize, geo->IndexBufferUploader);
+
+	geo->VertexByteStride = sizeof(Vertex);
+	geo->VertexBufferByteSize = vbByteSize;
+	geo->IndexFormat = DXGI_FORMAT_R16_UINT;
+	geo->IndexBufferByteSize = ibByteSize;
+
+	SubmeshGeometry submesh;
+	submesh.IndexCount = (UINT)box.Indices32.size();
+	submesh.StartIndexLocation = 0;
+	submesh.BaseVertexLocation = 0;
+	BoundingBox bounds;
+	//XMStoreFloat3(&bounds.Center, 0.5 * (vMin + vMax));
+	//XMStoreFloat3(&bounds.Extents, 0.5 * (vMin - vMax));
+	submesh.Bounds = bounds;
+
+	geo->DrawArgs["box"] = submesh;
+
+	m_Geometries[geo->Name] = std::move(geo);
+}
+
 void GameApp::BuildPSOs()
 {
 	D3D12_GRAPHICS_PIPELINE_STATE_DESC opaquePsoDesc;
@@ -660,7 +716,7 @@ void GameApp::BuildRenderItems()
 	skullRitem->BaseVertexLocation = skullRitem->Geo->DrawArgs["skull"].BaseVertexLocation;
 	skullRitem->Bounds = skullRitem->Geo->DrawArgs["skull"].Bounds;
 
-	const int n = 5;
+	const int n = 10;
 	skullRitem->Instances.resize(n * n * n);
 
 	float width, height, depth;
@@ -711,7 +767,7 @@ void GameApp::DrawRenderItems(ID3D12GraphicsCommandList* cmdList, const std::vec
 
 		// 使用描述符
 		auto instanceBuffer = m_CurrFrameResource->InstanceBuffer->Resource();
-		cmdList->SetGraphicsRootConstantBufferView(0, instanceBuffer->GetGPUVirtualAddress());
+		cmdList->SetGraphicsRootShaderResourceView(0, instanceBuffer->GetGPUVirtualAddress());
 
 		cmdList->DrawIndexedInstanced(ri->IndexCount, ri->InstanceCount, ri->StartIndexLocation, ri->BaseVertexLocation, 0);
 	}

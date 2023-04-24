@@ -77,6 +77,7 @@ public:
 	void BuildDescriptorHeaps();
 	void BuildShadersAndInputLayout();
 	void BuildSkullGeometry();
+	void BuildShapeGeometry();
 	void BuildPSOs();
 	void BuildFrameResources();
 	void BuildMaterials();
@@ -123,7 +124,7 @@ private:
 	float m_SunPhi = XM_PIDIV4;
 
 	bool m_WireframeEnable = true;
-	bool m_FrustumCullingEnable = true;
+	bool m_FrustumCullingEnable = false;
 	POINT m_LastMousePos;
 
 	std::string m_VertexFileName = "..\\Models\\skull.txt";
