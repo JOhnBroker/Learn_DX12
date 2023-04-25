@@ -49,6 +49,7 @@ class GameApp : public D3DApp
 {
 public:
 	enum class CameraMode { FirstPerson, ThirdPerson };
+	enum class ShowMode { Skull, Box };
 public:
 	GameApp(HINSTANCE hInstance);
 	GameApp(HINSTANCE hInstance, int width, int height);
@@ -82,6 +83,7 @@ public:
 	void BuildFrameResources();
 	void BuildMaterials();
 	void BuildRenderItems();
+	void BuildOpaqueItems();
 	void DrawRenderItems(ID3D12GraphicsCommandList* cmdList, const std::vector<RenderItem*>& ritems);
 
 	void ReadDataFromFile(std::vector<Vertex>& vertices, std::vector<std::uint16_t>& indices, BoundingBox& bounds);
@@ -116,8 +118,6 @@ private:
 	UINT m_PassCbvOffset = 0;
 
 	BoundingFrustum m_CamFrustum;
-	std::uint32_t m_CurrVisibleInstanceCount = 0;
-	CameraMode m_CameraMode = CameraMode::FirstPerson;
 	std::shared_ptr<Camera> m_pCamera = nullptr;
 
 	float m_SunTheta = 1.25f * XM_PI;
@@ -125,6 +125,11 @@ private:
 
 	bool m_WireframeEnable = true;
 	bool m_FrustumCullingEnable = false;
+	std::uint32_t m_CurrVisibleInstanceCount = 0;
+
+	CameraMode m_CameraMode = CameraMode::FirstPerson;
+	ShowMode m_ShowMode = ShowMode::Skull;
+
 	POINT m_LastMousePos;
 
 	std::string m_VertexFileName = "..\\Models\\skull.txt";

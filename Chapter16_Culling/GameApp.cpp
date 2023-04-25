@@ -35,8 +35,10 @@ bool GameApp::Initialize()
 	BuildDescriptorHeaps();
 	BuildShadersAndInputLayout();
 	BuildSkullGeometry();
+	BuildShapeGeometry();
 	BuildMaterials();
 	BuildRenderItems();
+	BuildOpaqueItems();
 	BuildFrameResources();
 	BuildPSOs();
 
@@ -112,15 +114,15 @@ void GameApp::Update(const GameTimer& timer)
 	{
 		ImGui::Checkbox("Wireframe", &m_WireframeEnable);
 		ImGui::Checkbox("FrustumCulling", &m_FrustumCullingEnable);
-		
-		static int curr_item = static_cast<int>(m_CameraMode);
-		static const char* modes[] = {
+
+		static int curr_cameramode = static_cast<int>(m_CameraMode);
+		static const char* cameraMode[] = {
 				"First Person",
 				"Third Person",
 		};
-		if (ImGui::Combo("Camera Mode", &curr_item, modes, ARRAYSIZE(modes)))
+		if (ImGui::Combo("Camera Mode", &curr_cameramode, cameraMode, ARRAYSIZE(cameraMode)))
 		{
-			if (curr_item == 0 && m_CameraMode != CameraMode::FirstPerson)
+			if (curr_cameramode == 0 && m_CameraMode != CameraMode::FirstPerson)
 			{
 				if (!cam1st)
 				{
@@ -136,7 +138,7 @@ void GameApp::Update(const GameTimer& timer)
 
 				m_CameraMode = CameraMode::FirstPerson;
 			}
-			else if (curr_item == 1 && m_CameraMode != CameraMode::ThirdPerson)
+			else if (curr_cameramode == 1 && m_CameraMode != CameraMode::ThirdPerson)
 			{
 				if (!cam3rd)
 				{
@@ -151,10 +153,25 @@ void GameApp::Update(const GameTimer& timer)
 				m_CameraMode = CameraMode::ThirdPerson;
 			}
 		}
-		//auto cameraPos = m_pCamera->GetPosition();
-		//auto cameraLook = m_pCamera->GetLookAxis();
-		//ImGui::Text("Camera Position\n%.2f %.2f %.2f", cameraPos.x, cameraPos.y, cameraPos.z);
-		//ImGui::Text("Camera Look\n%.2f %.2f %.2f", cameraLook.x, cameraPos.y, cameraLook.z);
+		
+		static int curr_showmode = static_cast<int>(m_ShowMode);
+		static const char* showMode[] = {
+				"Skull",
+				"Box",
+		};
+		if (ImGui::Combo("Show Mode", &curr_showmode, showMode, ARRAYSIZE(showMode)))
+		{
+			if (curr_showmode == 0 && m_ShowMode != ShowMode::Skull)
+			{
+				m_ShowMode = ShowMode::Skull;
+				BuildOpaqueItems();
+			}
+			else if (curr_showmode == 1 && m_ShowMode != ShowMode::Box) 
+			{
+				m_ShowMode = ShowMode::Box;
+				BuildOpaqueItems();
+			}
+		}
 		ImGui::Text("SumObjectCount %d\n VisibleObjectCount %d", m_AllRitems[0]->Instances.size(), m_CurrVisibleInstanceCount);
 	}
 	
@@ -318,7 +335,7 @@ void GameApp::UpdateInstanceData(const GameTimer& gt)
 	m_CurrVisibleInstanceCount = 0;
 	
 	auto currInstanceBuffer = m_CurrFrameResource->InstanceBuffer.get();
-	for (auto& obj : m_AllRitems) 
+	for (auto& obj : m_OpaqueRitems) 
 	{
 		const auto& instanceData = obj->Instances;
 		float visibleInstanceCount = 0;
@@ -561,12 +578,22 @@ void GameApp::BuildShapeGeometry()
 	std::vector<Vertex> vertices(box.Vertices.size());
 	std::vector<std::uint16_t> indices;
 
+	XMFLOAT3 vMinf3(+MathHelper::Infinity, +MathHelper::Infinity, +MathHelper::Infinity);
+	XMFLOAT3 vMaxf3(-MathHelper::Infinity, -MathHelper::Infinity, -MathHelper::Infinity);
+
+	XMVECTOR vMin = XMLoadFloat3(&vMinf3);
+	XMVECTOR vMax = XMLoadFloat3(&vMaxf3);
+
 	UINT index = 0;
 	for (size_t i = 0; i < box.Vertices.size(); ++i, ++index)
 	{
 		vertices[index].Pos = box.Vertices[i].Position;
 		vertices[index].Normal = box.Vertices[i].Normal;
 		vertices[index].TexC = box.Vertices[i].TexC;
+
+		XMVECTOR P = XMLoadFloat3(&vertices[index].Pos);
+		vMin = XMVectorMin(vMin, P);
+		vMax = XMVectorMax(vMax, P);
 	}
 
 	indices.insert(indices.end(), std::begin(box.GetIndices16()), std::end(box.GetIndices16()));
@@ -597,9 +624,10 @@ void GameApp::BuildShapeGeometry()
 	submesh.IndexCount = (UINT)box.Indices32.size();
 	submesh.StartIndexLocation = 0;
 	submesh.BaseVertexLocation = 0;
+
 	BoundingBox bounds;
-	//XMStoreFloat3(&bounds.Center, 0.5 * (vMin + vMax));
-	//XMStoreFloat3(&bounds.Extents, 0.5 * (vMin - vMax));
+	XMStoreFloat3(&bounds.Center, 0.5 * (vMin + vMax));
+	XMStoreFloat3(&bounds.Extents, 0.5 * (vMin - vMax));
 	submesh.Bounds = bounds;
 
 	geo->DrawArgs["box"] = submesh;
@@ -704,6 +732,7 @@ void GameApp::BuildMaterials()
 
 void GameApp::BuildRenderItems()
 {
+	float scale = 1.0f;
 	auto skullRitem = std::make_unique<RenderItem>();
 	skullRitem->World = MathHelper::Identity4x4();
 	skullRitem->TexTransform = MathHelper::Identity4x4();
@@ -715,12 +744,25 @@ void GameApp::BuildRenderItems()
 	skullRitem->StartIndexLocation = skullRitem->Geo->DrawArgs["skull"].StartIndexLocation;
 	skullRitem->BaseVertexLocation = skullRitem->Geo->DrawArgs["skull"].BaseVertexLocation;
 	skullRitem->Bounds = skullRitem->Geo->DrawArgs["skull"].Bounds;
+	
+	auto boxRitem = std::make_unique<RenderItem>();
+	boxRitem->World = MathHelper::Identity4x4();
+	boxRitem->TexTransform = MathHelper::Identity4x4();
+	boxRitem->ObjCBIndex = 0;
+	boxRitem->Mat = m_Materials["tile"].get();
+	boxRitem->Geo = m_Geometries["shapeGeo"].get();
+	boxRitem->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+	boxRitem->IndexCount = boxRitem->Geo->DrawArgs["box"].IndexCount;
+	boxRitem->StartIndexLocation = boxRitem->Geo->DrawArgs["box"].StartIndexLocation;
+	boxRitem->BaseVertexLocation = boxRitem->Geo->DrawArgs["box"].BaseVertexLocation;
+	boxRitem->Bounds = boxRitem->Geo->DrawArgs["box"].Bounds;
 
-	const int n = 10;
+	const int n = 3;
 	skullRitem->Instances.resize(n * n * n);
+	boxRitem->Instances.resize(n * n * n);
 
 	float width, height, depth;
-	width = height = depth = 200.0f;
+	width = height = depth = 100.0f;
 
 	float x = -0.5f * width;
 	float y = -0.5f * height;
@@ -744,14 +786,33 @@ void GameApp::BuildRenderItems()
 					x + j * dx, y + i * dy, z + k * dz, 1.0f);
 				XMStoreFloat4x4(&skullRitem->Instances[index].TexTransform, XMMatrixScaling(2.0f, 2.0f, 1.0f));
 				skullRitem->Instances[index].MaterialIndex = index % m_Materials.size();
+
+				boxRitem->Instances[index].World = XMFLOAT4X4
+				(
+					4.0f, 0.0f, 0.0f, 0.0f,
+					0.0f, 4.0f, 0.0f, 0.0f,
+					0.0f, 0.0f, 4.0f, 0.0f,
+					x + j * dx, y + i * dy, z + k * dz, 1.0f);
+				XMStoreFloat4x4(&boxRitem->Instances[index].TexTransform, XMMatrixScaling(1.0f, 1.0f, 1.0f));
+				boxRitem->Instances[index].MaterialIndex = index % m_Materials.size();
 			}
 		}
 	}
 
 	m_AllRitems.push_back(std::move(skullRitem));
-	for (auto& e : m_AllRitems) 
+	m_AllRitems.push_back(std::move(boxRitem));
+}
+
+void GameApp::BuildOpaqueItems()
+{
+	m_OpaqueRitems.swap(std::vector<RenderItem*>());
+	if (m_ShowMode == ShowMode::Skull) 
 	{
-		m_OpaqueRitems.push_back(e.get());
+		m_OpaqueRitems.push_back(m_AllRitems[0].get());
+	}
+	else if (m_ShowMode == ShowMode::Box)
+	{
+		m_OpaqueRitems.push_back(m_AllRitems[1].get());
 	}
 }
 

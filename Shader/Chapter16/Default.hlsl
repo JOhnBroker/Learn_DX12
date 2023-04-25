@@ -75,6 +75,16 @@ struct VertexIn
 	float2 TexC		:	TEXCOORD;
 };
 
+struct InstanceIn
+{
+    float3 PosL			: POSITION;
+    float3 NormalL		: NORMAL;
+    float2 TexC			: TEXCOORD;
+    float4x4 World		: WORLD;
+    float4x4 WorldInvTranspose : WorldInvTranspose;
+    uint MatIndex		: MATINDEX;
+};
+
 struct VertexOut
 {
 	float4 PosH 	:	SV_POSITION;
@@ -93,6 +103,8 @@ VertexOut VS(VertexIn vin, uint instanceID : SV_InstanceID)
     float4x4 world = instData.World;
     float4x4 texTransform = instData.TexTransform;
     uint matIndex = instData.MaterialIndex;
+	
+    vout.MatIndex = matIndex;
 	
     MaterialData matData = gMaterialData[matIndex];
 	

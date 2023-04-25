@@ -78,7 +78,7 @@ GeometryGenerator::MeshData GeometryGenerator::CreateBox(float width, float heig
 
     meshData.Indices32.assign(&i[0], &i[36]);
 
-    numSubdivisions = std::min<uint32>(numSubdivisions, 6u);
+    numSubdivisions = std::min<uint32>(numSubdivisions, 0u);
 
 	for (uint32 time = 0; time < numSubdivisions; ++time)
 	{
