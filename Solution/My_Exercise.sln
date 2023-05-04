@@ -35,6 +35,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Chapter15_Camera", "..\Chap
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Chapter16_Culling", "..\Chapter16_Culling\Chapter16_Culling.vcxproj", "{3DD820CD-C4AF-4D10-976B-965BB2ABE02E}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Chapter17_Picking", "..\Chapter17_Picking\Chapter17_Picking.vcxproj", "{AAC3F833-444C-4402-B407-968A90D88BDD}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -169,6 +171,14 @@ Global
 		{3DD820CD-C4AF-4D10-976B-965BB2ABE02E}.Release|x64.Build.0 = Release|x64
 		{3DD820CD-C4AF-4D10-976B-965BB2ABE02E}.Release|x86.ActiveCfg = Release|Win32
 		{3DD820CD-C4AF-4D10-976B-965BB2ABE02E}.Release|x86.Build.0 = Release|Win32
+		{AAC3F833-444C-4402-B407-968A90D88BDD}.Debug|x64.ActiveCfg = Debug|x64
+		{AAC3F833-444C-4402-B407-968A90D88BDD}.Debug|x64.Build.0 = Debug|x64
+		{AAC3F833-444C-4402-B407-968A90D88BDD}.Debug|x86.ActiveCfg = Debug|Win32
+		{AAC3F833-444C-4402-B407-968A90D88BDD}.Debug|x86.Build.0 = Debug|Win32
+		{AAC3F833-444C-4402-B407-968A90D88BDD}.Release|x64.ActiveCfg = Release|x64
+		{AAC3F833-444C-4402-B407-968A90D88BDD}.Release|x64.Build.0 = Release|x64
+		{AAC3F833-444C-4402-B407-968A90D88BDD}.Release|x86.ActiveCfg = Release|Win32
+		{AAC3F833-444C-4402-B407-968A90D88BDD}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
