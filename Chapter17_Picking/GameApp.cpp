@@ -435,9 +435,9 @@ void GameApp::BuildRootSignature()
 	CD3DX12_ROOT_PARAMETER slotRootParameter[4];
 
 	// 创建根描述符表
-	slotRootParameter[0].InitAsShaderResourceView(0, 1);
-	slotRootParameter[1].InitAsShaderResourceView(1, 1);
-	slotRootParameter[2].InitAsConstantBufferView(0);
+	slotRootParameter[0].InitAsConstantBufferView(0);
+	slotRootParameter[1].InitAsConstantBufferView(1);
+	slotRootParameter[2].InitAsShaderResourceView(0, 1);
 	slotRootParameter[3].InitAsDescriptorTable(1, &texTable, D3D12_SHADER_VISIBILITY_PIXEL);
 
 	auto staticSamplers = GetStaticSamplers();
@@ -514,8 +514,8 @@ void GameApp::BuildDescriptorHeaps()
 
 void GameApp::BuildShadersAndInputLayout()
 {
-	m_Shaders["standardVS"] = d3dUtil::CompileShader(L"..\\Shader\\Chapter16\\Default.hlsl", nullptr, "VS", "vs_5_1");
-	m_Shaders["opaquePS"] = d3dUtil::CompileShader(L"..\\Shader\\Chapter16\\Default.hlsl", nullptr, "PS", "ps_5_1");
+	m_Shaders["standardVS"] = d3dUtil::CompileShader(L"..\\Shader\\Chapter17\\Default.hlsl", nullptr, "VS", "vs_5_1");
+	m_Shaders["opaquePS"] = d3dUtil::CompileShader(L"..\\Shader\\Chapter17\\Default.hlsl", nullptr, "PS", "ps_5_1");
 
 	m_InputLayout =
 	{
@@ -601,6 +601,26 @@ void GameApp::BuildPSOs()
 	D3D12_GRAPHICS_PIPELINE_STATE_DESC opaqueWireframePsoDesc = opaquePsoDesc;
 	opaqueWireframePsoDesc.RasterizerState.FillMode = D3D12_FILL_MODE_WIREFRAME;
 	HR(m_pd3dDevice->CreateGraphicsPipelineState(&opaqueWireframePsoDesc, IID_PPV_ARGS(&m_PSOs["opaque_wireframe"])));
+
+	//highlight
+	D3D12_GRAPHICS_PIPELINE_STATE_DESC highlightPsoDesc = opaquePsoDesc;
+
+	highlightPsoDesc.DepthStencilState.DepthFunc = D3D12_COMPARISON_FUNC_LESS_EQUAL;
+
+	D3D12_RENDER_TARGET_BLEND_DESC transparencyBlendDesc;
+	transparencyBlendDesc.BlendEnable = true;
+	transparencyBlendDesc.LogicOpEnable = false;
+	transparencyBlendDesc.SrcBlend = D3D12_BLEND_SRC_ALPHA;
+	transparencyBlendDesc.DestBlend = D3D12_BLEND_INV_SRC_ALPHA;
+	transparencyBlendDesc.BlendOp = D3D12_BLEND_OP_ADD;
+	transparencyBlendDesc.SrcBlendAlpha = D3D12_BLEND_ONE;
+	transparencyBlendDesc.DestBlendAlpha = D3D12_BLEND_ZERO;
+	transparencyBlendDesc.BlendOpAlpha = D3D12_BLEND_OP_ADD;
+	transparencyBlendDesc.LogicOp = D3D12_LOGIC_OP_NOOP;
+	transparencyBlendDesc.RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
+
+	highlightPsoDesc.BlendState.RenderTarget[0] = transparencyBlendDesc;
+	HR(m_pd3dDevice->CreateGraphicsPipelineState(&highlightPsoDesc, IID_PPV_ARGS(&m_PSOs["highlight"])));
 
 }
 
@@ -759,6 +779,77 @@ void GameApp::ReadDataFromFile(std::vector<Vertex>& vertices, std::vector<std::u
 
 	XMStoreFloat3(&bounds.Center, 0.5 * (vMin + vMax));
 	XMStoreFloat3(&bounds.Extents, 0.5 * (vMin - vMax));
+
+	fin >> ignore;
+	fin >> ignore;
+	fin >> ignore;
+
+	for (UINT i = 0; i < tcount; ++i)
+	{
+		fin >> indices[i * 3 + 0] >> indices[i * 3 + 1] >> indices[i * 3 + 2];
+	}
+
+	fin.close();
+}
+
+void GameApp::ReadDataFromFile(std::vector<Vertex>& vertices, std::vector<std::uint16_t>& indices, BoundingSphere& bounds)
+{
+	std::ifstream fin(m_VertexFileName);
+
+	if (!fin)
+	{
+		OutputDebugStringA(m_VertexFileName.c_str());
+		OutputDebugStringA(" not found,\n");
+		return;
+	}
+
+	UINT vcount = 0, tcount = 0;
+	float normal = 0.0f;
+	std::string ignore;
+	fin >> ignore >> vcount;
+	fin >> ignore >> tcount;
+	fin >> ignore >> ignore >> ignore >> ignore;
+
+	vertices.resize(vcount);
+	indices.resize(3 * tcount);
+
+	XMFLOAT3 vMinf3(+MathHelper::Infinity, +MathHelper::Infinity, +MathHelper::Infinity);
+	XMFLOAT3 vMaxf3(-MathHelper::Infinity, -MathHelper::Infinity, -MathHelper::Infinity);
+
+	XMVECTOR vMin = XMLoadFloat3(&vMinf3);
+	XMVECTOR vMax = XMLoadFloat3(&vMaxf3);
+
+	for (UINT i = 0; i < vcount; ++i)
+	{
+		fin >> vertices[i].Pos.x >> vertices[i].Pos.y >> vertices[i].Pos.z;
+		fin >> vertices[i].Normal.x >> vertices[i].Normal.y >> vertices[i].Normal.z;
+
+		XMVECTOR P = XMLoadFloat3(&vertices[i].Pos);
+
+		XMFLOAT3 spherePos;
+		XMStoreFloat3(&spherePos, XMVector3Normalize(P));
+
+		float theta = atan2f(spherePos.z, spherePos.x);
+
+		if (theta < 0.0f)
+		{
+			theta += XM_2PI;
+		}
+		float phi = acosf(spherePos.y);
+
+		float u = theta / XM_PI * 0.5f;
+		float v = phi / XM_PI;
+
+		vertices[i].TexC = { u,v };
+
+		vMin = XMVectorMin(vMin, P);
+		vMax = XMVectorMax(vMax, P);
+	}
+
+	XMFLOAT3 len;
+	XMStoreFloat3(&len, XMVector3Length(vMin - vMax));
+	XMStoreFloat3(&bounds.Center, 0.5 * (vMin + vMax));
+	bounds.Radius = 0.5f * len.x;
 
 	fin >> ignore;
 	fin >> ignore;

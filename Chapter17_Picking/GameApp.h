@@ -86,6 +86,7 @@ public:
 	void Pick(int sx, int sy);
 
 	void ReadDataFromFile(std::vector<Vertex>& vertices, std::vector<std::uint16_t>& indices, BoundingBox& bounds);
+	void ReadDataFromFile(std::vector<Vertex>& vertices, std::vector<std::uint16_t>& indices, BoundingSphere& bounds);
 	std::array<const CD3DX12_STATIC_SAMPLER_DESC, STATICSAMPLERCOUNT>GetStaticSamplers();
 	void LoadTexture(std::string name, std::wstring filename);
 
