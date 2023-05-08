@@ -113,9 +113,7 @@ float4 PS (VertexOut pin) : SV_Target
 	
     pin.NormalW = normalize(pin.NormalW);
 	
-	float3 toEyeW = gEyePosW - pin.PosW;
-    float distToEye = length(toEyeW);
-    toEyeW /= distToEye;
+    float3 toEyeW = normalize(gEyePosW - pin.PosW);
     float4 ambient = gAmbientLight * diffuseAlbedo;
 
     const float shininess = 1.0f - roughness;

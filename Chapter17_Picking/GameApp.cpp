@@ -60,8 +60,12 @@ bool GameApp::InitResource()
 		m_pCamera = camera;
 		camera->SetFrustum(0.25f * MathHelper::Pi, AspectRatio(), 1.0f, 1000.0f);
 		camera->SetViewPort(0.0f, 0.0f, (float)m_ClientWidth, (float)m_ClientHeight);
-		camera->LookAt(XMFLOAT3(0.0f, 2.0f, -15.0f), XMFLOAT3(0.0f, 0.0f, -1.0f), XMFLOAT3(0.0f, 1.0f, 0.0f));
+		//camera->LookAt(XMFLOAT3(0.0f, 2.0f, -15.0f), XMFLOAT3(0.0f, 0.0f, -1.0f), XMFLOAT3(0.0f, 1.0f, 0.0f));
 		BoundingFrustum::CreateFromMatrix(m_CamFrustum, m_pCamera->GetProjXM());
+		camera->LookAt(
+			XMFLOAT3(5.0f, 4.0f, -15.0f),
+			XMFLOAT3(0.0f, 1.0f, 0.0f),
+			XMFLOAT3(0.0f, 1.0f, 0.0f));
 	}
 	else if (m_CameraMode == CameraMode::ThirdPerson)
 	{
@@ -111,7 +115,6 @@ void GameApp::Update(const GameTimer& timer)
 	if (ImGui::Begin("CameraDemo"))
 	{
 		ImGui::Checkbox("Wireframe", &m_WireframeEnable);
-		ImGui::Checkbox("FrustumCulling", &m_FrustumCullingEnable);
 
 		static int curr_cameramode = static_cast<int>(m_CameraMode);
 		static const char* cameraMode[] = {
@@ -170,7 +173,6 @@ void GameApp::Update(const GameTimer& timer)
 				// TODO
 			}
 		}
-		ImGui::Text("SumObjectCount %d\n VisibleObjectCount %d", m_AllRitems[0]->Instances.size(), m_CurrVisibleInstanceCount);
 	}
 	
 	if (ImGui::IsKeyDown(ImGuiKey_LeftArrow))
@@ -197,7 +199,7 @@ void GameApp::Update(const GameTimer& timer)
 		CloseHandle(eventHandle);
 	}
 
-	UpdateInstanceData(timer);
+	UpdateObjectCBs(timer);
 	UpdateMaterialBuffer(timer);
 	UpdateMainPassCB(timer);
 }
@@ -233,13 +235,16 @@ void GameApp::Draw(const GameTimer& timer)
 
 	m_CommandList->SetGraphicsRootSignature(m_RootSignature.Get());
 
-	auto matBuffer = m_CurrFrameResource->MaterialBuffer->Resource();
-	m_CommandList->SetGraphicsRootShaderResourceView(1, matBuffer->GetGPUVirtualAddress());
 	auto passCB = m_CurrFrameResource->PassCB->Resource();
-	m_CommandList->SetGraphicsRootConstantBufferView(2, passCB->GetGPUVirtualAddress());
+	m_CommandList->SetGraphicsRootConstantBufferView(1, passCB->GetGPUVirtualAddress());
+	auto matBuffer = m_CurrFrameResource->MaterialBuffer->Resource();
+	m_CommandList->SetGraphicsRootShaderResourceView(2, matBuffer->GetGPUVirtualAddress());
 	m_CommandList->SetGraphicsRootDescriptorTable(3, m_SrvDescriptorHeap->GetGPUDescriptorHandleForHeapStart());
 
-	DrawRenderItems(m_CommandList.Get(), m_OpaqueRitems);
+	DrawRenderItems(m_CommandList.Get(), m_RitemLayer[(int)RenderLayer::Opaque ]);
+
+	m_CommandList->SetPipelineState(m_PSOs["highlight"].Get());
+	DrawRenderItems(m_CommandList.Get(), m_RitemLayer[(int)RenderLayer::HighLight]);
 
 	m_CommandList->SetDescriptorHeaps(1, m_SRVHeap.GetAddressOf());
 	ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), m_CommandList.Get());
@@ -281,6 +286,10 @@ void GameApp::OnMouseUp(WPARAM btnState, int x, int y)
 
 void GameApp::OnMouseDown(WPARAM btnState, int x, int y)
 {
+	if ((btnState & MK_LBUTTON) != 0) 
+	{
+		Pick(x, y);
+	}
 	m_LastMousePos.x = x;
 	m_LastMousePos.y = y;
 	SetCapture(m_hMainWnd);
@@ -325,42 +334,25 @@ void GameApp::UpdateCamera(const GameTimer& gt)
 	m_pCamera->UpdateViewMatrix();
 }
 
-void GameApp::UpdateInstanceData(const GameTimer& gt)
-{
-	XMMATRIX view = m_pCamera->GetViewXM();
-	XMMATRIX invView = XMMatrixInverse(&XMMatrixDeterminant(view), view);
-
-	m_CurrVisibleInstanceCount = 0;
-	
-	auto currInstanceBuffer = m_CurrFrameResource->InstanceBuffer.get();
-	for (auto& obj : m_OpaqueRitems) 
+void GameApp::UpdateObjectCBs(const GameTimer& gt)
+{	
+	auto currObjectCB = m_CurrFrameResource->ObjectCB.get();
+	for (auto& obj : m_AllRitems) 
 	{
-		const auto& instanceData = obj->Instances;
-		float visibleInstanceCount = 0;
-
-		for (UINT i = 0; i < (UINT)instanceData.size(); ++i)
+		if (obj->NumFramesDirty > 0) 
 		{
-			// 在局部空间，进行视锥剔除
-			XMMATRIX world = XMLoadFloat4x4(&instanceData[i].World);
-			XMMATRIX texTransform = XMLoadFloat4x4(&instanceData[i].TexTransform);
+			XMMATRIX world = XMLoadFloat4x4(&obj->World);
+			XMMATRIX texTransform = XMLoadFloat4x4(&obj->TexTransform);
 
-			XMMATRIX invWorld = XMMatrixInverse(&XMMatrixDeterminant(world), world);
-			XMMATRIX viewToLocal = XMMatrixMultiply(invView, invWorld);
+			ObjectConstants objConstant;
+			XMStoreFloat4x4(&objConstant.World, XMMatrixTranspose(world));
+			XMStoreFloat4x4(&objConstant.TexTransform, XMMatrixTranspose(texTransform));
+			objConstant.MaterialIndex = obj->Mat->m_MatCBIndex;
 
-			BoundingFrustum localSpaceFrustum;
-			m_CamFrustum.Transform(localSpaceFrustum, viewToLocal);
-			if ((localSpaceFrustum.Contains(obj->Bounds) != DirectX::DISJOINT) || (false == m_FrustumCullingEnable)) 
-			{
-				InstanceData data; 
-				XMStoreFloat4x4(&data.World, XMMatrixTranspose(world));
-				XMStoreFloat4x4(&data.TexTransform, XMMatrixTranspose(texTransform));
-				data.MaterialIndex = instanceData[i].MaterialIndex;
+			currObjectCB->CopyData(obj->ObjCBIndex, objConstant);
 
-				currInstanceBuffer->CopyData(visibleInstanceCount++, data);
-			}
+			obj->NumFramesDirty--;
 		}
-		obj->InstanceCount = visibleInstanceCount;
-		m_CurrVisibleInstanceCount += visibleInstanceCount;
 	}
 }
 
@@ -528,14 +520,14 @@ void GameApp::BuildShadersAndInputLayout()
 void GameApp::BuildCarGeometry()
 {
 	std::vector<Vertex> vertices(1);
-	std::vector<std::uint16_t> indices;
+	std::vector<std::int32_t> indices;
 	BoundingBox bounds;
 
 	// read from file 
 	ReadDataFromFile(vertices, indices, bounds);
 
 	const UINT vbByteSize = (UINT)vertices.size() * sizeof(Vertex);
-	const UINT ibByteSize = (UINT)indices.size() * sizeof(std::uint16_t);
+	const UINT ibByteSize = (UINT)indices.size() * sizeof(std::int32_t);
 
 	SubmeshGeometry submesh;
 	submesh.IndexCount = (UINT)indices.size();
@@ -559,7 +551,7 @@ void GameApp::BuildCarGeometry()
 
 	geo->VertexByteStride = sizeof(Vertex);
 	geo->VertexBufferByteSize = vbByteSize;
-	geo->IndexFormat = DXGI_FORMAT_R16_UINT;
+	geo->IndexFormat = DXGI_FORMAT_R32_UINT;
 	geo->IndexBufferByteSize = ibByteSize;
 
 	geo->DrawArgs["car"] = submesh;
@@ -635,95 +627,167 @@ void GameApp::BuildFrameResources()
 
 void GameApp::BuildMaterials()
 {
-	auto bricks = std::make_unique<Material>();
-	bricks->m_Name = "bricks";
-	bricks->m_MatCBIndex = 0;
-	bricks->m_DiffuseSrvHeapIndex = 0;
-	bricks->m_DiffuseAlbedo = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
-	bricks->m_FresnelR0 = XMFLOAT3(0.02f, 0.02f, 0.02f);
-	bricks->m_Roughness = 0.1f;
+	auto gray = std::make_unique<Material>();
+	gray->m_Name = "gray";
+	gray->m_MatCBIndex = 0;
+	gray->m_DiffuseSrvHeapIndex = 4;
+	gray->m_DiffuseAlbedo = XMFLOAT4(0.7f, 0.7f, 0.7f, 1.0f);
+	gray->m_FresnelR0 = XMFLOAT3(0.04f, 0.04f, 0.04f);
+	gray->m_Roughness = 0.0f;
 
-	auto stone = std::make_unique<Material>();
-	stone->m_Name = "stone";
-	stone->m_MatCBIndex = 1;
-	stone->m_DiffuseSrvHeapIndex = 1;
-	stone->m_DiffuseAlbedo = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
-	stone->m_FresnelR0 = XMFLOAT3(0.05f, 0.05f, 0.05f);
-	stone->m_Roughness = 0.3f;
+	auto highlight = std::make_unique<Material>();
+	highlight->m_Name = "highlight";
+	highlight->m_MatCBIndex = 1;
+	highlight->m_DiffuseSrvHeapIndex = 4;
+	highlight->m_DiffuseAlbedo = XMFLOAT4(1.0f, 1.0f, 0.0f, 0.6f);
+	highlight->m_FresnelR0 = XMFLOAT3(0.06f, 0.06f, 0.06f);
+	highlight->m_Roughness = 0.0f;
 
-	auto tile = std::make_unique<Material>();
-	tile->m_Name = "tile";
-	tile->m_MatCBIndex = 2;
-	tile->m_DiffuseSrvHeapIndex = 2;
-	tile->m_DiffuseAlbedo = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
-	tile->m_FresnelR0 = XMFLOAT3(0.02f, 0.02f, 0.02f);
-	tile->m_Roughness = 0.3f;
-
-	auto crateMat = std::make_unique<Material>();
-	crateMat->m_Name = "crate";
-	crateMat->m_MatCBIndex = 3;
-	crateMat->m_DiffuseSrvHeapIndex = 3;
-	crateMat->m_DiffuseAlbedo = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
-	crateMat->m_FresnelR0 = XMFLOAT3(0.05f, 0.05f, 0.05f);
-	crateMat->m_Roughness = 0.2f;
-
-	auto skullMat = std::make_unique<Material>();
-	skullMat->m_Name = "skull";
-	skullMat->m_MatCBIndex = 4;
-	skullMat->m_DiffuseSrvHeapIndex = 4;
-	skullMat->m_DiffuseAlbedo = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
-	skullMat->m_FresnelR0 = XMFLOAT3(0.05f, 0.05f, 0.05f);
-	skullMat->m_Roughness = 0.3f;
-
-	m_Materials["bricks"] = std::move(bricks);
-	m_Materials["stone"] = std::move(stone);
-	m_Materials["tile"] = std::move(tile);
-	m_Materials["crate"] = std::move(crateMat);
-	m_Materials["skull"] = std::move(skullMat);
+	m_Materials["gray"] = std::move(gray);
+	m_Materials["highlight"] = std::move(highlight);
 }
 
 void GameApp::BuildRenderItems()
 {
-	float scale = 1.0f;
 	auto carRitem = std::make_unique<RenderItem>();
-	carRitem->World = MathHelper::Identity4x4();
-	carRitem->TexTransform = MathHelper::Identity4x4();
+	XMStoreFloat4x4(&carRitem->World, XMMatrixScaling(1.0f, 1.0f, 1.0f) * XMMatrixTranslation(0.0f, 1.0f, 0.0f));
+	XMStoreFloat4x4(&carRitem->TexTransform, XMMatrixScaling(1.0f, 1.0f, 1.0f));
 	carRitem->ObjCBIndex = 0;
-	carRitem->Mat = m_Materials["tile"].get();
+	carRitem->Mat = m_Materials["gray"].get();
 	carRitem->Geo = m_Geometries["carGeo"].get();
 	carRitem->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
 	carRitem->IndexCount = carRitem->Geo->DrawArgs["car"].IndexCount;
 	carRitem->StartIndexLocation = carRitem->Geo->DrawArgs["car"].StartIndexLocation;
 	carRitem->BaseVertexLocation = carRitem->Geo->DrawArgs["car"].BaseVertexLocation;
 	carRitem->Bounds = carRitem->Geo->DrawArgs["car"].Bounds;
+	m_RitemLayer[(int)RenderLayer::Opaque].push_back(carRitem.get());
 	
+	auto pickRitem = std::make_unique<RenderItem>();
+	pickRitem->World = MathHelper::Identity4x4();
+	pickRitem->TexTransform = MathHelper::Identity4x4();
+	pickRitem->ObjCBIndex = 1;
+	pickRitem->Mat = m_Materials["highlight"].get();
+	pickRitem->Geo = m_Geometries["carGeo"].get();
+	pickRitem->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+
+	pickRitem->Visible = false;
+	pickRitem->IndexCount = 0;
+	pickRitem->StartIndexLocation = 0;
+	pickRitem->BaseVertexLocation = 0;
+
+	m_PickedRitem = pickRitem.get();
+	m_RitemLayer[(int)RenderLayer::HighLight].push_back(pickRitem.get());
+
 	m_AllRitems.push_back(std::move(carRitem));
-	m_OpaqueRitems.push_back(carRitem.get());
+	m_AllRitems.push_back(std::move(pickRitem));
 }
 
 void GameApp::DrawRenderItems(ID3D12GraphicsCommandList* cmdList, const std::vector<RenderItem*>& ritems)
 {
+	UINT objCBByteSize = d3dUtil::CalcConstantBufferByteSize(sizeof(ObjectConstants));
+	auto objectCB = m_CurrFrameResource->ObjectCB->Resource();
+
 	for (size_t i = 0; i < ritems.size(); ++i) 
 	{
 		auto ri = ritems[i];
+
+		if (ri->Visible == false) 
+		{
+			continue;
+		}
 
 		cmdList->IASetVertexBuffers(0, 1, &ri->Geo->GetVertexBufferView());
 		cmdList->IASetIndexBuffer(&ri->Geo->GetIndexBufferView());
 		cmdList->IASetPrimitiveTopology(ri->PrimitiveType);
 
-		// 使用描述符
-		auto instanceBuffer = m_CurrFrameResource->InstanceBuffer->Resource();
-		cmdList->SetGraphicsRootShaderResourceView(0, instanceBuffer->GetGPUVirtualAddress());
+		D3D12_GPU_VIRTUAL_ADDRESS objCBAddress = objectCB->GetGPUVirtualAddress() + ri->ObjCBIndex * objCBByteSize;
 
-		cmdList->DrawIndexedInstanced(ri->IndexCount, ri->InstanceCount, ri->StartIndexLocation, ri->BaseVertexLocation, 0);
+		cmdList->SetGraphicsRootConstantBufferView(0, objCBAddress);
+
+		cmdList->DrawIndexedInstanced(ri->IndexCount, 1, ri->StartIndexLocation, ri->BaseVertexLocation, 0);
 	}
 }
 
 void GameApp::Pick(int sx, int sy)
 {
+	// 将屏幕上的点转换到视察空间（View Space）中的射线
+
+	XMFLOAT4X4 P = m_pCamera->GetProj();
+
+	float vx = (+2.0f * sx / m_ClientWidth - 1.0f) / P(0, 0);
+	float vy = (-2.0f * sy / m_ClientHeight + 1.0f) / P(1, 1);
+
+	// 射线两点分别是 相机位置 屏幕上的点
+	XMVECTOR rayOrigin = XMVectorSet(0.0f, 0.0f, 0.0f, 1.0f);
+	XMVECTOR rayDir = XMVectorSet(vx, vy, 1.0f, 0.0f);
+
+	XMMATRIX view = m_pCamera->GetViewXM();
+	XMMATRIX invView = XMMatrixInverse(&XMMatrixDeterminant(view), view);
+
+	m_PickedRitem->Visible = false;
+
+	for (auto obj : m_RitemLayer[(int)RenderLayer::Opaque]) 
+	{
+		auto geo = obj->Geo;
+
+		if (obj->Visible == false) 
+		{
+			continue;
+		}
+
+		XMMATRIX world = XMLoadFloat4x4(&obj->World);
+		XMMATRIX invWorld = XMMatrixInverse(&XMMatrixDeterminant(world), world);
+
+		// 将射线转到模型局部空间
+		XMMATRIX toLocal = XMMatrixMultiply(invView, invWorld);
+
+		rayOrigin = XMVector3TransformCoord(rayOrigin, toLocal);
+		rayDir = XMVector3TransformNormal(rayDir, toLocal);
+		rayDir = XMVector3Normalize(rayDir);
+
+		float minDepth = 0.0f;
+		if (obj->Bounds.Intersects(rayOrigin, rayDir, minDepth))
+		{
+			auto vertices = (Vertex*)geo->VertexBufferCPU->GetBufferPointer();
+			auto indices = (std::uint32_t*)geo->IndexBufferCPU->GetBufferPointer();
+			UINT triCount = obj->IndexCount / 3;
+
+			minDepth = MathHelper::Infinity;
+			for (UINT i = 0; i < triCount; ++i) 
+			{
+				UINT i0 = indices[i * 3 + 0];
+				UINT i1 = indices[i * 3 + 1];
+				UINT i2 = indices[i * 3 + 2];
+
+				XMVECTOR v0 = XMLoadFloat3(&vertices[i0].Pos);
+				XMVECTOR v1 = XMLoadFloat3(&vertices[i1].Pos);
+				XMVECTOR v2 = XMLoadFloat3(&vertices[i2].Pos);
+
+				float d = 0.0f;
+				if (TriangleTests::Intersects(rayOrigin, rayDir, v0, v1, v2, d)) 
+				{
+					if (d < minDepth) 
+					{
+						minDepth = d;
+						UINT pickedTriangle = i;
+
+						m_PickedRitem->Visible = true;
+						m_PickedRitem->IndexCount = 3;
+						m_PickedRitem->BaseVertexLocation = 0;
+						m_PickedRitem->StartIndexLocation = 3 * pickedTriangle;
+						m_PickedRitem->World = obj->World;
+						m_PickedRitem->NumFramesDirty = g_numFrameResources;
+
+					}
+				}
+			}
+		}
+
+	}
+
 }
 
-void GameApp::ReadDataFromFile(std::vector<Vertex>& vertices, std::vector<std::uint16_t>& indices, BoundingBox& bounds)
+void GameApp::ReadDataFromFile(std::vector<Vertex>& vertices, std::vector<std::int32_t>& indices, BoundingBox& bounds)
 {
 	std::ifstream fin(m_VertexFileName);
 
@@ -792,7 +856,7 @@ void GameApp::ReadDataFromFile(std::vector<Vertex>& vertices, std::vector<std::u
 	fin.close();
 }
 
-void GameApp::ReadDataFromFile(std::vector<Vertex>& vertices, std::vector<std::uint16_t>& indices, BoundingSphere& bounds)
+void GameApp::ReadDataFromFile(std::vector<Vertex>& vertices, std::vector<std::int32_t>& indices, BoundingSphere& bounds)
 {
 	std::ifstream fin(m_VertexFileName);
 

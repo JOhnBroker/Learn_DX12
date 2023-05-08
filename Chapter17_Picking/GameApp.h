@@ -36,13 +36,19 @@ struct RenderItem
 	D3D12_PRIMITIVE_TOPOLOGY PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
 
 	BoundingBox Bounds;
-	std::vector<InstanceData> Instances;
+	bool Visible = true;
 
 	// DrawIndexedInstanced parameters
 	UINT IndexCount = 0;
-	UINT InstanceCount = 0;
 	UINT StartIndexLocation = 0;
 	int BaseVertexLocation = 0;
+};
+
+enum class RenderLayer :int
+{
+	Opaque = 0,
+	HighLight,
+	Count
 };
 
 class GameApp : public D3DApp
@@ -70,7 +76,7 @@ public:
 	virtual void OnMouseDown(WPARAM btnState, int x, int y) override;
 
 	void UpdateCamera(const GameTimer& gt);
-	void UpdateInstanceData(const GameTimer& gt);
+	void UpdateObjectCBs(const GameTimer& gt);
 	void UpdateMaterialBuffer(const GameTimer& gt);
 	void UpdateMainPassCB(const GameTimer& gt);
 
@@ -85,8 +91,8 @@ public:
 	void DrawRenderItems(ID3D12GraphicsCommandList* cmdList, const std::vector<RenderItem*>& ritems);
 	void Pick(int sx, int sy);
 
-	void ReadDataFromFile(std::vector<Vertex>& vertices, std::vector<std::uint16_t>& indices, BoundingBox& bounds);
-	void ReadDataFromFile(std::vector<Vertex>& vertices, std::vector<std::uint16_t>& indices, BoundingSphere& bounds);
+	void ReadDataFromFile(std::vector<Vertex>& vertices, std::vector<std::int32_t>& indices, BoundingBox& bounds);
+	void ReadDataFromFile(std::vector<Vertex>& vertices, std::vector<std::int32_t>& indices, BoundingSphere& bounds);
 	std::array<const CD3DX12_STATIC_SAMPLER_DESC, STATICSAMPLERCOUNT>GetStaticSamplers();
 	void LoadTexture(std::string name, std::wstring filename);
 
@@ -110,7 +116,7 @@ private:
 	std::vector<D3D12_INPUT_ELEMENT_DESC> m_InputLayout;
 
 	std::vector<std::unique_ptr<RenderItem>> m_AllRitems;
-	std::vector<RenderItem*> m_OpaqueRitems;
+	std::vector<RenderItem*> m_RitemLayer[(int)RenderLayer::Count];
 	RenderItem* m_PickedRitem = nullptr;
 
 	PassConstants m_MainPassCB;
@@ -122,8 +128,6 @@ private:
 	float m_SunPhi = XM_PIDIV4;
 
 	bool m_WireframeEnable = true;
-	bool m_FrustumCullingEnable = false;
-	std::uint32_t m_CurrVisibleInstanceCount = 0;
 
 	CameraMode m_CameraMode = CameraMode::FirstPerson;
 	ShowMode m_ShowMode = ShowMode::Box;

@@ -9,7 +9,7 @@ const int g_numFrameResources = 3;
 #include <Material.h>
 #include <Light.h>
 
-struct InstanceData
+struct ObjectConstants
 {
 	DirectX::XMFLOAT4X4 World = MathHelper::Identity4x4();
 	DirectX::XMFLOAT4X4 TexTransform = MathHelper::Identity4x4();
@@ -50,7 +50,7 @@ struct Vertex
 struct FrameResource
 {
 public:
-	FrameResource(ID3D12Device* device, UINT passCount, UINT maxInstanceCount, UINT materialCount);
+	FrameResource(ID3D12Device* device, UINT passCount, UINT objectCount, UINT materialCount);
 	FrameResource(const FrameResource& rhs) = delete;
 	FrameResource& operator= (const FrameResource& rhs) = delete;
 	~FrameResource();
@@ -58,8 +58,8 @@ public:
 	Microsoft::WRL::ComPtr<ID3D12CommandAllocator> CmdListAlloc;
 
 	std::unique_ptr<UploadBuffer<PassConstants>> PassCB = nullptr;
+	std::unique_ptr<UploadBuffer<ObjectConstants>> ObjectCB = nullptr;
 	std::unique_ptr<UploadBuffer<MaterialData>> MaterialBuffer = nullptr;
-	std::unique_ptr<UploadBuffer<InstanceData>> InstanceBuffer = nullptr;
 
 	UINT64 Fence = 0;
 };
