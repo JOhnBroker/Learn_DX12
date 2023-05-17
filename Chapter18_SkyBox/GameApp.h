@@ -36,7 +36,6 @@ struct RenderItem
 	D3D12_PRIMITIVE_TOPOLOGY PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
 
 	BoundingBox Bounds;
-	bool Visible = true;
 
 	// DrawIndexedInstanced parameters
 	UINT IndexCount = 0;
@@ -47,7 +46,11 @@ struct RenderItem
 enum class RenderLayer :int
 {
 	Opaque = 0,
-	HighLight,
+	Sky,
+	DynamicSky,
+	SlabMethod,
+	Reflection,
+	Refraction,
 	Count
 };
 
@@ -55,7 +58,8 @@ class GameApp : public D3DApp
 {
 public:
 	enum class CameraMode { FirstPerson, ThirdPerson };
-	enum class ShowMode { Sphere, Box };
+	enum class SkyMode { StaticSky, DynamicSky };
+	enum class ShowMode { Reflection, Refraction };
 public:
 	GameApp(HINSTANCE hInstance);
 	GameApp(HINSTANCE hInstance, int width, int height);
@@ -83,13 +87,13 @@ public:
 	void BuildRootSignature();
 	void BuildDescriptorHeaps();
 	void BuildShadersAndInputLayout();
-	void BuildCarGeometry();
+	void BuildShapeGeometry();
+	void BuildSkullGeometry();
 	void BuildPSOs();
 	void BuildFrameResources();
 	void BuildMaterials();
 	void BuildRenderItems();
 	void DrawRenderItems(ID3D12GraphicsCommandList* cmdList, const std::vector<RenderItem*>& ritems);
-	void Pick(int sx, int sy);
 
 	void ReadDataFromFile(std::vector<Vertex>& vertices, std::vector<std::int32_t>& indices, BoundingBox& bounds);
 	void ReadDataFromFile(std::vector<Vertex>& vertices, std::vector<std::int32_t>& indices, BoundingSphere& bounds);
@@ -121,7 +125,6 @@ private:
 
 	PassConstants m_MainPassCB;
 
-	BoundingFrustum m_CamFrustum;
 	std::shared_ptr<Camera> m_pCamera = nullptr;
 
 	float m_SunTheta = 1.25f * XM_PI;
@@ -130,11 +133,12 @@ private:
 	bool m_WireframeEnable = true;
 
 	CameraMode m_CameraMode = CameraMode::FirstPerson;
-	ShowMode m_ShowMode = ShowMode::Box;
+	SkyMode m_SkyMode = SkyMode::StaticSky;
+	ShowMode m_ShowMode = ShowMode::Reflection;
 
 	POINT m_LastMousePos;
 
-	std::string m_VertexFileName = "..\\Models\\car.txt";
+	std::string m_VertexFileName = "..\\Models\\skull.txt";
 };
 
 

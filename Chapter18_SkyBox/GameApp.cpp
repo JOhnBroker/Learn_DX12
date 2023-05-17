@@ -34,7 +34,8 @@ bool GameApp::Initialize()
 	BuildRootSignature();
 	BuildDescriptorHeaps();
 	BuildShadersAndInputLayout();
-	BuildCarGeometry();
+	BuildShapeGeometry();
+	BuildSkullGeometry();
 	BuildMaterials();
 	BuildRenderItems();
 	BuildFrameResources();
@@ -61,7 +62,6 @@ bool GameApp::InitResource()
 		camera->SetFrustum(0.25f * MathHelper::Pi, AspectRatio(), 1.0f, 1000.0f);
 		camera->SetViewPort(0.0f, 0.0f, (float)m_ClientWidth, (float)m_ClientHeight);
 		//camera->LookAt(XMFLOAT3(0.0f, 2.0f, -15.0f), XMFLOAT3(0.0f, 0.0f, -1.0f), XMFLOAT3(0.0f, 1.0f, 0.0f));
-		BoundingFrustum::CreateFromMatrix(m_CamFrustum, m_pCamera->GetProjXM());
 		camera->LookAt(
 			XMFLOAT3(5.0f, 4.0f, -15.0f),
 			XMFLOAT3(0.0f, 1.0f, 0.0f),
@@ -76,14 +76,12 @@ bool GameApp::InitResource()
 		camera->SetTarget(XMFLOAT3(0.0f, 0.0f, 1.0f));
 		camera->SetDistance(10.0f);
 		camera->SetDistanceMinMax(3.0f, 20.0f);
-		BoundingFrustum::CreateFromMatrix(m_CamFrustum, m_pCamera->GetProjXM());
 	}
 
-	LoadTexture("bricksTex", L"..\\Textures\\bricks.dds");
-	LoadTexture("stoneTex", L"..\\Textures\\stone.dds");
+	LoadTexture("bricksTex", L"..\\Textures\\bricks2.dds");
 	LoadTexture("tileTex", L"..\\Textures\\tile.dds");
-	LoadTexture("crateTex", L"..\\Textures\\WoodCrate01.dds");
 	LoadTexture("whiteTex", L"..\\Textures\\white1x1.dds");
+	LoadTexture("skyCubeMap", L"..\\Textures\\grasscube1024.dds");
 
 	bResult = true;
 
@@ -98,7 +96,6 @@ void GameApp::OnResize()
 	{
 		m_pCamera->SetFrustum(0.25f * MathHelper::Pi, AspectRatio(), 1.0f, 1000.0f);
 		m_pCamera->SetViewPort(0.0f, 0.0f, (float)m_ClientWidth, (float)m_ClientHeight);
-		BoundingFrustum::CreateFromMatrix(m_CamFrustum, m_pCamera->GetProjXM());
 	}
 }
 
@@ -157,19 +154,37 @@ void GameApp::Update(const GameTimer& timer)
 		
 		static int curr_showmode = static_cast<int>(m_ShowMode);
 		static const char* showMode[] = {
-				"Sphere",
-				"Box",
+				"Reflection",
+				"Refraction",
 		};
 		if (ImGui::Combo("Show Mode", &curr_showmode, showMode, ARRAYSIZE(showMode)))
 		{
-			if (curr_showmode == 0 && m_ShowMode != ShowMode::Sphere)
+			if (curr_showmode == 0 && m_ShowMode != ShowMode::Reflection)
 			{
-				m_ShowMode = ShowMode::Sphere;
+				m_ShowMode = ShowMode::Reflection;
 				// TODO
 			}
-			else if (curr_showmode == 1 && m_ShowMode != ShowMode::Box) 
+			else if (curr_showmode == 1 && m_ShowMode != ShowMode::Refraction) 
 			{
-				m_ShowMode = ShowMode::Box;
+				m_ShowMode = ShowMode::Refraction;
+				// TODO
+			}
+		}
+		static int curr_skymode = static_cast<int>(m_SkyMode);
+		static const char* skyMode[] = {
+				"StaticSky",
+				"DynamicSky",
+		};
+		if (ImGui::Combo("Sky Mode", &curr_skymode, skyMode, ARRAYSIZE(skyMode)))
+		{
+			if (curr_skymode == 0 && m_SkyMode != SkyMode::StaticSky)
+			{
+				m_SkyMode = SkyMode::StaticSky;
+				// TODO
+			}
+			else if (curr_skymode == 1 && m_SkyMode != SkyMode::DynamicSky)
+			{
+				m_SkyMode = SkyMode::DynamicSky;
 				// TODO
 			}
 		}
@@ -244,7 +259,7 @@ void GameApp::Draw(const GameTimer& timer)
 	DrawRenderItems(m_CommandList.Get(), m_RitemLayer[(int)RenderLayer::Opaque ]);
 
 	m_CommandList->SetPipelineState(m_PSOs["highlight"].Get());
-	DrawRenderItems(m_CommandList.Get(), m_RitemLayer[(int)RenderLayer::HighLight]);
+	DrawRenderItems(m_CommandList.Get(), m_RitemLayer[(int)RenderLayer::Sky]);
 
 	m_CommandList->SetDescriptorHeaps(1, m_SRVHeap.GetAddressOf());
 	ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), m_CommandList.Get());
@@ -461,7 +476,7 @@ void GameApp::BuildRootSignature()
 void GameApp::BuildDescriptorHeaps()
 {
 	D3D12_DESCRIPTOR_HEAP_DESC srvHeapDesc = {};
-	srvHeapDesc.NumDescriptors = 5;
+	srvHeapDesc.NumDescriptors = 4;
 	srvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
 	srvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
 	HR(m_pd3dDevice->CreateDescriptorHeap(&srvHeapDesc, IID_PPV_ARGS(&m_SrvDescriptorHeap)));
@@ -469,10 +484,9 @@ void GameApp::BuildDescriptorHeaps()
 	CD3DX12_CPU_DESCRIPTOR_HANDLE hDescriptor(m_SrvDescriptorHeap->GetCPUDescriptorHandleForHeapStart());
 
 	auto bricksTex = m_Textures["bricksTex"]->m_Resource;
-	auto stoneTex = m_Textures["stoneTex"]->m_Resource;
 	auto tileTex = m_Textures["tileTex"]->m_Resource;
-	auto crateTex = m_Textures["crateTex"]->m_Resource;
 	auto whiteTex = m_Textures["whiteTex"]->m_Resource;
+	auto skyCubeMap = m_Textures["skyCubeMap"]->m_Resource;
 
 	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
 	srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
@@ -484,24 +498,22 @@ void GameApp::BuildDescriptorHeaps()
 	m_pd3dDevice->CreateShaderResourceView(bricksTex.Get(), &srvDesc, hDescriptor);
 
 	hDescriptor.Offset(1, m_CBVSRVDescriptorSize);
-	srvDesc.Format = stoneTex->GetDesc().Format;
-	srvDesc.Texture2D.MipLevels = stoneTex->GetDesc().MipLevels;
-	m_pd3dDevice->CreateShaderResourceView(stoneTex.Get(), &srvDesc, hDescriptor);
-
-	hDescriptor.Offset(1, m_CBVSRVDescriptorSize);
 	srvDesc.Format = tileTex->GetDesc().Format;
 	srvDesc.Texture2D.MipLevels = tileTex->GetDesc().MipLevels;
 	m_pd3dDevice->CreateShaderResourceView(tileTex.Get(), &srvDesc, hDescriptor);
 
 	hDescriptor.Offset(1, m_CBVSRVDescriptorSize);
-	srvDesc.Format = crateTex->GetDesc().Format;
-	srvDesc.Texture2D.MipLevels = crateTex->GetDesc().MipLevels;
-	m_pd3dDevice->CreateShaderResourceView(crateTex.Get(), &srvDesc, hDescriptor);
-
-	hDescriptor.Offset(1, m_CBVSRVDescriptorSize);
 	srvDesc.Format = whiteTex->GetDesc().Format;
 	srvDesc.Texture2D.MipLevels = whiteTex->GetDesc().MipLevels;
 	m_pd3dDevice->CreateShaderResourceView(whiteTex.Get(), &srvDesc, hDescriptor);
+
+	hDescriptor.Offset(1, m_CBVSRVDescriptorSize);
+	srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURECUBE;
+	srvDesc.TextureCube.MostDetailedMip = 0;
+	srvDesc.TextureCube.MipLevels = skyCubeMap->GetDesc().MipLevels;
+	srvDesc.TextureCube.ResourceMinLODClamp = 0.0f;
+	srvDesc.Format = skyCubeMap->GetDesc().Format;
+	m_pd3dDevice->CreateShaderResourceView(skyCubeMap.Get(), &srvDesc, hDescriptor);
 }
 
 void GameApp::BuildShadersAndInputLayout()
@@ -517,7 +529,117 @@ void GameApp::BuildShadersAndInputLayout()
 	};
 }
 
-void GameApp::BuildCarGeometry()
+void GameApp::BuildShapeGeometry()
+{
+	GeometryGenerator geoGen;
+	GeometryGenerator::MeshData box = geoGen.CreateBox(1.0f, 1.0f, 1.0f, 0);
+	GeometryGenerator::MeshData grid = geoGen.CreateGrid(20.0f, 30.0f, 60, 40);
+	GeometryGenerator::MeshData sphere = geoGen.CreateSphere(0.5f, 20, 20);
+	GeometryGenerator::MeshData cylinder = geoGen.CreateCylinder(0.5f, 0.3f, 3.0f, 20, 20);
+
+	UINT boxVertexOffset = 0;
+	UINT gridVertexOffset = (UINT)box.Vertices.size();
+	UINT sphereVertexOffset = gridVertexOffset + (UINT)grid.Vertices.size();
+	UINT cylinderVertexOffset = sphereVertexOffset + (UINT)sphere.Vertices.size();
+
+	UINT boxIndexOffset = 0;
+	UINT gridIndexOffset = (UINT)box.Indices32.size();
+	UINT sphereIndexOffset = gridIndexOffset + (UINT)grid.Indices32.size();
+	UINT cylinderIndexOffset = sphereIndexOffset + (UINT)sphere.Indices32.size();
+
+	SubmeshGeometry boxSubmesh;
+	boxSubmesh.IndexCount = (UINT)box.Indices32.size();
+	boxSubmesh.BaseVertexLocation = boxVertexOffset;
+	boxSubmesh.StartIndexLocation = boxIndexOffset;
+
+	SubmeshGeometry gridSubmesh;
+	gridSubmesh.IndexCount = (UINT)grid.Indices32.size();
+	gridSubmesh.BaseVertexLocation = gridVertexOffset;
+	gridSubmesh.StartIndexLocation = gridIndexOffset;
+
+	SubmeshGeometry sphereSubmesh;
+	sphereSubmesh.IndexCount = (UINT)sphere.Indices32.size();
+	sphereSubmesh.BaseVertexLocation = sphereVertexOffset;
+	sphereSubmesh.StartIndexLocation = sphereIndexOffset;
+
+	SubmeshGeometry cylinderSubmesh;
+	cylinderSubmesh.IndexCount = (UINT)cylinder.Indices32.size();
+	cylinderSubmesh.BaseVertexLocation = cylinderVertexOffset;
+	cylinderSubmesh.StartIndexLocation = cylinderIndexOffset;
+
+	auto totalVertexCount =
+		box.Vertices.size() +
+		grid.Vertices.size() +
+		sphere.Vertices.size() +
+		cylinder.Vertices.size();
+
+	std::vector<Vertex> vertices(totalVertexCount);
+	
+	UINT k = 0;
+	for (size_t i = 0; i < box.Vertices.size(); ++i, ++k) 
+	{
+		vertices[k].Pos = box.Vertices[i].Position;
+		vertices[k].Normal = box.Vertices[i].Normal;
+		vertices[k].TexC = box.Vertices[i].TexC;
+	}
+	for (size_t i = 0; i < grid.Vertices.size(); ++i, ++k)
+	{
+		vertices[k].Pos = grid.Vertices[i].Position;
+		vertices[k].Normal = grid.Vertices[i].Normal;
+		vertices[k].TexC = grid.Vertices[i].TexC;
+	}
+	for (size_t i = 0; i < sphere.Vertices.size(); ++i, ++k)
+	{
+		vertices[k].Pos = sphere.Vertices[i].Position;
+		vertices[k].Normal = sphere.Vertices[i].Normal;
+		vertices[k].TexC = sphere.Vertices[i].TexC;
+	}
+	for (size_t i = 0; i < cylinder.Vertices.size(); ++i, ++k)
+	{
+		vertices[k].Pos = cylinder.Vertices[i].Position;
+		vertices[k].Normal = cylinder.Vertices[i].Normal;
+		vertices[k].TexC = cylinder.Vertices[i].TexC;
+	}
+
+	std::vector<std::uint16_t> indices;
+	indices.insert(indices.end(), std::begin(box.GetIndices16()), std::end(box.GetIndices16()));
+	indices.insert(indices.end(), std::begin(grid.GetIndices16()), std::end(grid.GetIndices16()));
+	indices.insert(indices.end(), std::begin(sphere.GetIndices16()), std::end(sphere.GetIndices16()));
+	indices.insert(indices.end(), std::begin(cylinder.GetIndices16()), std::end(cylinder.GetIndices16()));
+
+	const UINT vbByteSize = (UINT)vertices.size() * sizeof(Vertex);
+	const UINT ibByteSize = (UINT)indices.size() * sizeof(std::uint16_t);
+
+	auto geo = std::make_unique<MeshGeometry>();
+	geo->Name = "shapeGeo";
+
+	HR(D3DCreateBlob(vbByteSize, &geo->VertexBufferCPU));
+	CopyMemory(geo->VertexBufferCPU->GetBufferPointer(), vertices.data(), vertices.size());
+
+	HR(D3DCreateBlob(ibByteSize, &geo->IndexBufferCPU));
+	CopyMemory(geo->IndexBufferCPU->GetBufferPointer(), indices.data(), indices.size());
+
+	geo->VertexBufferGPU = d3dUtil::CreateDefaultBuffer(m_pd3dDevice.Get(),
+		m_CommandList.Get(), vertices.data(), vbByteSize, geo->VertexBufferUploader);
+
+	geo->IndexBufferGPU = d3dUtil::CreateDefaultBuffer(m_pd3dDevice.Get(),
+		m_CommandList.Get(), indices.data(), ibByteSize, geo->IndexBufferUploader);
+
+	geo->VertexByteStride = sizeof(Vertex);
+	geo->VertexBufferByteSize = vbByteSize;
+	geo->IndexFormat = DXGI_FORMAT_R16_UINT;
+	geo->IndexBufferByteSize = ibByteSize;
+
+	geo->DrawArgs["box"] = boxSubmesh;
+	geo->DrawArgs["grid"] = gridSubmesh;
+	geo->DrawArgs["sphere"] = sphereSubmesh;
+	geo->DrawArgs["cylinder"] = cylinderSubmesh;
+	
+	m_Geometries[geo->Name] = std::move(geo);
+
+}
+
+void GameApp::BuildSkullGeometry()
 {
 	std::vector<Vertex> vertices(1);
 	std::vector<std::int32_t> indices;
@@ -536,7 +658,7 @@ void GameApp::BuildCarGeometry()
 	submesh.Bounds = bounds;
 
 	auto geo = std::make_unique<MeshGeometry>();
-	geo->Name = "carGeo";
+	geo->Name = "skullGeo";
 
 	HR(D3DCreateBlob(vbByteSize, &geo->VertexBufferCPU));
 	CopyMemory(geo->VertexBufferCPU->GetBufferPointer(), vertices.data(), vbByteSize);
@@ -554,7 +676,7 @@ void GameApp::BuildCarGeometry()
 	geo->IndexFormat = DXGI_FORMAT_R32_UINT;
 	geo->IndexBufferByteSize = ibByteSize;
 
-	geo->DrawArgs["car"] = submesh;
+	geo->DrawArgs["skull"] = submesh;
 
 	m_Geometries[geo->Name] = std::move(geo);
 }
@@ -627,59 +749,175 @@ void GameApp::BuildFrameResources()
 
 void GameApp::BuildMaterials()
 {
-	auto gray = std::make_unique<Material>();
-	gray->m_Name = "gray";
-	gray->m_MatCBIndex = 0;
-	gray->m_DiffuseSrvHeapIndex = 4;
-	gray->m_DiffuseAlbedo = XMFLOAT4(0.7f, 0.7f, 0.7f, 1.0f);
-	gray->m_FresnelR0 = XMFLOAT3(0.04f, 0.04f, 0.04f);
-	gray->m_Roughness = 0.0f;
+	auto bricks = std::make_unique<Material>();
+	bricks->m_Name = "bricks";
+	bricks->m_MatCBIndex = 0;
+	bricks->m_DiffuseSrvHeapIndex = 0;
+	bricks->m_DiffuseAlbedo = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
+	bricks->m_FresnelR0 = XMFLOAT3(0.1f, 0.1f, 0.1f);
+	bricks->m_Roughness = 0.3f;
 
-	auto highlight = std::make_unique<Material>();
-	highlight->m_Name = "highlight";
-	highlight->m_MatCBIndex = 1;
-	highlight->m_DiffuseSrvHeapIndex = 4;
-	highlight->m_DiffuseAlbedo = XMFLOAT4(1.0f, 1.0f, 0.0f, 0.6f);
-	highlight->m_FresnelR0 = XMFLOAT3(0.06f, 0.06f, 0.06f);
-	highlight->m_Roughness = 0.0f;
+	auto tile = std::make_unique<Material>();
+	tile->m_Name = "tile";
+	tile->m_MatCBIndex = 1;
+	tile->m_DiffuseSrvHeapIndex = 1;
+	tile->m_DiffuseAlbedo = XMFLOAT4(0.9f, 0.9f, 0.9f, 1.0f);
+	tile->m_FresnelR0 = XMFLOAT3(0.2f, 0.2f, 0.2f);
+	tile->m_Roughness = 0.1f;
 
-	m_Materials["gray"] = std::move(gray);
-	m_Materials["highlight"] = std::move(highlight);
+	auto mirror = std::make_unique<Material>();
+	mirror->m_Name = "mirror";
+	mirror->m_MatCBIndex = 2;
+	mirror->m_DiffuseSrvHeapIndex = 2;
+	mirror->m_DiffuseAlbedo = XMFLOAT4(0.0f, 0.0f, 0.1f, 1.0f);
+	mirror->m_FresnelR0 = XMFLOAT3(0.98f, 0.98f, 0.98f);
+	mirror->m_Roughness = 0.1f;
+
+	auto skullMat = std::make_unique<Material>();
+	skullMat->m_Name = "skullMat";
+	skullMat->m_MatCBIndex = 3;
+	skullMat->m_DiffuseSrvHeapIndex = 2;
+	skullMat->m_DiffuseAlbedo = XMFLOAT4(0.8f, 0.8f, 0.8f, 1.0f);
+	skullMat->m_FresnelR0 = XMFLOAT3(0.2f, 0.2f, 0.2f);
+	skullMat->m_Roughness = 0.2f;
+
+	auto sky = std::make_unique<Material>();
+	sky->m_Name = "sky";
+	sky->m_MatCBIndex = 4;
+	sky->m_DiffuseSrvHeapIndex = 3;
+	sky->m_DiffuseAlbedo = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
+	sky->m_FresnelR0 = XMFLOAT3(0.2f, 0.2f, 0.2f);
+	sky->m_Roughness = 0.2f;
+
+	m_Materials["bricks"] = std::move(bricks);
+	m_Materials["tile"] = std::move(tile);
+	m_Materials["mirror"] = std::move(mirror);
+	m_Materials["skullMat"] = std::move(skullMat);
+	m_Materials["sky"] = std::move(sky);
 }
 
 void GameApp::BuildRenderItems()
 {
-	auto carRitem = std::make_unique<RenderItem>();
-	XMStoreFloat4x4(&carRitem->World, XMMatrixScaling(1.0f, 1.0f, 1.0f) * XMMatrixTranslation(0.0f, 1.0f, 0.0f));
-	XMStoreFloat4x4(&carRitem->TexTransform, XMMatrixScaling(1.0f, 1.0f, 1.0f));
-	carRitem->ObjCBIndex = 0;
-	carRitem->Mat = m_Materials["gray"].get();
-	carRitem->Geo = m_Geometries["carGeo"].get();
-	carRitem->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
-	carRitem->IndexCount = carRitem->Geo->DrawArgs["car"].IndexCount;
-	carRitem->StartIndexLocation = carRitem->Geo->DrawArgs["car"].StartIndexLocation;
-	carRitem->BaseVertexLocation = carRitem->Geo->DrawArgs["car"].BaseVertexLocation;
-	carRitem->Bounds = carRitem->Geo->DrawArgs["car"].Bounds;
-	m_RitemLayer[(int)RenderLayer::Opaque].push_back(carRitem.get());
+	auto skyRitem = std::make_unique<RenderItem>();
+	XMStoreFloat4x4(&skyRitem->World, XMMatrixScaling(5000.0f, 5000.0f, 5000.0f));
+	skyRitem->TexTransform = MathHelper::Identity4x4();
+	skyRitem->ObjCBIndex = 0;
+	skyRitem->Mat = m_Materials["sky"].get();
+	skyRitem->Geo = m_Geometries["shapeGeo"].get();
+	skyRitem->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+	skyRitem->IndexCount = skyRitem->Geo->DrawArgs["sphere"].IndexCount;
+	skyRitem->StartIndexLocation = skyRitem->Geo->DrawArgs["sphere"].StartIndexLocation;
+	skyRitem->BaseVertexLocation = skyRitem->Geo->DrawArgs["sphere"].BaseVertexLocation;
+
+	m_RitemLayer[(int)RenderLayer::Sky].push_back(skyRitem.get());
+	m_AllRitems.push_back(std::move(skyRitem));
+
+	auto boxRitem = std::make_unique<RenderItem>();
+	XMStoreFloat4x4(&boxRitem->World, XMMatrixScaling(2.0f, 1.0f, 2.0f) * XMMatrixTranslation(0.0f, 0.5f, 0.0f));
+	XMStoreFloat4x4(&boxRitem->TexTransform, XMMatrixScaling(1.0f, 1.0f, 1.0f));
+	boxRitem->ObjCBIndex = 1;
+	boxRitem->Mat = m_Materials["bricks"].get();
+	boxRitem->Geo = m_Geometries["shapeGeo"].get();
+	boxRitem->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+	boxRitem->IndexCount = boxRitem->Geo->DrawArgs["box"].IndexCount;
+	boxRitem->StartIndexLocation = boxRitem->Geo->DrawArgs["box"].StartIndexLocation;
+	boxRitem->BaseVertexLocation = boxRitem->Geo->DrawArgs["box"].BaseVertexLocation;
+
+	m_RitemLayer[(int)RenderLayer::Opaque].push_back(boxRitem.get());
+	m_AllRitems.push_back(std::move(boxRitem));
+
+	auto skullRitem = std::make_unique<RenderItem>();
+	XMStoreFloat4x4(&skullRitem->World, XMMatrixScaling(0.4f, 0.4f, 0.4f) * XMMatrixTranslation(0.0f, 1.0f, 0.0f));
+	skullRitem->TexTransform = MathHelper::Identity4x4();
+	skullRitem->ObjCBIndex = 2;
+	skullRitem->Mat = m_Materials["skullMat"].get();
+	skullRitem->Geo = m_Geometries["skullGeo"].get();
+	skullRitem->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+	skullRitem->IndexCount = skullRitem->Geo->DrawArgs["skull"].IndexCount;
+	skullRitem->StartIndexLocation = skullRitem->Geo->DrawArgs["skull"].StartIndexLocation;
+	skullRitem->BaseVertexLocation = skullRitem->Geo->DrawArgs["skull"].BaseVertexLocation;
+
+	m_RitemLayer[(int)RenderLayer::Opaque].push_back(skullRitem.get());
+	m_AllRitems.push_back(std::move(skullRitem));
 	
-	auto pickRitem = std::make_unique<RenderItem>();
-	pickRitem->World = MathHelper::Identity4x4();
-	pickRitem->TexTransform = MathHelper::Identity4x4();
-	pickRitem->ObjCBIndex = 1;
-	pickRitem->Mat = m_Materials["highlight"].get();
-	pickRitem->Geo = m_Geometries["carGeo"].get();
-	pickRitem->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+	auto gridRitem = std::make_unique<RenderItem>();
+	gridRitem->World = MathHelper::Identity4x4();
+	XMStoreFloat4x4(&gridRitem->TexTransform, XMMatrixScaling(8.0f, 8.0f, 1.0f));
+	gridRitem->ObjCBIndex = 3;
+	gridRitem->Mat = m_Materials["tile"].get();
+	gridRitem->Geo = m_Geometries["shapeGeo"].get();
+	gridRitem->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+	gridRitem->IndexCount = gridRitem->Geo->DrawArgs["grid"].IndexCount;
+	gridRitem->StartIndexLocation = gridRitem->Geo->DrawArgs["grid"].StartIndexLocation;
+	gridRitem->BaseVertexLocation = gridRitem->Geo->DrawArgs["grid"].BaseVertexLocation;
+	m_RitemLayer[(int)RenderLayer::Opaque].push_back(gridRitem.get());
+	m_AllRitems.push_back(std::move(gridRitem));
 
-	pickRitem->Visible = false;
-	pickRitem->IndexCount = 0;
-	pickRitem->StartIndexLocation = 0;
-	pickRitem->BaseVertexLocation = 0;
+	XMMATRIX brickTexTransform = XMMatrixScaling(1.5f, 2.0f, 1.0f);
+	UINT objCBIndex = 4;
+	for (int i = 0; i < 5; ++i) 
+	{
+		auto leftCylRitem = std::make_unique<RenderItem>();
+		auto rightCylRitem = std::make_unique<RenderItem>();
+		auto leftSphereRitem = std::make_unique<RenderItem>();
+		auto rightSphereRitem = std::make_unique<RenderItem>();
 
-	m_PickedRitem = pickRitem.get();
-	m_RitemLayer[(int)RenderLayer::HighLight].push_back(pickRitem.get());
+		XMMATRIX leftCylWorld = XMMatrixTranslation(-5.0f, 1.5f, -10.0f + i * 5.0f);
+		XMMATRIX rightCylWorld = XMMatrixTranslation(+5.0f, 1.5f, -10.0f + i * 5.0f);
 
-	m_AllRitems.push_back(std::move(carRitem));
-	m_AllRitems.push_back(std::move(pickRitem));
+		XMMATRIX leftSphereWorld = XMMatrixTranslation(-5.0f, 3.5f, -10.0f + i * 5.0f);
+		XMMATRIX rightSphereWorld = XMMatrixTranslation(+5.0f, 3.5f, -10.0f + i * 5.0f);
+
+		XMStoreFloat4x4(&leftCylRitem->World, rightCylWorld);
+		XMStoreFloat4x4(&leftCylRitem->TexTransform, brickTexTransform);
+		leftCylRitem->ObjCBIndex = objCBIndex++;
+		leftCylRitem->Mat = m_Materials["bricks"].get();
+		leftCylRitem->Geo = m_Geometries["shapeGeo"].get();
+		leftCylRitem->PrimitiveType = D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+		leftCylRitem->IndexCount = leftCylRitem->Geo->DrawArgs["cylinder"].IndexCount;
+		leftCylRitem->StartIndexLocation = leftCylRitem->Geo->DrawArgs["cylinder"].StartIndexLocation;
+		leftCylRitem->BaseVertexLocation = leftCylRitem->Geo->DrawArgs["cylinder"].BaseVertexLocation;
+
+		XMStoreFloat4x4(&rightCylRitem->World, leftCylWorld);
+		XMStoreFloat4x4(&rightCylRitem->TexTransform, brickTexTransform);
+		rightCylRitem->ObjCBIndex = objCBIndex++;
+		rightCylRitem->Mat = m_Materials["bricks"].get();
+		rightCylRitem->Geo = m_Geometries["shapeGeo"].get();
+		rightCylRitem->PrimitiveType = D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+		rightCylRitem->IndexCount = rightCylRitem->Geo->DrawArgs["cylinder"].IndexCount;
+		rightCylRitem->StartIndexLocation = rightCylRitem->Geo->DrawArgs["cylinder"].StartIndexLocation;
+		rightCylRitem->BaseVertexLocation = rightCylRitem->Geo->DrawArgs["cylinder"].BaseVertexLocation;
+
+		XMStoreFloat4x4(&leftSphereRitem->World, leftSphereWorld);
+		leftSphereRitem->TexTransform = MathHelper::Identity4x4();
+		leftSphereRitem->ObjCBIndex = objCBIndex++;
+		leftSphereRitem->Mat = m_Materials["mirror"].get();
+		leftSphereRitem->Geo = m_Geometries["shapeGeo"].get();
+		leftSphereRitem->PrimitiveType = D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+		leftSphereRitem->IndexCount = leftSphereRitem->Geo->DrawArgs["sphere"].IndexCount;
+		leftSphereRitem->StartIndexLocation = leftSphereRitem->Geo->DrawArgs["sphere"].StartIndexLocation;
+		leftSphereRitem->BaseVertexLocation = leftSphereRitem->Geo->DrawArgs["sphere"].BaseVertexLocation;
+
+		XMStoreFloat4x4(&rightSphereRitem->World, rightSphereWorld);
+		rightSphereRitem->TexTransform = MathHelper::Identity4x4();
+		rightSphereRitem->ObjCBIndex = objCBIndex++;
+		rightSphereRitem->Mat = m_Materials["mirror"].get();
+		rightSphereRitem->Geo = m_Geometries["shapeGeo"].get();
+		rightSphereRitem->PrimitiveType = D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+		rightSphereRitem->IndexCount = rightSphereRitem->Geo->DrawArgs["sphere"].IndexCount;
+		rightSphereRitem->StartIndexLocation = rightSphereRitem->Geo->DrawArgs["sphere"].StartIndexLocation;
+		rightSphereRitem->BaseVertexLocation = rightSphereRitem->Geo->DrawArgs["sphere"].BaseVertexLocation;
+
+		m_RitemLayer[(int)RenderLayer::Opaque].push_back(leftCylRitem.get());
+		m_RitemLayer[(int)RenderLayer::Opaque].push_back(rightCylRitem.get());
+		m_RitemLayer[(int)RenderLayer::Opaque].push_back(leftSphereRitem.get());
+		m_RitemLayer[(int)RenderLayer::Opaque].push_back(rightSphereRitem.get());
+
+		m_AllRitems.push_back(std::move(leftCylRitem));
+		m_AllRitems.push_back(std::move(rightCylRitem));
+		m_AllRitems.push_back(std::move(leftSphereRitem));
+		m_AllRitems.push_back(std::move(rightSphereRitem));
+	}
 }
 
 void GameApp::DrawRenderItems(ID3D12GraphicsCommandList* cmdList, const std::vector<RenderItem*>& ritems)
@@ -691,11 +929,6 @@ void GameApp::DrawRenderItems(ID3D12GraphicsCommandList* cmdList, const std::vec
 	{
 		auto ri = ritems[i];
 
-		if (ri->Visible == false) 
-		{
-			continue;
-		}
-
 		cmdList->IASetVertexBuffers(0, 1, &ri->Geo->GetVertexBufferView());
 		cmdList->IASetIndexBuffer(&ri->Geo->GetIndexBufferView());
 		cmdList->IASetPrimitiveTopology(ri->PrimitiveType);
@@ -706,85 +939,6 @@ void GameApp::DrawRenderItems(ID3D12GraphicsCommandList* cmdList, const std::vec
 
 		cmdList->DrawIndexedInstanced(ri->IndexCount, 1, ri->StartIndexLocation, ri->BaseVertexLocation, 0);
 	}
-}
-
-void GameApp::Pick(int sx, int sy)
-{
-	// 将屏幕上的点转换到视察空间（View Space）中的射线
-
-	XMFLOAT4X4 P = m_pCamera->GetProj();
-
-	float vx = (+2.0f * sx / m_ClientWidth - 1.0f) / P(0, 0);
-	float vy = (-2.0f * sy / m_ClientHeight + 1.0f) / P(1, 1);
-
-	// 射线两点分别是 相机位置 屏幕上的点
-	XMVECTOR rayOrigin = XMVectorSet(0.0f, 0.0f, 0.0f, 1.0f);
-	XMVECTOR rayDir = XMVectorSet(vx, vy, 1.0f, 0.0f);
-
-	XMMATRIX view = m_pCamera->GetViewXM();
-	XMMATRIX invView = XMMatrixInverse(&XMMatrixDeterminant(view), view);
-
-	m_PickedRitem->Visible = false;
-
-	for (auto obj : m_RitemLayer[(int)RenderLayer::Opaque]) 
-	{
-		auto geo = obj->Geo;
-
-		if (obj->Visible == false) 
-		{
-			continue;
-		}
-
-		XMMATRIX world = XMLoadFloat4x4(&obj->World);
-		XMMATRIX invWorld = XMMatrixInverse(&XMMatrixDeterminant(world), world);
-
-		// 将射线转到模型局部空间
-		XMMATRIX toLocal = XMMatrixMultiply(invView, invWorld);
-
-		rayOrigin = XMVector3TransformCoord(rayOrigin, toLocal);
-		rayDir = XMVector3TransformNormal(rayDir, toLocal);
-		rayDir = XMVector3Normalize(rayDir);
-
-		float minDepth = 0.0f;
-		if (obj->Bounds.Intersects(rayOrigin, rayDir, minDepth))
-		{
-			auto vertices = (Vertex*)geo->VertexBufferCPU->GetBufferPointer();
-			auto indices = (std::uint32_t*)geo->IndexBufferCPU->GetBufferPointer();
-			UINT triCount = obj->IndexCount / 3;
-
-			minDepth = MathHelper::Infinity;
-			for (UINT i = 0; i < triCount; ++i) 
-			{
-				UINT i0 = indices[i * 3 + 0];
-				UINT i1 = indices[i * 3 + 1];
-				UINT i2 = indices[i * 3 + 2];
-
-				XMVECTOR v0 = XMLoadFloat3(&vertices[i0].Pos);
-				XMVECTOR v1 = XMLoadFloat3(&vertices[i1].Pos);
-				XMVECTOR v2 = XMLoadFloat3(&vertices[i2].Pos);
-
-				float d = 0.0f;
-				if (TriangleTests::Intersects(rayOrigin, rayDir, v0, v1, v2, d)) 
-				{
-					if (d < minDepth) 
-					{
-						minDepth = d;
-						UINT pickedTriangle = i;
-
-						m_PickedRitem->Visible = true;
-						m_PickedRitem->IndexCount = 3;
-						m_PickedRitem->BaseVertexLocation = 0;
-						m_PickedRitem->StartIndexLocation = 3 * pickedTriangle;
-						m_PickedRitem->World = obj->World;
-						m_PickedRitem->NumFramesDirty = g_numFrameResources;
-
-					}
-				}
-			}
-		}
-
-	}
-
 }
 
 void GameApp::ReadDataFromFile(std::vector<Vertex>& vertices, std::vector<std::int32_t>& indices, BoundingBox& bounds)
