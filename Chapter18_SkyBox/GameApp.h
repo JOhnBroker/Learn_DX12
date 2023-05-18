@@ -49,8 +49,6 @@ enum class RenderLayer :int
 	Sky,
 	DynamicSky,
 	SlabMethod,
-	Reflection,
-	Refraction,
 	Count
 };
 
@@ -121,7 +119,8 @@ private:
 
 	std::vector<std::unique_ptr<RenderItem>> m_AllRitems;
 	std::vector<RenderItem*> m_RitemLayer[(int)RenderLayer::Count];
-	RenderItem* m_PickedRitem = nullptr;
+
+	UINT m_SkyTexHeapIndex = 0;
 
 	PassConstants m_MainPassCB;
 

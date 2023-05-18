@@ -19,20 +19,21 @@ struct Material
 {
 	std::string m_Name;
 	
-	// ³£Á¿»º³åÇø ¶ÔÓ¦µ½¸Ã ²ÄÖÊµÄË÷Òı
+	// å¸¸é‡ç¼“å†²åŒº å¯¹åº”åˆ°è¯¥ æè´¨çš„ç´¢å¼•
 	int m_MatCBIndex = -1;
-	// DiffuseÌùÍ¼ SRV heap µÄË÷Òı
+	// Diffuseè´´å›¾ SRV heap çš„ç´¢å¼•
 	int m_DiffuseSrvHeapIndex = -1;
-	// NormalÌùÍ¼ SRV heap µÄË÷Òı
+	// Normalè´´å›¾ SRV heap çš„ç´¢å¼•
 	int m_NormalSrvHeapIndex = -1;
 
-	// Ã¿¸öFrameResource¾ùĞèÒªÉı¼¶
+	// æ¯ä¸ªFrameResourceå‡éœ€è¦å‡çº§
 	int m_NumFramesDirty = g_numFrameResources;
 
 	DirectX::XMFLOAT4 m_DiffuseAlbedo = { 1.0f,1.0f,1.0f,1.0f };
 	DirectX::XMFLOAT3 m_FresnelR0 = { 0.01f,0.01f,0.01f };
 	float m_Roughness = 0.25f;
 	DirectX::XMFLOAT4X4 m_MatTransform = MathHelper::Identity4x4();
+	float m_Eta = 1.0f;
 };
 
 struct MaterialData
@@ -47,7 +48,7 @@ struct MaterialData
 	UINT MaterialPad0;
 	UINT MaterialPad1;
 	UINT MaterialPad2;
-
+	float Eta = 1.0f;
 };
 
 #endif //MATERIAL_H

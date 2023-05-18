@@ -81,7 +81,9 @@ bool GameApp::InitResource()
 	LoadTexture("bricksTex", L"..\\Textures\\bricks2.dds");
 	LoadTexture("tileTex", L"..\\Textures\\tile.dds");
 	LoadTexture("whiteTex", L"..\\Textures\\white1x1.dds");
-	LoadTexture("skyCubeMap", L"..\\Textures\\grasscube1024.dds");
+	LoadTexture("grassCube", L"..\\Textures\\grasscube1024.dds");
+	LoadTexture("snowCube", L"..\\Textures\\snowcube1024.dds");
+	LoadTexture("sunsetCube", L"..\\Textures\\sunset1024.dds");
 
 	bResult = true;
 
@@ -180,12 +182,31 @@ void GameApp::Update(const GameTimer& timer)
 			if (curr_skymode == 0 && m_SkyMode != SkyMode::StaticSky)
 			{
 				m_SkyMode = SkyMode::StaticSky;
-				// TODO
 			}
 			else if (curr_skymode == 1 && m_SkyMode != SkyMode::DynamicSky)
 			{
 				m_SkyMode = SkyMode::DynamicSky;
-				// TODO
+			}
+		}
+		static int curr_skyCubemode = max(0, static_cast<int>(m_SkyTexHeapIndex) - 3);
+		static const char* skyCubeMode[] = {
+				"grass",
+				"snow",
+				"sunset"
+		};
+		if (ImGui::Combo("SkyCube", &curr_skyCubemode, skyCubeMode, ARRAYSIZE(skyCubeMode)))
+		{
+			if (curr_skyCubemode == 0 )
+			{
+				m_SkyTexHeapIndex = 3;
+			}
+			else if (curr_skyCubemode == 1)
+			{
+				m_SkyTexHeapIndex = 4;
+			}
+			else if (curr_skyCubemode == 2) 
+			{
+				m_SkyTexHeapIndex = 5;
 			}
 		}
 	}
@@ -254,11 +275,24 @@ void GameApp::Draw(const GameTimer& timer)
 	m_CommandList->SetGraphicsRootConstantBufferView(1, passCB->GetGPUVirtualAddress());
 	auto matBuffer = m_CurrFrameResource->MaterialBuffer->Resource();
 	m_CommandList->SetGraphicsRootShaderResourceView(2, matBuffer->GetGPUVirtualAddress());
-	m_CommandList->SetGraphicsRootDescriptorTable(3, m_SrvDescriptorHeap->GetGPUDescriptorHandleForHeapStart());
 
-	DrawRenderItems(m_CommandList.Get(), m_RitemLayer[(int)RenderLayer::Opaque ]);
+	CD3DX12_GPU_DESCRIPTOR_HANDLE skyTexDescriptor(m_SrvDescriptorHeap->GetGPUDescriptorHandleForHeapStart());
+	skyTexDescriptor.Offset(m_SkyTexHeapIndex, m_CBVSRVDescriptorSize);
+	m_CommandList->SetGraphicsRootDescriptorTable(3, skyTexDescriptor);
 
-	m_CommandList->SetPipelineState(m_PSOs["highlight"].Get());
+	m_CommandList->SetGraphicsRootDescriptorTable(4, m_SrvDescriptorHeap->GetGPUDescriptorHandleForHeapStart());
+
+	switch (m_ShowMode)
+	{
+	case GameApp::ShowMode::Reflection:
+		break;
+	case GameApp::ShowMode::Refraction:
+		m_CommandList->SetPipelineState(m_PSOs["refraction"].Get());
+		break;
+	}
+	DrawRenderItems(m_CommandList.Get(), m_RitemLayer[(int)RenderLayer::Opaque]);
+
+	m_CommandList->SetPipelineState(m_PSOs["sky"].Get());
 	DrawRenderItems(m_CommandList.Get(), m_RitemLayer[(int)RenderLayer::Sky]);
 
 	m_CommandList->SetDescriptorHeaps(1, m_SRVHeap.GetAddressOf());
@@ -301,10 +335,6 @@ void GameApp::OnMouseUp(WPARAM btnState, int x, int y)
 
 void GameApp::OnMouseDown(WPARAM btnState, int x, int y)
 {
-	if ((btnState & MK_LBUTTON) != 0) 
-	{
-		Pick(x, y);
-	}
 	m_LastMousePos.x = x;
 	m_LastMousePos.y = y;
 	SetCapture(m_hMainWnd);
@@ -387,6 +417,7 @@ void GameApp::UpdateMaterialBuffer(const GameTimer& gt)
 			matData.Roughness = mat->m_Roughness;
 			XMStoreFloat4x4(&matData.MatTransform, XMMatrixTranspose(matTransform));
 			matData.DiffuseMapIndex = mat->m_DiffuseSrvHeapIndex;
+			matData.Eta = mat->m_Eta;
 
 			currMaterialCB->CopyData(mat->m_MatCBIndex, matData);
 
@@ -436,16 +467,19 @@ void GameApp::UpdateMainPassCB(const GameTimer& gt)
 void GameApp::BuildRootSignature()
 {
 	HRESULT hReturn = E_FAIL;
-	CD3DX12_DESCRIPTOR_RANGE texTable;
-	texTable.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 5, 0, 0);
-	
-	CD3DX12_ROOT_PARAMETER slotRootParameter[4];
+	CD3DX12_DESCRIPTOR_RANGE texTable0;
+	texTable0.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0, 0);
+	CD3DX12_DESCRIPTOR_RANGE texTable1;
+	texTable1.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 4, 1, 0);
+
+	CD3DX12_ROOT_PARAMETER slotRootParameter[5];
 
 	// 创建根描述符表
 	slotRootParameter[0].InitAsConstantBufferView(0);
 	slotRootParameter[1].InitAsConstantBufferView(1);
 	slotRootParameter[2].InitAsShaderResourceView(0, 1);
-	slotRootParameter[3].InitAsDescriptorTable(1, &texTable, D3D12_SHADER_VISIBILITY_PIXEL);
+	slotRootParameter[3].InitAsDescriptorTable(1, &texTable0, D3D12_SHADER_VISIBILITY_PIXEL);
+	slotRootParameter[4].InitAsDescriptorTable(1, &texTable1, D3D12_SHADER_VISIBILITY_PIXEL);
 
 	auto staticSamplers = GetStaticSamplers();
 
@@ -476,7 +510,7 @@ void GameApp::BuildRootSignature()
 void GameApp::BuildDescriptorHeaps()
 {
 	D3D12_DESCRIPTOR_HEAP_DESC srvHeapDesc = {};
-	srvHeapDesc.NumDescriptors = 4;
+	srvHeapDesc.NumDescriptors = 6;
 	srvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
 	srvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
 	HR(m_pd3dDevice->CreateDescriptorHeap(&srvHeapDesc, IID_PPV_ARGS(&m_SrvDescriptorHeap)));
@@ -486,7 +520,9 @@ void GameApp::BuildDescriptorHeaps()
 	auto bricksTex = m_Textures["bricksTex"]->m_Resource;
 	auto tileTex = m_Textures["tileTex"]->m_Resource;
 	auto whiteTex = m_Textures["whiteTex"]->m_Resource;
-	auto skyCubeMap = m_Textures["skyCubeMap"]->m_Resource;
+	auto grassCube = m_Textures["grassCube"]->m_Resource;
+	auto snowCube = m_Textures["snowCube"]->m_Resource;
+	auto sunsetCube = m_Textures["sunsetCube"]->m_Resource;
 
 	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
 	srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
@@ -507,19 +543,39 @@ void GameApp::BuildDescriptorHeaps()
 	srvDesc.Texture2D.MipLevels = whiteTex->GetDesc().MipLevels;
 	m_pd3dDevice->CreateShaderResourceView(whiteTex.Get(), &srvDesc, hDescriptor);
 
+	m_SkyTexHeapIndex = 3;
 	hDescriptor.Offset(1, m_CBVSRVDescriptorSize);
 	srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURECUBE;
 	srvDesc.TextureCube.MostDetailedMip = 0;
-	srvDesc.TextureCube.MipLevels = skyCubeMap->GetDesc().MipLevels;
+	srvDesc.TextureCube.MipLevels = grassCube->GetDesc().MipLevels;
 	srvDesc.TextureCube.ResourceMinLODClamp = 0.0f;
-	srvDesc.Format = skyCubeMap->GetDesc().Format;
-	m_pd3dDevice->CreateShaderResourceView(skyCubeMap.Get(), &srvDesc, hDescriptor);
+	srvDesc.Format = grassCube->GetDesc().Format;
+	m_pd3dDevice->CreateShaderResourceView(grassCube.Get(), &srvDesc, hDescriptor);
+
+	hDescriptor.Offset(1, m_CBVSRVDescriptorSize);
+	srvDesc.TextureCube.MipLevels = snowCube->GetDesc().MipLevels;
+	srvDesc.Format = snowCube->GetDesc().Format;
+	m_pd3dDevice->CreateShaderResourceView(snowCube.Get(), &srvDesc, hDescriptor);
+
+	hDescriptor.Offset(1, m_CBVSRVDescriptorSize);
+	srvDesc.TextureCube.MipLevels = sunsetCube->GetDesc().MipLevels;
+	srvDesc.Format = sunsetCube->GetDesc().Format;
+	m_pd3dDevice->CreateShaderResourceView(sunsetCube.Get(), &srvDesc, hDescriptor);
 }
 
 void GameApp::BuildShadersAndInputLayout()
 {
-	m_Shaders["standardVS"] = d3dUtil::CompileShader(L"..\\Shader\\Chapter17\\Default.hlsl", nullptr, "VS", "vs_5_1");
-	m_Shaders["opaquePS"] = d3dUtil::CompileShader(L"..\\Shader\\Chapter17\\Default.hlsl", nullptr, "PS", "ps_5_1");
+	const D3D_SHADER_MACRO refractDefines[] =
+	{
+		"REFRACT", "1",
+		NULL, NULL
+	};
+
+	m_Shaders["standardVS"] = d3dUtil::CompileShader(L"..\\Shader\\Chapter18\\Default.hlsl", nullptr, "VS", "vs_5_1");
+	m_Shaders["reflectionPS"] = d3dUtil::CompileShader(L"..\\Shader\\Chapter18\\Default.hlsl", nullptr, "PS", "ps_5_1");
+	m_Shaders["refractionPS"] = d3dUtil::CompileShader(L"..\\Shader\\Chapter18\\Default.hlsl", refractDefines, "PS", "ps_5_1");
+	m_Shaders["skyVS"] = d3dUtil::CompileShader(L"..\\Shader\\Chapter18\\Default.hlsl", nullptr, "Sky_VS", "vs_5_1");
+	m_Shaders["skyPS"] = d3dUtil::CompileShader(L"..\\Shader\\Chapter18\\Default.hlsl", nullptr, "Sky_PS", "ps_5_1");
 
 	m_InputLayout =
 	{
@@ -695,8 +751,8 @@ void GameApp::BuildPSOs()
 	};
 	opaquePsoDesc.PS =
 	{
-		reinterpret_cast<BYTE*>(m_Shaders["opaquePS"]->GetBufferPointer()),
-		m_Shaders["opaquePS"]->GetBufferSize()
+		reinterpret_cast<BYTE*>(m_Shaders["reflectionPS"]->GetBufferPointer()),
+		m_Shaders["reflectionPS"]->GetBufferSize()
 	};
 	opaquePsoDesc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
 	opaquePsoDesc.RasterizerState.FillMode = D3D12_FILL_MODE_SOLID;
@@ -716,26 +772,31 @@ void GameApp::BuildPSOs()
 	opaqueWireframePsoDesc.RasterizerState.FillMode = D3D12_FILL_MODE_WIREFRAME;
 	HR(m_pd3dDevice->CreateGraphicsPipelineState(&opaqueWireframePsoDesc, IID_PPV_ARGS(&m_PSOs["opaque_wireframe"])));
 
-	//highlight
-	D3D12_GRAPHICS_PIPELINE_STATE_DESC highlightPsoDesc = opaquePsoDesc;
+	// refraction
+	D3D12_GRAPHICS_PIPELINE_STATE_DESC refractPsoDesc = opaquePsoDesc;
+	refractPsoDesc.PS =
+	{
+		reinterpret_cast<BYTE*>(m_Shaders["refractionPS"]->GetBufferPointer()),
+		m_Shaders["refractionPS"]->GetBufferSize()
+	};
+	HR(m_pd3dDevice->CreateGraphicsPipelineState(&refractPsoDesc, IID_PPV_ARGS(&m_PSOs["refraction"])));
 
-	highlightPsoDesc.DepthStencilState.DepthFunc = D3D12_COMPARISON_FUNC_LESS_EQUAL;
-
-	D3D12_RENDER_TARGET_BLEND_DESC transparencyBlendDesc;
-	transparencyBlendDesc.BlendEnable = true;
-	transparencyBlendDesc.LogicOpEnable = false;
-	transparencyBlendDesc.SrcBlend = D3D12_BLEND_SRC_ALPHA;
-	transparencyBlendDesc.DestBlend = D3D12_BLEND_INV_SRC_ALPHA;
-	transparencyBlendDesc.BlendOp = D3D12_BLEND_OP_ADD;
-	transparencyBlendDesc.SrcBlendAlpha = D3D12_BLEND_ONE;
-	transparencyBlendDesc.DestBlendAlpha = D3D12_BLEND_ZERO;
-	transparencyBlendDesc.BlendOpAlpha = D3D12_BLEND_OP_ADD;
-	transparencyBlendDesc.LogicOp = D3D12_LOGIC_OP_NOOP;
-	transparencyBlendDesc.RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
-
-	highlightPsoDesc.BlendState.RenderTarget[0] = transparencyBlendDesc;
-	HR(m_pd3dDevice->CreateGraphicsPipelineState(&highlightPsoDesc, IID_PPV_ARGS(&m_PSOs["highlight"])));
-
+	//sky
+	D3D12_GRAPHICS_PIPELINE_STATE_DESC skyPsoDesc = opaquePsoDesc;
+	skyPsoDesc.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;
+	skyPsoDesc.DepthStencilState.DepthFunc = D3D12_COMPARISON_FUNC_LESS_EQUAL;
+	skyPsoDesc.pRootSignature = m_RootSignature.Get();
+	skyPsoDesc.VS =
+	{
+		reinterpret_cast<BYTE*>(m_Shaders["skyVS"]->GetBufferPointer()),
+		m_Shaders["skyVS"]->GetBufferSize()
+	};
+	skyPsoDesc.PS =
+	{
+		reinterpret_cast<BYTE*>(m_Shaders["skyPS"]->GetBufferPointer()),
+		m_Shaders["skyPS"]->GetBufferSize()
+	};
+	HR(m_pd3dDevice->CreateGraphicsPipelineState(&skyPsoDesc, IID_PPV_ARGS(&m_PSOs["sky"])));
 }
 
 void GameApp::BuildFrameResources()
@@ -772,6 +833,7 @@ void GameApp::BuildMaterials()
 	mirror->m_DiffuseAlbedo = XMFLOAT4(0.0f, 0.0f, 0.1f, 1.0f);
 	mirror->m_FresnelR0 = XMFLOAT3(0.98f, 0.98f, 0.98f);
 	mirror->m_Roughness = 0.1f;
+	mirror->m_Eta = 1.51f;
 
 	auto skullMat = std::make_unique<Material>();
 	skullMat->m_Name = "skullMat";
