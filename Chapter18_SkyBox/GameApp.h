@@ -121,7 +121,7 @@ private:
 	std::vector<RenderItem*> m_RitemLayer[(int)RenderLayer::Count];
 
 	UINT m_SkyTexHeapIndex = 0;
-
+	DirectX::XMFLOAT3 m_SkyBoxScale = { 5000.0f, 5000.0f, 5000.0f };
 	PassConstants m_MainPassCB;
 
 	std::shared_ptr<Camera> m_pCamera = nullptr;

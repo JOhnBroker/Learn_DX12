@@ -21,6 +21,7 @@ struct ObjectConstants
 
 struct PassConstants 
 {
+	DirectX::XMFLOAT4X4 InvSkyBoxWorld = MathHelper::Identity4x4();
 	DirectX::XMFLOAT4X4 View = MathHelper::Identity4x4();
 	DirectX::XMFLOAT4X4 InvView = MathHelper::Identity4x4();
 	DirectX::XMFLOAT4X4 Proj = MathHelper::Identity4x4();
@@ -35,6 +36,8 @@ struct PassConstants
 	float FarZ = 0.0f;
 	float TotalTime = 0.0f;
 	float DeltaTime = 0.0f;
+	//DirectX::XMFLOAT3 SkyboxExtents = { 5000.0f, 5000.0f, 5000.0f };
+	//float cbPerObjectPad2 = 0.0f;
 
 	DirectX::XMFLOAT4 AmbientLight = { 0.0f,0.0f,0.0f,1.0f };
 	Light Lights[MAXLIGHTNUM];

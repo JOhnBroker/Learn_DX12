@@ -33,6 +33,24 @@ struct SkyVertexOut
     float3 PosL : POSITION;
 };
 
+float3 BoxCubeMapLookup(float3 rayOrigin, float3 unitRayDir)
+{
+    float3 boxCenter = float3(0.0f, 0.0f, 0.0f);
+    float3 boxExtents = float3(1.0f, 1.0f, 1.0f);
+    float3 p = rayOrigin - boxCenter;
+    
+    // 参考资料https://cloud.tencent.com/developer/article/1055343
+    float3 t1 = (-p + boxExtents) / unitRayDir;
+    float3 t2 = (-p - boxExtents) / unitRayDir;
+
+    float3 tmax = max(t1, t2);
+
+    float t = min(min(tmax.x, tmax.y), tmax.z);
+
+    return p + t * unitRayDir;
+    
+}
+
 VertexOut VS(VertexIn vin)
 {
 	VertexOut vout = (VertexOut)0.0f;
@@ -59,7 +77,7 @@ float4 PS (VertexOut pin) : SV_Target
     float3 fresnelR0 = matData.FresnelR0;
     float roughness = matData.Roughness;
     uint diffuseTexIndex = matData.DiffuseMapIndex;
-    float eta = matData.Eta;
+    float eta = 1.0f / matData.Eta;
 	
     diffuseAlbedo *= gDiffuseMap[diffuseTexIndex].Sample(gsamLinearWrap, pin.TexC);
 	
@@ -76,14 +94,23 @@ float4 PS (VertexOut pin) : SV_Target
 	float4 litColor = ambient + directLight;
 	
 #ifndef REFRACT 
+    // slab method
+    //float4 rayOrigin = mul(float4(pin.PosW, 1.0f), gInvSkyBoxWorld);
+    //float3 rayDir = reflect(-toEyeW, pin.NormalW);
+    //float3 r = BoxCubeMapLookup(rayOrigin.xyz, normalize(rayDir));
     float3 r = reflect(-toEyeW, pin.NormalW);
-    float4 reflectionColor = gCubeMap.Sample(gsamLinearWrap, r);
+    float4 reflectionColor = gCubeMap.Sample(gsamLinearClamp, r);
     float3 fresnelFactor = SchlickFresnel(fresnelR0, pin.NormalW, r);
     litColor.rgb += shininess * fresnelFactor * reflectionColor.rgb;
+    //litColor.rgb = shininess * fresnelFactor * reflectionColor.rgb;
 #else
-    float3 r = refract(-toEyeW, pin.NormalW, eta);
-    float4 refractionColor = gCubeMap.Sample(gsamLinearWrap, r);
-    litColor.rgb += shininess * refractionColor.rgb;
+    if(eta < 1.0f)
+    {
+        float3 refractColor = float3(0.8f, 0.8f, 0.8f);
+        float3 r = refract(-toEyeW, pin.NormalW, eta);
+        float4 refractionColor = gCubeMap.Sample(gsamLinearWrap, r);
+        litColor.rgb += refractColor * refractionColor.rgb;
+    }
 #endif
 
 	litColor.a = diffuseAlbedo.a;

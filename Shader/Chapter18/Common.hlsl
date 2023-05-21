@@ -51,6 +51,7 @@ cbuffer cbPerObject : register(b0)
 
 cbuffer cbPass : register(b1)
 {
+	float4x4 gInvSkyBoxWorld;
 	float4x4 gView;
 	float4x4 gInvView;
 	float4x4 gProj;
@@ -66,6 +67,9 @@ cbuffer cbPass : register(b1)
 	float gTotalTime;
 	float gDeltaTime;
 	float4 gAmbientLight;
+    //float3 gSkyBoxExtents;
+    //float gPad2;
 	
 	Light gLights[MaxLights];
+	
 };

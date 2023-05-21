@@ -428,6 +428,9 @@ void GameApp::UpdateMaterialBuffer(const GameTimer& gt)
 
 void GameApp::UpdateMainPassCB(const GameTimer& gt)
 {
+	XMMATRIX skyboxWorld = XMMatrixScaling(m_SkyBoxScale.x, m_SkyBoxScale.y, m_SkyBoxScale.z);
+	XMVECTOR dSkyboxWorld = XMMatrixDeterminant(skyboxWorld);
+	XMMATRIX invSkyboxWorld = XMMatrixInverse(&dSkyboxWorld, skyboxWorld);
 	XMMATRIX view = m_pCamera->GetViewXM();
 	XMMATRIX proj = m_pCamera->GetProjXM();
 
@@ -439,6 +442,7 @@ void GameApp::UpdateMainPassCB(const GameTimer& gt)
 	XMMATRIX invProj = XMMatrixInverse(&dProj, proj);
 	XMMATRIX invViewproj = XMMatrixInverse(&dViewProj, viewproj);
 
+	XMStoreFloat4x4(&m_MainPassCB.InvSkyBoxWorld, XMMatrixTranspose(invSkyboxWorld));
 	XMStoreFloat4x4(&m_MainPassCB.View, XMMatrixTranspose(view));
 	XMStoreFloat4x4(&m_MainPassCB.Proj, XMMatrixTranspose(proj));
 	XMStoreFloat4x4(&m_MainPassCB.InvView, XMMatrixTranspose(invView));
@@ -452,6 +456,7 @@ void GameApp::UpdateMainPassCB(const GameTimer& gt)
 	m_MainPassCB.FarZ = 1000.0f;
 	m_MainPassCB.TotalTime = gt.TotalTime();
 	m_MainPassCB.DeltaTime = gt.DeltaTime();
+	//m_MainPassCB.SkyboxExtents = m_SkyBoxScale;
 	m_MainPassCB.AmbientLight = { 0.25f, 0.25f, 0.35f, 1.0f };
 	m_MainPassCB.Lights[0].m_Direction = { 0.57735f, -0.57735f, 0.57735f };
 	m_MainPassCB.Lights[0].m_Strength = { 0.8f, 0.8f, 0.8f };
@@ -861,7 +866,7 @@ void GameApp::BuildMaterials()
 void GameApp::BuildRenderItems()
 {
 	auto skyRitem = std::make_unique<RenderItem>();
-	XMStoreFloat4x4(&skyRitem->World, XMMatrixScaling(5000.0f, 5000.0f, 5000.0f));
+	XMStoreFloat4x4(&skyRitem->World, XMMatrixScaling(m_SkyBoxScale.x, m_SkyBoxScale.y, m_SkyBoxScale.z));
 	skyRitem->TexTransform = MathHelper::Identity4x4();
 	skyRitem->ObjCBIndex = 0;
 	skyRitem->Mat = m_Materials["sky"].get();
