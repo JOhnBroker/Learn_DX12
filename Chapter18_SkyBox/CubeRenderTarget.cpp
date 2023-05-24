@@ -81,8 +81,8 @@ void CubeRenderTarget::BuildDescriptors()
 		rtvDesc.Format = m_Format;
 		rtvDesc.Texture2DArray.MipSlice = 0;
 		rtvDesc.Texture2DArray.PlaneSlice = 0;
-		rtvDesc.Texture2DArray.FirstArraySlice = i;
-		rtvDesc.Texture2DArray.ArraySize = 1;
+		rtvDesc.Texture2DArray.FirstArraySlice = i;	// 用于纹理数组的第一个纹理的索引
+		rtvDesc.Texture2DArray.ArraySize = 1;		// 数组中的纹理数量
 		m_pd3dDevice->CreateRenderTargetView(m_CubeMap.Get(), &rtvDesc, m_hCpuRtv[i]);
 	}
 }

@@ -40,6 +40,9 @@
     <ClCompile Include="DDSTextureLoader.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
+    <ClCompile Include="CubeRenderTarget.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="d3dApp.h">
@@ -94,6 +97,9 @@
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="Texture.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="CubeRenderTarget.h">
       <Filter>头文件</Filter>
     </ClInclude>
   </ItemGroup>
