@@ -11,8 +11,10 @@
 #include "Texture.h"
 #include "Light.h"
 #include "Camera.h"
+#include "CubeRenderTarget.h"
 
 #define STATICSAMPLERCOUNT 6
+#define CUBEMAP_SIZE 512
 
 using namespace DirectX;
 using namespace DirectX::PackedVector;
@@ -69,6 +71,7 @@ public:
 	bool InitResource();
 
 public:
+	virtual void CreateRTVAndDSVDescriptorHeaps() override;
 	virtual void OnResize() override;
 	virtual void Update(const GameTimer& timer) override;
 	virtual void Draw(const GameTimer& timer) override;
@@ -81,9 +84,11 @@ public:
 	void UpdateObjectCBs(const GameTimer& gt);
 	void UpdateMaterialBuffer(const GameTimer& gt);
 	void UpdateMainPassCB(const GameTimer& gt);
+	void UpdateCubeMapFacePassCBs();
 
 	void BuildRootSignature();
 	void BuildDescriptorHeaps();
+	void BuildCubeDepthStencil();
 	void BuildShadersAndInputLayout();
 	void BuildShapeGeometry();
 	void BuildSkullGeometry();
@@ -92,7 +97,9 @@ public:
 	void BuildMaterials();
 	void BuildRenderItems();
 	void DrawRenderItems(ID3D12GraphicsCommandList* cmdList, const std::vector<RenderItem*>& ritems);
+	void DrawSceneToCubeMap();
 
+	void BuildCubeFaceCamera(float x, float y, float z);
 	void ReadDataFromFile(std::vector<Vertex>& vertices, std::vector<std::int32_t>& indices, BoundingBox& bounds);
 	void ReadDataFromFile(std::vector<Vertex>& vertices, std::vector<std::int32_t>& indices, BoundingSphere& bounds);
 	std::array<const CD3DX12_STATIC_SAMPLER_DESC, STATICSAMPLERCOUNT>GetStaticSamplers();
@@ -120,8 +127,17 @@ private:
 	std::vector<std::unique_ptr<RenderItem>> m_AllRitems;
 	std::vector<RenderItem*> m_RitemLayer[(int)RenderLayer::Count];
 
+	// static SkyBox
 	UINT m_SkyTexHeapIndex = 0;
 	DirectX::XMFLOAT3 m_SkyBoxScale = { 5000.0f, 5000.0f, 5000.0f };
+
+	// dynamic SkyBox
+	UINT m_DynamicSkyTexHeapIndex = 0;
+	std::unique_ptr<CubeRenderTarget>m_DynamicCubeMap = nullptr;
+	CD3DX12_CPU_DESCRIPTOR_HANDLE m_CubeDSV;
+	std::shared_ptr<FirstPersonCamera> m_CubeCamera[6];
+
+
 	PassConstants m_MainPassCB;
 
 	std::shared_ptr<Camera> m_pCamera = nullptr;

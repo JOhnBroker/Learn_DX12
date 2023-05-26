@@ -90,6 +90,36 @@ bool GameApp::InitResource()
 	return bResult;
 }
 
+void GameApp::CreateRTVAndDSVDescriptorHeaps()
+{
+	D3D12_DESCRIPTOR_HEAP_DESC rtvHeapDesc;
+	rtvHeapDesc.NumDescriptors = SwapChainBufferCount + 6;
+	rtvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
+	rtvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
+	rtvHeapDesc.NodeMask = 0;
+	HR(m_pd3dDevice->CreateDescriptorHeap(
+		&rtvHeapDesc, IID_PPV_ARGS(m_RTVHeap.GetAddressOf())));
+
+	D3D12_DESCRIPTOR_HEAP_DESC dsvHeapDesc;
+	dsvHeapDesc.NumDescriptors = 2;
+	dsvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_DSV;
+	dsvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
+	dsvHeapDesc.NodeMask = 0;
+	HR(m_pd3dDevice->CreateDescriptorHeap(
+		&dsvHeapDesc, IID_PPV_ARGS(m_DSVHeap.GetAddressOf())));
+
+	m_CubeDSV = CD3DX12_CPU_DESCRIPTOR_HANDLE(m_DSVHeap->GetCPUDescriptorHandleForHeapStart(), 1, m_DSVDescriptorSize);
+
+	// 为ImGui创建SRV堆
+	D3D12_DESCRIPTOR_HEAP_DESC srvHeapDesc;
+	srvHeapDesc.NumDescriptors = 1;
+	srvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+	srvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+	srvHeapDesc.NodeMask = 0;
+	HR(m_pd3dDevice->CreateDescriptorHeap(
+		&srvHeapDesc, IID_PPV_ARGS(m_SRVHeap.GetAddressOf())));
+}
+
 void GameApp::OnResize()
 {
 	D3DApp::OnResize();
@@ -469,6 +499,37 @@ void GameApp::UpdateMainPassCB(const GameTimer& gt)
 	currPassCB->CopyData(0, m_MainPassCB);
 }
 
+void GameApp::UpdateCubeMapFacePassCBs()
+{
+	for (int i = 0; i < 6; ++i) 
+	{
+		PassConstants cubeFacePassCB = m_MainPassCB;
+		XMMATRIX view = m_CubeCamera[i]->GetViewXM();
+		XMMATRIX proj = m_CubeCamera[i]->GetProjXM();
+
+		XMMATRIX viewproj = XMMatrixMultiply(view, proj);
+		XMVECTOR dView = XMMatrixDeterminant(view);
+		XMVECTOR dProj = XMMatrixDeterminant(proj);
+		XMVECTOR dViewProj = XMMatrixDeterminant(viewproj);
+		XMMATRIX invView = XMMatrixInverse(&dView, view);
+		XMMATRIX invProj = XMMatrixInverse(&dProj, proj);
+		XMMATRIX invViewproj = XMMatrixInverse(&dViewProj, viewproj);
+
+		XMStoreFloat4x4(&cubeFacePassCB.View, XMMatrixTranspose(view));
+		XMStoreFloat4x4(&cubeFacePassCB.Proj, XMMatrixTranspose(proj));
+		XMStoreFloat4x4(&cubeFacePassCB.InvView, XMMatrixTranspose(invView));
+		XMStoreFloat4x4(&cubeFacePassCB.InvProj, XMMatrixTranspose(invProj));
+		XMStoreFloat4x4(&cubeFacePassCB.ViewProj, XMMatrixTranspose(viewproj));
+		XMStoreFloat4x4(&cubeFacePassCB.InvViewProj, XMMatrixTranspose(invViewproj));
+		cubeFacePassCB.EyePosW = m_CubeCamera[i]->GetPosition();
+		cubeFacePassCB.RenderTargetSize = XMFLOAT2((float)CUBEMAP_SIZE, (float)CUBEMAP_SIZE);
+		cubeFacePassCB.InvRenderTargetSize = XMFLOAT2(1.0f / CUBEMAP_SIZE, 1.0f / CUBEMAP_SIZE);
+
+		auto currPassCB = m_CurrFrameResource->PassCB.get();
+		currPassCB->CopyData(1 + i, cubeFacePassCB);
+	}
+}
+
 void GameApp::BuildRootSignature()
 {
 	HRESULT hReturn = E_FAIL;
@@ -515,7 +576,7 @@ void GameApp::BuildRootSignature()
 void GameApp::BuildDescriptorHeaps()
 {
 	D3D12_DESCRIPTOR_HEAP_DESC srvHeapDesc = {};
-	srvHeapDesc.NumDescriptors = 6;
+	srvHeapDesc.NumDescriptors = 7;
 	srvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
 	srvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
 	HR(m_pd3dDevice->CreateDescriptorHeap(&srvHeapDesc, IID_PPV_ARGS(&m_SrvDescriptorHeap)));
@@ -566,6 +627,28 @@ void GameApp::BuildDescriptorHeaps()
 	srvDesc.TextureCube.MipLevels = sunsetCube->GetDesc().MipLevels;
 	srvDesc.Format = sunsetCube->GetDesc().Format;
 	m_pd3dDevice->CreateShaderResourceView(sunsetCube.Get(), &srvDesc, hDescriptor);
+
+	m_DynamicSkyTexHeapIndex = m_SkyTexHeapIndex + 3;
+
+	auto srvCpuStart = m_SrvDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
+	auto srvGpuStart = m_SrvDescriptorHeap->GetGPUDescriptorHandleForHeapStart();
+	auto rtvCpuStart = m_RTVHeap->GetCPUDescriptorHandleForHeapStart();
+
+	int rtvOffset = SwapChainBufferCount;
+	CD3DX12_CPU_DESCRIPTOR_HANDLE cubeRtvHandles[6];
+	for (int i = 0; i < 6; ++i) 
+	{
+		cubeRtvHandles[i] = CD3DX12_CPU_DESCRIPTOR_HANDLE(rtvCpuStart, rtvOffset + i, m_RTVDescriptorSize);
+	}
+	m_DynamicCubeMap->BuildDescriptors(
+		CD3DX12_CPU_DESCRIPTOR_HANDLE(srvCpuStart, m_DynamicSkyTexHeapIndex, m_CBVSRVDescriptorSize)
+		, CD3DX12_GPU_DESCRIPTOR_HANDLE(srvGpuStart, m_DynamicSkyTexHeapIndex, m_CBVSRVDescriptorSize),
+		cubeRtvHandles);
+
+}
+
+void GameApp::BuildCubeDepthStencil()
+{
 }
 
 void GameApp::BuildShadersAndInputLayout()
@@ -809,7 +892,7 @@ void GameApp::BuildFrameResources()
 	for(int i = 0;i<g_numFrameResources;++i)
 	{
 		m_FrameResources.push_back(std::make_unique<FrameResource>(m_pd3dDevice.Get(),
-			1, (UINT)m_AllRitems.size(), (UINT)m_Materials.size()));
+			7, (UINT)m_AllRitems.size(), (UINT)m_Materials.size()));
 	}
 }
 
@@ -1005,6 +1088,61 @@ void GameApp::DrawRenderItems(ID3D12GraphicsCommandList* cmdList, const std::vec
 		cmdList->SetGraphicsRootConstantBufferView(0, objCBAddress);
 
 		cmdList->DrawIndexedInstanced(ri->IndexCount, 1, ri->StartIndexLocation, ri->BaseVertexLocation, 0);
+	}
+}
+
+void GameApp::DrawSceneToCubeMap()
+{
+	m_CommandList->RSSetViewports(1, &m_DynamicCubeMap->Viewport());
+	m_CommandList->RSSetScissorRects(1, &m_DynamicCubeMap->ScissorRect());
+
+	// 将立方体图作为RT
+	m_CommandList->ResourceBarrier(1,
+		&CD3DX12_RESOURCE_BARRIER::Transition(
+		m_DynamicCubeMap->Resource(),
+		D3D12_RESOURCE_STATE_GENERIC_READ,
+		D3D12_RESOURCE_STATE_RENDER_TARGET));
+
+	UINT passCBByteSize = d3dUtil::CalcConstantBufferByteSize(sizeof(PassConstants));
+
+	for (int i = 0; i < 6; ++i) 
+	{
+		m_CommandList->ClearRenderTargetView(m_DynamicCubeMap->GetRtv(i), Colors::LightSteelBlue, 0, nullptr);
+		
+	}
+}
+
+void GameApp::BuildCubeFaceCamera(float x, float y, float z)
+{
+	// 指定位置
+	XMFLOAT3 center(x, y, z);
+	XMFLOAT3 worldUp(0.0f, 1.0f, 0.0f);
+
+	XMFLOAT3 targets[6] =
+	{
+		XMFLOAT3(x + 1.0f,y,z),	//+x
+		XMFLOAT3(x - 1.0f,y,z),	//-x
+		XMFLOAT3(x,y + 1.0f,z),	//+y
+		XMFLOAT3(x,y - 1.0f,z),	//-y
+		XMFLOAT3(x,y,z + 1.0f),	//+z
+		XMFLOAT3(x,y,z - 1.0f) 	//-z
+	};
+
+	XMFLOAT3 ups[6] =
+	{
+		XMFLOAT3(0.0f,1.0f,0.0f),	 //+x
+		XMFLOAT3(0.0f,1.0f,0.0f),	 //-x
+		XMFLOAT3(0.0f,0.0f,-1.0f),	 //+y
+		XMFLOAT3(0.0f,0.0f,+1.0f),	 //-y
+		XMFLOAT3(0.0f,1.0f,0.0f),	 //+z
+		XMFLOAT3(0.0f,1.0f,0.0f) 	 //-z
+	};
+	
+	for (int i = 0; i < 6; ++i) 
+	{
+		m_CubeCamera[i]->SetFrustum(0.5f * MathHelper::Pi, 1.0f, 0.1f, 1000.0f);
+		m_CubeCamera[i]->LookAt(center, targets[i], ups[i]);
+		m_CubeCamera[i]->UpdateViewMatrix();
 	}
 }
 
