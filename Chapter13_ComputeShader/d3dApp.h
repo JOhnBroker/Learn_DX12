@@ -120,7 +120,7 @@ protected:
 	DXGI_FORMAT m_DepthStencilFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;	// 深度/模板缓冲区的格式
 
 	// 派生类应该在构造函数设置好这些自定义的初始参数
-	std::wstring m_MainWndCaption = L"Blend demo";				// 主窗口标题
+	std::wstring m_MainWndCaption = L"ComputerShader demo";		// 主窗口标题
 	int m_ClientWidth;											// 视口宽度
 	int m_ClientHeight;											// 视口高度
 };

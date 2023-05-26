@@ -49,8 +49,8 @@ enum class RenderLayer :int
 {
 	Opaque = 0,
 	Sky,
+	StaticSky,
 	DynamicSky,
-	SlabMethod,
 	Count
 };
 
@@ -115,6 +115,7 @@ private:
 
 	ComPtr<ID3D12RootSignature> m_RootSignature = nullptr;
 	ComPtr<ID3D12DescriptorHeap> m_SrvDescriptorHeap = nullptr;
+	ComPtr<ID3D12Resource> m_CubeDepthStencilBuffer = nullptr;
 
 	std::unordered_map<std::string, std::unique_ptr<MeshGeometry>> m_Geometries;
 	std::unordered_map<std::string, std::unique_ptr<Material>> m_Materials;
@@ -135,8 +136,9 @@ private:
 	UINT m_DynamicSkyTexHeapIndex = 0;
 	std::unique_ptr<CubeRenderTarget>m_DynamicCubeMap = nullptr;
 	CD3DX12_CPU_DESCRIPTOR_HANDLE m_CubeDSV;
-	std::shared_ptr<FirstPersonCamera> m_CubeCamera[6];
+	std::shared_ptr<FirstPersonCamera> m_CubeCamera;
 
+	RenderItem* m_SkullRitem = nullptr;
 
 	PassConstants m_MainPassCB;
 
@@ -145,7 +147,7 @@ private:
 	float m_SunTheta = 1.25f * XM_PI;
 	float m_SunPhi = XM_PIDIV4;
 
-	bool m_WireframeEnable = true;
+	bool m_WireframeEnable = false;
 
 	CameraMode m_CameraMode = CameraMode::FirstPerson;
 	SkyMode m_SkyMode = SkyMode::StaticSky;

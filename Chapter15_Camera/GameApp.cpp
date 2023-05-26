@@ -106,7 +106,7 @@ void GameApp::Update(const GameTimer& timer)
 	ImGuiIO& io = ImGui::GetIO();
 	
 	const float dt = timer.DeltaTime();
-	if (ImGui::Begin("CameraDemo"))
+	if (ImGui::Begin("Camera Demo"))
 	{
 		ImGui::Checkbox("Wireframe", &m_IsWireframe);
 		

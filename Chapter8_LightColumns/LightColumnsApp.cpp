@@ -73,7 +73,7 @@ void LightColumnsApp::Update(const GameTimer& timer)
 	ImGuiIO& io = ImGui::GetIO();
 	
 	const float dt = timer.DeltaTime();
-	if (ImGui::Begin("LandAndWaveDemo"))
+	if (ImGui::Begin("LightColumns Demo"))
 	{
 		ImGui::Checkbox("Wireframe", &m_IsWireframe);
 	}

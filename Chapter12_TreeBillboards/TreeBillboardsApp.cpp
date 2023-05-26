@@ -91,7 +91,7 @@ void TreeBillboardsApp::Update(const GameTimer& timer)
 	ImGuiIO& io = ImGui::GetIO();
 	
 	const float dt = timer.DeltaTime();
-	if (ImGui::Begin("Blend demo"))
+	if (ImGui::Begin("Billboard demo"))
 	{
 		static int curr_mode_item = static_cast<int>(m_CurrMode);
 		const char* mode_strs[] = {

@@ -110,7 +110,7 @@ void GameApp::Update(const GameTimer& timer)
 	ImGuiIO& io = ImGui::GetIO();
 	
 	const float dt = timer.DeltaTime();
-	if (ImGui::Begin("CameraDemo"))
+	if (ImGui::Begin("Culling Demo"))
 	{
 		ImGui::Checkbox("Wireframe", &m_WireframeEnable);
 		ImGui::Checkbox("FrustumCulling", &m_FrustumCullingEnable);

@@ -1,5 +1,5 @@
 #ifndef NUM_DIR_LIGHT
-	#define NUM_DIR_LIGHT 3
+	#define NUM_DIR_LIGHT 2
 #endif
 
 #ifndef NUM_POINT_LIGHT
