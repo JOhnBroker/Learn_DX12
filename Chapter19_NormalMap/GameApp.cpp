@@ -89,6 +89,8 @@ bool GameApp::InitResource()
 	LoadTexture("tileNorTex", L"..\\Textures\\tile_nmap.dds");
 	LoadTexture("whiteTex", L"..\\Textures\\white1x1.dds");
 	LoadTexture("whiteNorTex", L"..\\Textures\\default_nmap.dds");
+	LoadTexture("WavesHTex", L"..\\Textures\\waves0.dds");
+	LoadTexture("WavesLTex", L"..\\Textures\\waves1.dds");
 	LoadTexture("grassCube", L"..\\Textures\\grasscube1024.dds");
 	LoadTexture("snowCube", L"..\\Textures\\snowcube1024.dds");
 	LoadTexture("sunsetCube", L"..\\Textures\\sunset1024.dds");
@@ -205,6 +207,7 @@ void GameApp::Update(const GameTimer& timer)
 		static const char* showMode[] = {
 				"Reflection",
 				"Refraction",
+				"Waves"
 		};
 		if (ImGui::Combo("Show Mode", &curr_showmode, showMode, ARRAYSIZE(showMode)))
 		{
@@ -217,6 +220,10 @@ void GameApp::Update(const GameTimer& timer)
 			{
 				m_ShowMode = ShowMode::Refraction;
 				// TODO
+			}
+			else if (curr_showmode == 2 && m_ShowMode != ShowMode::Waves) 
+			{
+				m_ShowMode = ShowMode::Waves;
 			}
 		}
 		static int curr_skymode = static_cast<int>(m_SkyMode);
@@ -235,7 +242,7 @@ void GameApp::Update(const GameTimer& timer)
 				m_SkyMode = SkyMode::DynamicSky;
 			}
 		}
-		static int curr_skyCubemode = max(0, static_cast<int>(m_SkyTexHeapIndex) - 6);
+		static int curr_skyCubemode = max(0, static_cast<int>(m_SkyTexHeapIndex) - 8);
 		static const char* skyCubeMode[] = {
 				"grass",
 				"snow",
@@ -245,15 +252,15 @@ void GameApp::Update(const GameTimer& timer)
 		{
 			if (curr_skyCubemode == 0 )
 			{
-				m_SkyTexHeapIndex = 6;
+				m_SkyTexHeapIndex = 8;
 			}
 			else if (curr_skyCubemode == 1)
 			{
-				m_SkyTexHeapIndex = 7;
+				m_SkyTexHeapIndex = 9;
 			}
 			else if (curr_skyCubemode == 2) 
 			{
-				m_SkyTexHeapIndex = 8;
+				m_SkyTexHeapIndex = 10;
 			}
 		}
 	}
@@ -282,6 +289,10 @@ void GameApp::Update(const GameTimer& timer)
 		CloseHandle(eventHandle);
 	}
 
+	if (m_ShowMode == ShowMode::Waves) 
+	{
+		AnimateMaterials(timer);
+	}
 	UpdateObjectCBs(timer);
 	UpdateMaterialBuffer(timer);
 	UpdateMainPassCB(timer);
@@ -335,10 +346,6 @@ void GameApp::Draw(const GameTimer& timer)
 	auto passCB = m_CurrFrameResource->PassCB->Resource();
 	m_CommandList->SetGraphicsRootConstantBufferView(1, passCB->GetGPUVirtualAddress());
 	
-	if (m_ShowMode == ShowMode::Refraction)
-	{
-		m_CommandList->SetPipelineState(m_PSOs["refraction"].Get());
-	}
 	if (m_SkyMode == SkyMode::DynamicSky && m_CameraMode == CameraMode::FirstPerson)
 	{
 		CD3DX12_GPU_DESCRIPTOR_HANDLE dynamicTexDescriptor(m_SrvDescriptorHeap->GetGPUDescriptorHandleForHeapStart());
@@ -346,12 +353,25 @@ void GameApp::Draw(const GameTimer& timer)
 		m_CommandList->SetGraphicsRootDescriptorTable(3, dynamicTexDescriptor);
 		DrawRenderItems(m_CommandList.Get(), m_RitemLayer[(int)RenderLayer::DynamicSky]);
 	}
-	else 
+	else
 	{
 		DrawRenderItems(m_CommandList.Get(), m_RitemLayer[(int)RenderLayer::StaticSky]);
 	}
-	DrawRenderItems(m_CommandList.Get(), m_RitemLayer[(int)RenderLayer::Opaque]);
-
+	if (m_ShowMode != ShowMode::Waves) 
+	{
+		if (m_ShowMode == ShowMode::Refraction)
+		{
+			m_CommandList->SetPipelineState(m_PSOs["refraction"].Get());
+		}
+		DrawRenderItems(m_CommandList.Get(), m_RitemLayer[(int)RenderLayer::Opaque]);
+	}
+	else
+	{
+		m_CommandList->SetPipelineState(m_PSOs["waves"].Get());
+		DrawRenderItems(m_CommandList.Get(), m_RitemLayer[(int)RenderLayer::Waves]);
+		m_CommandList->SetPipelineState(m_PSOs["opaque"].Get());
+		DrawRenderItems(m_CommandList.Get(), m_RitemLayer[(int)RenderLayer::WavesOpaque]);
+	}
 	m_CommandList->SetGraphicsRootDescriptorTable(3, skyTexDescriptor);
 	m_CommandList->SetPipelineState(m_PSOs["sky"].Get());
 	DrawRenderItems(m_CommandList.Get(), m_RitemLayer[(int)RenderLayer::Sky]);
@@ -399,6 +419,36 @@ void GameApp::OnMouseDown(WPARAM btnState, int x, int y)
 	m_LastMousePos.x = x;
 	m_LastMousePos.y = y;
 	SetCapture(m_hMainWnd);
+}
+
+void GameApp::AnimateMaterials(const GameTimer& gt)
+{
+	auto wavesMat = m_Materials["water"].get();
+	float& tu0 = wavesMat->m_MatTransform(3, 0);
+	float& tv0 = wavesMat->m_MatTransform(3, 1);
+	float& tu1 = wavesMat->m_MatTransform1(3, 0);
+	float& tv1 = wavesMat->m_MatTransform1(3, 1);
+
+	tu0 += 0.1f * gt.DeltaTime();
+	tv0 += 0.02f * gt.DeltaTime();
+	tu1 += 0.02f * gt.DeltaTime();
+	tv1 += 0.1f * gt.DeltaTime();
+
+	if (tu0 >= 1.0f)
+		tu0 -= 1.0f;
+	if (tv0 >= 1.0f)
+		tv0 -= 1.0f;
+	if (tu1 >= 1.0f)
+		tu1 -= 1.0f;
+	if (tv1 >= 1.0f)
+		tv1 -= 1.0f;
+
+	wavesMat->m_MatTransform(3, 0) = tu0;
+	wavesMat->m_MatTransform(3, 1) = tv0;
+	wavesMat->m_MatTransform1(3, 0) = tu1;
+	wavesMat->m_MatTransform1(3, 1) = tv1;
+
+	wavesMat->m_NumFramesDirty = g_numFrameResources;
 }
 
 void GameApp::UpdateCamera(const GameTimer& gt)
@@ -471,12 +521,14 @@ void GameApp::UpdateMaterialBuffer(const GameTimer& gt)
 		if (mat->m_NumFramesDirty > 0) 
 		{
 			XMMATRIX matTransform = XMLoadFloat4x4(&mat->m_MatTransform);
+			XMMATRIX matTransform1 = XMLoadFloat4x4(&mat->m_MatTransform1);
 
 			MaterialData matData;
 			matData.DiffuseAlbedo = mat->m_DiffuseAlbedo;
 			matData.FresnelR0 = mat->m_FresnelR0;
 			matData.Roughness = mat->m_Roughness;
 			XMStoreFloat4x4(&matData.MatTransform, XMMatrixTranspose(matTransform));
+			XMStoreFloat4x4(&matData.MatTransform1, XMMatrixTranspose(matTransform1));
 			matData.DiffuseMapIndex = mat->m_DiffuseSrvHeapIndex;
 			matData.NormalMapIndex = mat->m_NormalSrvHeapIndex;
 			matData.Eta = mat->m_Eta;
@@ -600,7 +652,7 @@ void GameApp::BuildRootSignature()
 	CD3DX12_DESCRIPTOR_RANGE texTable0;
 	texTable0.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0, 0);
 	CD3DX12_DESCRIPTOR_RANGE texTable1;
-	texTable1.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 10, 1, 0);
+	texTable1.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 12, 1, 0);
 
 	CD3DX12_ROOT_PARAMETER slotRootParameter[5];
 
@@ -609,7 +661,7 @@ void GameApp::BuildRootSignature()
 	slotRootParameter[1].InitAsConstantBufferView(1);
 	slotRootParameter[2].InitAsShaderResourceView(0, 1);
 	slotRootParameter[3].InitAsDescriptorTable(1, &texTable0, D3D12_SHADER_VISIBILITY_PIXEL);
-	slotRootParameter[4].InitAsDescriptorTable(1, &texTable1, D3D12_SHADER_VISIBILITY_PIXEL);
+	slotRootParameter[4].InitAsDescriptorTable(1, &texTable1, D3D12_SHADER_VISIBILITY_ALL);
 
 	auto staticSamplers = GetStaticSamplers();
 
@@ -640,7 +692,7 @@ void GameApp::BuildRootSignature()
 void GameApp::BuildDescriptorHeaps()
 {
 	D3D12_DESCRIPTOR_HEAP_DESC srvHeapDesc = {};
-	srvHeapDesc.NumDescriptors = 10;
+	srvHeapDesc.NumDescriptors = 12;
 	srvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
 	srvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
 	HR(m_pd3dDevice->CreateDescriptorHeap(&srvHeapDesc, IID_PPV_ARGS(&m_SrvDescriptorHeap)));
@@ -655,6 +707,8 @@ void GameApp::BuildDescriptorHeaps()
 		m_Textures["tileNorTex"]->m_Resource,
 		m_Textures["whiteTex"]->m_Resource,
 		m_Textures["whiteNorTex"]->m_Resource,
+		m_Textures["WavesHTex"]->m_Resource,
+		m_Textures["WavesLTex"]->m_Resource
 	};
 	auto grassSkyMap = m_Textures["grassCube"]->m_Resource;
 	auto snowSkyMap = m_Textures["snowCube"]->m_Resource;
@@ -674,7 +728,7 @@ void GameApp::BuildDescriptorHeaps()
 		hDescriptor.Offset(1, m_CBVSRVDescriptorSize);
 	}
 
-	m_SkyTexHeapIndex = 6;
+	m_SkyTexHeapIndex = 8;
 	srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURECUBE;
 	srvDesc.TextureCube.MostDetailedMip = 0;
 	srvDesc.TextureCube.MipLevels = grassSkyMap->GetDesc().MipLevels;
@@ -757,6 +811,8 @@ void GameApp::BuildShadersAndInputLayout()
 	m_Shaders["standardVS"] = d3dUtil::CompileShader(L"..\\Shader\\Chapter19\\Default.hlsl", nullptr, "VS", "vs_5_1");
 	m_Shaders["reflectionPS"] = d3dUtil::CompileShader(L"..\\Shader\\Chapter19\\Default.hlsl", nullptr, "PS", "ps_5_1");
 	m_Shaders["refractionPS"] = d3dUtil::CompileShader(L"..\\Shader\\Chapter19\\Default.hlsl", refractDefines, "PS", "ps_5_1");
+	m_Shaders["wavesVS"] = d3dUtil::CompileShader(L"..\\Shader\\Chapter19\\Default.hlsl", nullptr, "Waves_VS", "vs_5_1");
+	m_Shaders["wavesPS"] = d3dUtil::CompileShader(L"..\\Shader\\Chapter19\\Default.hlsl", nullptr, "Waves_PS", "ps_5_1");
 	m_Shaders["skyVS"] = d3dUtil::CompileShader(L"..\\Shader\\Chapter19\\Default.hlsl", nullptr, "Sky_VS", "vs_5_1");
 	m_Shaders["skyPS"] = d3dUtil::CompileShader(L"..\\Shader\\Chapter19\\Default.hlsl", nullptr, "Sky_PS", "ps_5_1");
 
@@ -773,7 +829,7 @@ void GameApp::BuildShapeGeometry()
 {
 	GeometryGenerator geoGen;
 	GeometryGenerator::MeshData box = geoGen.CreateBox(1.0f, 1.0f, 1.0f, 0);
-	GeometryGenerator::MeshData grid = geoGen.CreateGrid(10.0f, 10.0f, 20, 20);
+	GeometryGenerator::MeshData grid = geoGen.CreateGrid(10.0f, 10.0f, 100, 100);
 	GeometryGenerator::MeshData sphere = geoGen.CreateSphere(0.5f, 20, 20);
 	GeometryGenerator::MeshData cylinder = geoGen.CreateCylinder(0.5f, 0.5f, 2.0f, 20, 20);
 
@@ -965,7 +1021,7 @@ void GameApp::BuildPSOs()
 	};
 	HR(m_pd3dDevice->CreateGraphicsPipelineState(&refractPsoDesc, IID_PPV_ARGS(&m_PSOs["refraction"])));
 
-	//sky
+	// sky
 	D3D12_GRAPHICS_PIPELINE_STATE_DESC skyPsoDesc = opaquePsoDesc;
 	skyPsoDesc.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;
 	skyPsoDesc.DepthStencilState.DepthFunc = D3D12_COMPARISON_FUNC_LESS_EQUAL;
@@ -981,6 +1037,22 @@ void GameApp::BuildPSOs()
 		m_Shaders["skyPS"]->GetBufferSize()
 	};
 	HR(m_pd3dDevice->CreateGraphicsPipelineState(&skyPsoDesc, IID_PPV_ARGS(&m_PSOs["sky"])));
+
+	// wave
+	D3D12_GRAPHICS_PIPELINE_STATE_DESC wavesPsoDesc = opaquePsoDesc;
+	wavesPsoDesc.pRootSignature = m_RootSignature.Get();
+	wavesPsoDesc.VS =
+	{
+		reinterpret_cast<BYTE*>(m_Shaders["wavesVS"]->GetBufferPointer()),
+		m_Shaders["wavesVS"]->GetBufferSize()
+	};
+	wavesPsoDesc.PS =
+	{
+		reinterpret_cast<BYTE*>(m_Shaders["wavesPS"]->GetBufferPointer()),
+		m_Shaders["wavesPS"]->GetBufferSize()
+	};
+	HR(m_pd3dDevice->CreateGraphicsPipelineState(&wavesPsoDesc, IID_PPV_ARGS(&m_PSOs["waves"])));
+
 }
 
 void GameApp::BuildFrameResources()
@@ -1034,17 +1106,27 @@ void GameApp::BuildMaterials()
 	auto sky = std::make_unique<Material>();
 	sky->m_Name = "sky";
 	sky->m_MatCBIndex = 4;
-	sky->m_DiffuseSrvHeapIndex = 6;
+	sky->m_DiffuseSrvHeapIndex = m_SkyTexHeapIndex;
 	sky->m_NormalSrvHeapIndex = 5;
 	sky->m_DiffuseAlbedo = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
 	sky->m_FresnelR0 = XMFLOAT3(0.2f, 0.2f, 0.2f);
 	sky->m_Roughness = 0.2f;
+
+	auto water = std::make_unique<Material>();
+	water->m_Name = "water";
+	water->m_MatCBIndex = 5;
+	water->m_DiffuseSrvHeapIndex = 4;
+	water->m_NormalSrvHeapIndex = 6;
+	water->m_DiffuseAlbedo = XMFLOAT4(0.09f, 0.09f, 0.43f, 1.0f);
+	water->m_FresnelR0 = XMFLOAT3(0.98f, 0.98f, 0.98f);
+	water->m_Roughness = 0.1f;
 
 	m_Materials["bricks"] = std::move(bricks);
 	m_Materials["tile"] = std::move(tile);
 	m_Materials["mirror"] = std::move(mirror);
 	m_Materials["skullMat"] = std::move(skullMat);
 	m_Materials["sky"] = std::move(sky);
+	m_Materials["water"] = std::move(water);
 }
 
 void GameApp::BuildRenderItems()
@@ -1074,6 +1156,7 @@ void GameApp::BuildRenderItems()
 	columnRitem->StartIndexLocation = columnRitem->Geo->DrawArgs["column"].StartIndexLocation;
 	columnRitem->BaseVertexLocation = columnRitem->Geo->DrawArgs["column"].BaseVertexLocation;
 
+	m_RitemLayer[(int)RenderLayer::WavesOpaque].push_back(columnRitem.get());
 	m_RitemLayer[(int)RenderLayer::Opaque].push_back(columnRitem.get());
 	m_AllRitems.push_back(std::move(columnRitem));
 
@@ -1104,6 +1187,7 @@ void GameApp::BuildRenderItems()
 	skullRitem->BaseVertexLocation = skullRitem->Geo->DrawArgs["skull"].BaseVertexLocation;
 
 	m_SkullRitem = skullRitem.get();
+	m_RitemLayer[(int)RenderLayer::WavesOpaque].push_back(skullRitem.get());
 	m_RitemLayer[(int)RenderLayer::Opaque].push_back(skullRitem.get());
 	m_AllRitems.push_back(std::move(skullRitem));
 	
@@ -1117,9 +1201,23 @@ void GameApp::BuildRenderItems()
 	gridRitem->IndexCount = gridRitem->Geo->DrawArgs["grid"].IndexCount;
 	gridRitem->StartIndexLocation = gridRitem->Geo->DrawArgs["grid"].StartIndexLocation;
 	gridRitem->BaseVertexLocation = gridRitem->Geo->DrawArgs["grid"].BaseVertexLocation;
+	
 	m_RitemLayer[(int)RenderLayer::Opaque].push_back(gridRitem.get());
 	m_AllRitems.push_back(std::move(gridRitem));
 
+	auto waterRitem = std::make_unique<RenderItem>();
+	waterRitem->World = MathHelper::Identity4x4();
+	waterRitem->TexTransform = MathHelper::Identity4x4();
+	waterRitem->ObjCBIndex = 5;
+	waterRitem->Mat = m_Materials["water"].get();
+	waterRitem->Geo = m_Geometries["shapeGeo"].get();
+	waterRitem->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+	waterRitem->IndexCount = waterRitem->Geo->DrawArgs["grid"].IndexCount;
+	waterRitem->StartIndexLocation = waterRitem->Geo->DrawArgs["grid"].StartIndexLocation;
+	waterRitem->BaseVertexLocation = waterRitem->Geo->DrawArgs["grid"].BaseVertexLocation;
+
+	m_RitemLayer[(int)RenderLayer::Waves].push_back(waterRitem.get());
+	m_AllRitems.push_back(std::move(waterRitem));
 }
 
 void GameApp::DrawRenderItems(ID3D12GraphicsCommandList* cmdList, const std::vector<RenderItem*>& ritems)
@@ -1168,7 +1266,16 @@ void GameApp::DrawSceneToCubeMap()
 
 		m_CommandList->SetGraphicsRootConstantBufferView(1, passCBAdress);
 
-		DrawRenderItems(m_CommandList.Get(), m_RitemLayer[(int)RenderLayer::Opaque]);
+		if (m_ShowMode == ShowMode::Waves) 
+		{
+			DrawRenderItems(m_CommandList.Get(), m_RitemLayer[(int)RenderLayer::WavesOpaque]);	
+			m_CommandList->SetPipelineState(m_PSOs["waves"].Get());
+			DrawRenderItems(m_CommandList.Get(), m_RitemLayer[(int)RenderLayer::Waves]);
+		}
+		else 
+		{
+			DrawRenderItems(m_CommandList.Get(), m_RitemLayer[(int)RenderLayer::Opaque]);	
+		}
 		m_CommandList->SetPipelineState(m_PSOs["sky"].Get());
 		DrawRenderItems(m_CommandList.Get(), m_RitemLayer[(int)RenderLayer::Sky]);
 		m_CommandList->SetPipelineState(m_PSOs["opaque"].Get());

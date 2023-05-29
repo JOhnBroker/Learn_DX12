@@ -33,6 +33,7 @@ struct Material
 	DirectX::XMFLOAT3 m_FresnelR0 = { 0.01f,0.01f,0.01f };
 	float m_Roughness = 0.25f;
 	DirectX::XMFLOAT4X4 m_MatTransform = MathHelper::Identity4x4();
+	DirectX::XMFLOAT4X4 m_MatTransform1 = MathHelper::Identity4x4();
 	float m_Eta = 1.0f;
 };
 
@@ -43,6 +44,7 @@ struct MaterialData
 	float Roughness = 64.0f;
 
 	DirectX::XMFLOAT4X4 MatTransform = MathHelper::Identity4x4();
+	DirectX::XMFLOAT4X4 MatTransform1 = MathHelper::Identity4x4();
 
 	UINT DiffuseMapIndex = 0;
 	UINT NormalMapIndex = 0;

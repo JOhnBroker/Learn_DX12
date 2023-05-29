@@ -18,6 +18,7 @@ struct MaterialData
     float3		FresnelR0;
     float		Roughness;
     float4x4	MatTransform;
+    float4x4	MatTransform1;
     uint		DiffuseMapIndex;
     uint		NormalMapIndex;
     uint		MatPad0;
@@ -26,7 +27,7 @@ struct MaterialData
 };
 
 TextureCube gCubeMap : register(t0);
-Texture2D gDiffuseMap[10] : register(t1);
+Texture2D gDiffuseMap[12] : register(t1);
 
 StructuredBuffer<MaterialData> gMaterialData : register(t0, space1);
 
@@ -67,8 +68,6 @@ cbuffer cbPass : register(b1)
 	float gTotalTime;
 	float gDeltaTime;
 	float4 gAmbientLight;
-    //float3 gSkyBoxExtents;
-    //float gPad2;
 	
 	Light gLights[MaxLights];
 	

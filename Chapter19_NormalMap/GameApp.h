@@ -51,6 +51,8 @@ enum class RenderLayer :int
 	Sky,
 	StaticSky,
 	DynamicSky,
+	Waves,
+	WavesOpaque,
 	Count
 };
 
@@ -59,7 +61,7 @@ class GameApp : public D3DApp
 public:
 	enum class CameraMode { FirstPerson, ThirdPerson };
 	enum class SkyMode { StaticSky, DynamicSky };
-	enum class ShowMode { Reflection, Refraction };
+	enum class ShowMode { Reflection, Refraction, Waves };
 public:
 	GameApp(HINSTANCE hInstance);
 	GameApp(HINSTANCE hInstance, int width, int height);
@@ -80,6 +82,7 @@ public:
 	virtual void OnMouseUp(WPARAM btnState, int x, int y) override;
 	virtual void OnMouseDown(WPARAM btnState, int x, int y) override;
 
+	void AnimateMaterials(const GameTimer& gt);
 	void UpdateCamera(const GameTimer& gt);
 	void UpdateObjectCBs(const GameTimer& gt);
 	void UpdateMaterialBuffer(const GameTimer& gt);
