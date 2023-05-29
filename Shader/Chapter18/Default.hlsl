@@ -77,7 +77,6 @@ float4 PS (VertexOut pin) : SV_Target
     float3 fresnelR0 = matData.FresnelR0;
     float roughness = matData.Roughness;
     uint diffuseTexIndex = matData.DiffuseMapIndex;
-    float eta = 1.0f / matData.Eta;
 	
     diffuseAlbedo *= gDiffuseMap[diffuseTexIndex].Sample(gsamLinearWrap, pin.TexC);
 	
@@ -104,10 +103,10 @@ float4 PS (VertexOut pin) : SV_Target
     litColor.rgb += shininess * fresnelFactor * reflectionColor.rgb;
     //litColor.rgb = shininess * fresnelFactor * reflectionColor.rgb;
 #else
-    if(eta < 1.0f)
+    if(matData.Eta > 0.0f)
     {
         float3 refractColor = float3(0.8f, 0.8f, 0.8f);
-        float3 r = refract(-toEyeW, pin.NormalW, eta);
+        float3 r = refract(-toEyeW, pin.NormalW, matData.Eta);
         float4 refractionColor = gCubeMap.Sample(gsamLinearWrap, r);
         litColor.rgb += refractColor * refractionColor.rgb;
     }

@@ -346,6 +346,11 @@ void GameApp::Draw(const GameTimer& timer)
 	auto passCB = m_CurrFrameResource->PassCB->Resource();
 	m_CommandList->SetGraphicsRootConstantBufferView(1, passCB->GetGPUVirtualAddress());
 	
+	if (m_ShowMode == ShowMode::Refraction)
+	{
+		m_CommandList->SetPipelineState(m_PSOs["refraction"].Get());
+	}
+
 	if (m_SkyMode == SkyMode::DynamicSky && m_CameraMode == CameraMode::FirstPerson)
 	{
 		CD3DX12_GPU_DESCRIPTOR_HANDLE dynamicTexDescriptor(m_SrvDescriptorHeap->GetGPUDescriptorHandleForHeapStart());
@@ -357,12 +362,10 @@ void GameApp::Draw(const GameTimer& timer)
 	{
 		DrawRenderItems(m_CommandList.Get(), m_RitemLayer[(int)RenderLayer::StaticSky]);
 	}
+
 	if (m_ShowMode != ShowMode::Waves) 
 	{
-		if (m_ShowMode == ShowMode::Refraction)
-		{
-			m_CommandList->SetPipelineState(m_PSOs["refraction"].Get());
-		}
+		m_CommandList->SetPipelineState(m_PSOs["opaque"].Get());
 		DrawRenderItems(m_CommandList.Get(), m_RitemLayer[(int)RenderLayer::Opaque]);
 	}
 	else
@@ -1092,7 +1095,7 @@ void GameApp::BuildMaterials()
 	mirror->m_DiffuseAlbedo = XMFLOAT4(0.0f, 0.0f, 0.1f, 1.0f);
 	mirror->m_FresnelR0 = XMFLOAT3(0.98f, 0.98f, 0.98f);
 	mirror->m_Roughness = 0.1f;
-	mirror->m_Eta = 1.51f;
+	mirror->m_Eta = 0.95f;
 
 	auto skullMat = std::make_unique<Material>();
 	skullMat->m_Name = "skullMat";
@@ -1117,9 +1120,9 @@ void GameApp::BuildMaterials()
 	water->m_MatCBIndex = 5;
 	water->m_DiffuseSrvHeapIndex = 4;
 	water->m_NormalSrvHeapIndex = 6;
-	water->m_DiffuseAlbedo = XMFLOAT4(0.09f, 0.09f, 0.43f, 1.0f);
-	water->m_FresnelR0 = XMFLOAT3(0.98f, 0.98f, 0.98f);
-	water->m_Roughness = 0.1f;
+	water->m_DiffuseAlbedo = XMFLOAT4(0.09f, 0.09f, 0.52f, 1.0f);
+	water->m_FresnelR0 = XMFLOAT3(0.6f, 0.6f, 0.6f);
+	water->m_Roughness = 0.15f;
 
 	m_Materials["bricks"] = std::move(bricks);
 	m_Materials["tile"] = std::move(tile);

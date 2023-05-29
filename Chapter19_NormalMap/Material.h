@@ -34,7 +34,7 @@ struct Material
 	float m_Roughness = 0.25f;
 	DirectX::XMFLOAT4X4 m_MatTransform = MathHelper::Identity4x4();
 	DirectX::XMFLOAT4X4 m_MatTransform1 = MathHelper::Identity4x4();
-	float m_Eta = 1.0f;
+	float m_Eta = -1.0f;
 };
 
 struct MaterialData

@@ -347,6 +347,7 @@ void GameApp::Draw(const GameTimer& timer)
 	{
 		DrawRenderItems(m_CommandList.Get(), m_RitemLayer[(int)RenderLayer::StaticSky]);
 	}
+	m_CommandList->SetPipelineState(m_PSOs["opaque"].Get());
 	DrawRenderItems(m_CommandList.Get(), m_RitemLayer[(int)RenderLayer::Opaque]);
 
 	m_CommandList->SetGraphicsRootDescriptorTable(3, skyTexDescriptor);
@@ -1010,7 +1011,7 @@ void GameApp::BuildMaterials()
 	mirror->m_DiffuseAlbedo = XMFLOAT4(0.0f, 0.0f, 0.1f, 1.0f);
 	mirror->m_FresnelR0 = XMFLOAT3(0.98f, 0.98f, 0.98f);
 	mirror->m_Roughness = 0.1f;
-	mirror->m_Eta = 1.51f;
+	mirror->m_Eta = 0.90f;
 
 	auto skullMat = std::make_unique<Material>();
 	skullMat->m_Name = "skullMat";
