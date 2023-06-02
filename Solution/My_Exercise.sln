@@ -41,6 +41,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Chapter18_SkyBox", "..\Chap
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Chapter19_NormalMap", "..\Chapter19_NormalMap\Chapter19_NormalMap.vcxproj", "{C8257431-7CF8-41AD-9C20-1E00AA51B71C}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Chapter20_ShadowMap", "..\Chapter20_ShadowMap\Chapter20_ShadowMap.vcxproj", "{61AA45F5-D356-4DEC-AF3B-B9D3C2759BB3}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -199,6 +201,14 @@ Global
 		{C8257431-7CF8-41AD-9C20-1E00AA51B71C}.Release|x64.Build.0 = Release|x64
 		{C8257431-7CF8-41AD-9C20-1E00AA51B71C}.Release|x86.ActiveCfg = Release|Win32
 		{C8257431-7CF8-41AD-9C20-1E00AA51B71C}.Release|x86.Build.0 = Release|Win32
+		{61AA45F5-D356-4DEC-AF3B-B9D3C2759BB3}.Debug|x64.ActiveCfg = Debug|x64
+		{61AA45F5-D356-4DEC-AF3B-B9D3C2759BB3}.Debug|x64.Build.0 = Debug|x64
+		{61AA45F5-D356-4DEC-AF3B-B9D3C2759BB3}.Debug|x86.ActiveCfg = Debug|Win32
+		{61AA45F5-D356-4DEC-AF3B-B9D3C2759BB3}.Debug|x86.Build.0 = Debug|Win32
+		{61AA45F5-D356-4DEC-AF3B-B9D3C2759BB3}.Release|x64.ActiveCfg = Release|x64
+		{61AA45F5-D356-4DEC-AF3B-B9D3C2759BB3}.Release|x64.Build.0 = Release|x64
+		{61AA45F5-D356-4DEC-AF3B-B9D3C2759BB3}.Release|x86.ActiveCfg = Release|Win32
+		{61AA45F5-D356-4DEC-AF3B-B9D3C2759BB3}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
