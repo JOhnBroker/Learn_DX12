@@ -58,7 +58,6 @@ VertexOut VS(VertexIn vin)
 	return vout;
 }
 
-
 float4 PS (VertexOut pin) : SV_Target
 {
     MaterialData matData = gMaterialData[gMaterialIndex];
@@ -70,25 +69,33 @@ float4 PS (VertexOut pin) : SV_Target
 	
     diffuseAlbedo *= gDiffuseMap[diffuseTexIndex].Sample(gSamLinearWrap, pin.TexC);
 	
+#ifdef ALPHA_TEST
+    clip(diffuseAlbedo.a - 0.1f);
+#endif
+    
     pin.NormalW = normalize(pin.NormalW);
     float4 normalMapSample = gDiffuseMap[normalIndex].Sample(gSamAnisotropicWrap, pin.TexC);
     float3 bumpedNormalW = NormalSampleToWorldSpace(normalMapSample.xyz, pin.NormalW, pin.TangentW);
     
-    const float shininess = (1.0f - roughness) * normalMapSample.a;
     float3 toEyeW = normalize(gEyePosW - pin.PosW);
     float4 ambient = gAmbientLight * diffuseAlbedo;
-
-    pin.ShadowPosH.xyz /= pin.ShadowPosH.w;
-    float4 shadowColor = gDiffuseMap[0].Sample(gSamShadow, pin.ShadowPosH.xy);
-    diffuseAlbedo *= shadowColor;
+    float3 shadowFactor = float3(1.0f, 1.0f, 1.0f);
     
+#ifdef HARDSHADOW
+    float4 shadowPosH = pin.ShadowPosH;
+    shadowPosH.xyz /= shadowPosH.w;
+    shadowFactor[0] = gShadowMap.SampleCmpLevelZero(
+        gSamShadow, shadowPosH.xy, shadowPosH.z).r;
+#else
+    shadowFactor[0] = CalcShadowFactor(pin.ShadowPosH);
+#endif
+    
+    const float shininess = (1.0f - roughness) * normalMapSample.a;
     Material mat = { diffuseAlbedo, fresnelR0, shininess };
-	float3 shadowFactor = 1.0f;
 	float4 directLight = ComputeLighting(gLights, mat, pin.PosW, bumpedNormalW, toEyeW, shadowFactor);
 
 	float4 litColor = ambient + directLight;
-	
-#ifndef REFRACT 
+
     // slab method
     //float4 rayOrigin = mul(float4(pin.PosW, 1.0f), gInvSkyBoxWorld);
     //float3 rayDir = reflect(-toEyeW, pin.NormalW);
@@ -97,15 +104,6 @@ float4 PS (VertexOut pin) : SV_Target
     float4 reflectionColor = gCubeMap.Sample(gSamLinearClamp, r);
     float3 fresnelFactor = SchlickFresnel(fresnelR0, bumpedNormalW, r);
     litColor.rgb += shininess * fresnelFactor * reflectionColor.rgb;
-#else
-    if(matData.Eta > 0.0f)
-    {
-        float3 refractColor = float3(0.8f, 0.8f, 0.8f);
-        float3 r = refract(-toEyeW, pin.NormalW, matData.Eta);
-        float4 refractionColor = gCubeMap.Sample(gSamLinearWrap, r);
-        litColor.rgb += refractColor * refractionColor.rgb;
-    }
-#endif
 
 	litColor.a = diffuseAlbedo.a;
     

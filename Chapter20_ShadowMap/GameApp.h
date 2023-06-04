@@ -12,6 +12,7 @@
 #include "Light.h"
 #include "Camera.h"
 #include "CubeRenderTarget.h"
+#include "ShadowMap.h"
 
 #define STATICSAMPLERCOUNT 7
 #define LIGHTCOUNT 3
@@ -49,9 +50,8 @@ struct RenderItem
 enum class RenderLayer :int
 {
 	Opaque = 0,
+	Debug,
 	Sky,
-	StaticSky,
-	DynamicSky,
 	Count
 };
 
@@ -59,8 +59,7 @@ class GameApp : public D3DApp
 {
 public:
 	enum class CameraMode { FirstPerson, ThirdPerson };
-	enum class SkyMode { StaticSky, DynamicSky };
-	enum class ShowMode { Reflection, Refraction };
+	enum class ShowMode { SoftShadow, SoftShadow_AplhaTest, HardShadow, PeterPanning, ShadowAcne };
 	enum class LightMode { Orthogonal, Perspective };
 public:
 	GameApp(HINSTANCE hInstance);
@@ -87,13 +86,11 @@ public:
 	void UpdateObjectCBs(const GameTimer& gt);
 	void UpdateMaterialBuffer(const GameTimer& gt);
 	void UpdateMainPassCB(const GameTimer& gt);
-	void UpdateCubeMapFacePassCBs();
 	void UpdateShadowTransform(const GameTimer& gt);
 	void UpdateShadowPassCB(const GameTimer& gt);
 
 	void BuildRootSignature();
 	void BuildDescriptorHeaps();
-	void BuildCubeDepthStencil();
 	void BuildShadersAndInputLayout();
 	void BuildShapeGeometry();
 	void BuildSkullGeometry();
@@ -102,9 +99,8 @@ public:
 	void BuildMaterials();
 	void BuildRenderItems();
 	void DrawRenderItems(ID3D12GraphicsCommandList* cmdList, const std::vector<RenderItem*>& ritems);
-	void DrawSceneToCubeMap();
+	void DrawSceneToShadowMap();
 
-	void BuildCubeFaceCamera(float x, float y, float z);
 	void ReadDataFromFile(std::vector<Vertex>& vertices, std::vector<std::int32_t>& indices, BoundingBox& bounds);
 	void ReadDataFromFile(std::vector<Vertex>& vertices, std::vector<std::int32_t>& indices, BoundingSphere& bounds);
 	std::array<const CD3DX12_STATIC_SAMPLER_DESC, STATICSAMPLERCOUNT>GetStaticSamplers();
@@ -145,24 +141,25 @@ private:
 	UINT m_SkyTexHeapIndex = 0;
 	DirectX::XMFLOAT3 m_SkyBoxScale = { 5000.0f, 5000.0f, 5000.0f };
 
-	// dynamic SkyBox
-	UINT m_DynamicSkyTexHeapIndex = 0;
-	std::unique_ptr<CubeRenderTarget>m_DynamicCubeMap = nullptr;
-	CD3DX12_CPU_DESCRIPTOR_HANDLE m_CubeDSV;
-	std::shared_ptr<FirstPersonCamera> m_CubeCamera;
-
 	// light
 	float m_SunTheta = 1.25f * XM_PI;
 	float m_SunPhi = XM_PIDIV4;
 	std::array<std::shared_ptr<Light>, LIGHTCOUNT> m_Lights;
 
 	//shadow
+	int m_ShadowMapSize = 0;
+	UINT m_ShadowMapHeapIndex = 0;
+	UINT m_NullCubeSrvIndex = 0;
+	UINT m_NullTexSrvIndex = 0;
+	CD3DX12_GPU_DESCRIPTOR_HANDLE m_NullCubeSrv;
+	CD3DX12_GPU_DESCRIPTOR_HANDLE m_NullTexSrv;
+	std::unique_ptr<ShadowMap> m_ShadowMap;
 
 	//Imgui
 	bool m_WireframeEnable = false;
+	bool m_ShadowMapDebugEnable = false;
 	CameraMode m_CameraMode = CameraMode::FirstPerson;
-	SkyMode m_SkyMode = SkyMode::StaticSky;
-	ShowMode m_ShowMode = ShowMode::Reflection;
+	ShowMode m_ShowMode = ShowMode::SoftShadow;
 	LightMode m_LightMode = LightMode::Orthogonal;
 
 	POINT m_LastMousePos;
