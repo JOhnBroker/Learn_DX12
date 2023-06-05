@@ -1,5 +1,5 @@
 #ifndef NUM_DIR_LIGHT
-	#define NUM_DIR_LIGHT 2
+	#define NUM_DIR_LIGHT 3
 #endif
 
 #ifndef NUM_POINT_LIGHT
@@ -84,8 +84,9 @@ float4 PS (VertexOut pin) : SV_Target
 #ifdef HARDSHADOW
     float4 shadowPosH = pin.ShadowPosH;
     shadowPosH.xyz /= shadowPosH.w;
-    shadowFactor[0] = gShadowMap.SampleCmpLevelZero(
-        gSamShadow, shadowPosH.xy, shadowPosH.z).r;
+    
+    //shadowFactor[0] = gShadowMap.Sample(gSamLinearClamp, shadowPosH.xy).r >= shadowPosH.z;
+    shadowFactor[0] = gShadowMap.SampleCmpLevelZero(gSamShadow, shadowPosH.xy, shadowPosH.z).r;
 #else
     shadowFactor[0] = CalcShadowFactor(pin.ShadowPosH);
 #endif

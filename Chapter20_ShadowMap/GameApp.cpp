@@ -152,7 +152,7 @@ void GameApp::CreateRTVAndDSVDescriptorHeaps()
 
 	// 为ImGui创建SRV堆
 	D3D12_DESCRIPTOR_HEAP_DESC srvHeapDesc;
-	srvHeapDesc.NumDescriptors = 1;
+	srvHeapDesc.NumDescriptors = 2;
 	srvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
 	srvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
 	srvHeapDesc.NodeMask = 0;
@@ -286,9 +286,11 @@ void GameApp::Update(const GameTimer& timer)
 				m_SkyTexHeapIndex = 10;
 			}
 		}
-		if (ImGui::SliderInt("ShadowMap size", &m_ShadowMapSize, 0, 4)) 
+		ImGui::SliderInt("ShadowMap size", &m_ShadowMapSize, 0, 4);
+		UINT newSize = pow(2, m_ShadowMapSize) * 256;
+		if (m_ShadowMap->GetWidth() != newSize)
 		{
-			UINT newSize = pow(2, m_ShadowMapSize) * 256;
+			FlushCommandQueue();
 			m_ShadowMap->OnResize(newSize, newSize);
 		}
 		ImGui::Checkbox("Enable ShadowMap debug", &m_ShadowMapDebugEnable);
@@ -1326,6 +1328,9 @@ void GameApp::DrawSceneToShadowMap()
 		break;
 	case GameApp::ShowMode::ShadowAcne:
 		m_CommandList->SetPipelineState(m_PSOs["shadow_acne"].Get());
+		break;
+	default:
+		m_CommandList->SetPipelineState(m_PSOs["shadow_opaque"].Get());
 		break;
 	}
 
