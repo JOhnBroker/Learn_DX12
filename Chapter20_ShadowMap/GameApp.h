@@ -115,7 +115,6 @@ private:
 	int m_CurrFrameResourceIndex = 0;
 
 	ComPtr<ID3D12RootSignature> m_RootSignature = nullptr;
-	ComPtr<ID3D12DescriptorHeap> m_SrvDescriptorHeap = nullptr;
 	ComPtr<ID3D12Resource> m_CubeDepthStencilBuffer = nullptr;
 
 	std::unordered_map<std::string, std::unique_ptr<MeshGeometry>> m_Geometries;

@@ -150,14 +150,11 @@ void GameApp::CreateRTVAndDSVDescriptorHeaps()
 	HR(m_pd3dDevice->CreateDescriptorHeap(
 		&dsvHeapDesc, IID_PPV_ARGS(m_DSVHeap.GetAddressOf())));
 
-	// 为ImGui创建SRV堆
-	D3D12_DESCRIPTOR_HEAP_DESC srvHeapDesc;
-	srvHeapDesc.NumDescriptors = 2;
+	D3D12_DESCRIPTOR_HEAP_DESC srvHeapDesc = {};
+	srvHeapDesc.NumDescriptors = 12;
 	srvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
 	srvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
-	srvHeapDesc.NodeMask = 0;
-	HR(m_pd3dDevice->CreateDescriptorHeap(
-		&srvHeapDesc, IID_PPV_ARGS(m_SRVHeap.GetAddressOf())));
+	HR(m_pd3dDevice->CreateDescriptorHeap(&srvHeapDesc, IID_PPV_ARGS(&m_SRVHeap)));
 }
 
 void GameApp::OnResize()
@@ -275,15 +272,15 @@ void GameApp::Update(const GameTimer& timer)
 		{
 			if (curr_skyCubemode == 0 )
 			{
-				m_SkyTexHeapIndex = 8;
+				m_SkyTexHeapIndex = 6;
 			}
 			else if (curr_skyCubemode == 1)
 			{
-				m_SkyTexHeapIndex = 9;
+				m_SkyTexHeapIndex = 7;
 			}
 			else if (curr_skyCubemode == 2) 
 			{
-				m_SkyTexHeapIndex = 10;
+				m_SkyTexHeapIndex = 8;
 			}
 		}
 		ImGui::SliderInt("ShadowMap size", &m_ShadowMapSize, 0, 4);
@@ -341,7 +338,7 @@ void GameApp::Draw(const GameTimer& timer)
 		HR(m_CommandList->Reset(cmdListAlloc.Get(), m_PSOs["opaque"].Get()));
 	}
 
-	ID3D12DescriptorHeap* descriptorHeap[] = { m_SrvDescriptorHeap.Get() };
+	ID3D12DescriptorHeap* descriptorHeap[] = { m_SRVHeap.Get() };
 	m_CommandList->SetDescriptorHeaps(_countof(descriptorHeap), descriptorHeap);
 	m_CommandList->SetGraphicsRootSignature(m_RootSignature.Get());
 
@@ -349,7 +346,7 @@ void GameApp::Draw(const GameTimer& timer)
 	m_CommandList->SetGraphicsRootShaderResourceView(2, matBuffer->GetGPUVirtualAddress());
 	m_CommandList->SetGraphicsRootDescriptorTable(3, m_NullCubeSrv);
 	m_CommandList->SetGraphicsRootDescriptorTable(4, m_NullTexSrv);
-	m_CommandList->SetGraphicsRootDescriptorTable(5, m_SrvDescriptorHeap->GetGPUDescriptorHandleForHeapStart());
+	m_CommandList->SetGraphicsRootDescriptorTable(5, m_SRVHeap->GetGPUDescriptorHandleForHeapStart());
 
 	DrawSceneToShadowMap();
 
@@ -367,10 +364,10 @@ void GameApp::Draw(const GameTimer& timer)
 	auto passCB = m_CurrFrameResource->PassCB->Resource();
 	m_CommandList->SetGraphicsRootConstantBufferView(1, passCB->GetGPUVirtualAddress());
 	
-	CD3DX12_GPU_DESCRIPTOR_HANDLE skyTexDescriptor(m_SrvDescriptorHeap->GetGPUDescriptorHandleForHeapStart());
+	CD3DX12_GPU_DESCRIPTOR_HANDLE skyTexDescriptor(m_SRVHeap->GetGPUDescriptorHandleForHeapStart());
 	skyTexDescriptor.Offset(m_SkyTexHeapIndex, m_CBVSRVDescriptorSize);
 	m_CommandList->SetGraphicsRootDescriptorTable(3, skyTexDescriptor);
-	m_CommandList->SetGraphicsRootDescriptorTable(4, m_ShadowMap->GetSrv());
+	m_CommandList->SetGraphicsRootDescriptorTable(4, m_ShadowMap->GetGpuSrv());
 
 	if (m_ShowMode == ShowMode::HardShadow) 
 	{
@@ -385,17 +382,52 @@ void GameApp::Draw(const GameTimer& timer)
 	m_CommandList->SetPipelineState(m_PSOs["sky"].Get());
 	DrawRenderItems(m_CommandList.Get(), m_RitemLayer[(int)RenderLayer::Sky]);
 
-	m_CommandList->SetDescriptorHeaps(1, m_SRVHeap.GetAddressOf());
 	if (m_ShadowMapDebugEnable) 
 	{
+		//m_CommandList->ClearRenderTargetView(CurrentBackBufferView(), DirectX::Colors::LightSteelBlue, 0, nullptr);
+		//m_CommandList->ClearDepthStencilView(DepthStencilView(), D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, 1.0f, 0, 0, nullptr);
+		//
+		//m_CommandList->OMSetRenderTargets(1, &CurrentBackBufferView(), true, &DepthStencilView());
+
+		//m_CommandList->SetPipelineState(m_PSOs["shadow_debug"].Get());
+		//DrawRenderItems(m_CommandList.Get(), m_RitemLayer[(int)RenderLayer::Opaque]);
+		
+		auto matBuffer = m_CurrFrameResource->MaterialBuffer->Resource();
+		m_CommandList->SetGraphicsRootShaderResourceView(2, matBuffer->GetGPUVirtualAddress());
+		m_CommandList->SetGraphicsRootDescriptorTable(3, m_NullCubeSrv);
+		m_CommandList->SetGraphicsRootDescriptorTable(4, m_NullTexSrv);
+		m_CommandList->SetGraphicsRootDescriptorTable(5, m_SRVHeap->GetGPUDescriptorHandleForHeapStart());
+
+		m_CommandList->RSSetViewports(1, &m_ShadowMap->GetViewport());
+		m_CommandList->RSSetScissorRects(1, &m_ShadowMap->GetScissorRect());
+
+		m_CommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_ShadowMap->GetResource(),
+			D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_DEPTH_WRITE));
+
+		UINT passCBByteSize = d3dUtil::CalcConstantBufferByteSize(sizeof(PassConstants));
+
+		m_CommandList->ClearDepthStencilView(m_ShadowMap->GetDsv(),
+			D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, 1.0f, 0, 0, nullptr);
+
+		m_CommandList->OMSetRenderTargets(0, &m_ShadowMap->GetCpuSrv(), false, &m_ShadowMap->GetDsv());
+
+		auto passCB = m_CurrFrameResource->PassCB->Resource();
+		D3D12_GPU_VIRTUAL_ADDRESS passCBAddress = passCB->GetGPUVirtualAddress() + 1 * passCBByteSize;
+		m_CommandList->SetGraphicsRootConstantBufferView(1, passCBAddress);
+
 		m_CommandList->SetPipelineState(m_PSOs["shadow_debug"].Get());
+
 		DrawRenderItems(m_CommandList.Get(), m_RitemLayer[(int)RenderLayer::Opaque]);
+
+		m_CommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_ShadowMap->GetResource(),
+			D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_GENERIC_READ));
 
 		if (ImGui::Begin("Depth buffer", &m_ShadowMapDebugEnable)) 
 		{
 			ImVec2 winSize = ImGui::GetWindowSize();
 			float smaller = (std::min)(winSize.x - 20, winSize.y - 36);
-			ImGui::Image(m_ShadowMap->GetResource(), ImVec2(smaller, smaller));
+
+			ImGui::Image((ImTextureID)m_ShadowMap->GetGpuSrv().ptr, ImVec2(smaller, smaller));
 		}
 		ImGui::End();
 	}
@@ -714,13 +746,7 @@ void GameApp::BuildRootSignature()
 
 void GameApp::BuildDescriptorHeaps()
 {
-	D3D12_DESCRIPTOR_HEAP_DESC srvHeapDesc = {};
-	srvHeapDesc.NumDescriptors = 12;
-	srvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
-	srvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
-	HR(m_pd3dDevice->CreateDescriptorHeap(&srvHeapDesc, IID_PPV_ARGS(&m_SrvDescriptorHeap)));
-
-	CD3DX12_CPU_DESCRIPTOR_HANDLE hDescriptor(m_SrvDescriptorHeap->GetCPUDescriptorHandleForHeapStart());
+	CD3DX12_CPU_DESCRIPTOR_HANDLE hDescriptor(m_SRVHeap->GetCPUDescriptorHandleForHeapStart());
 
 	std::vector<ComPtr<ID3D12Resource>> tex2DList =
 	{
@@ -741,6 +767,7 @@ void GameApp::BuildDescriptorHeaps()
 	srvDesc.Texture2D.MostDetailedMip = 0;
 	srvDesc.Texture2D.ResourceMinLODClamp = 0.0f;
 
+	//hDescriptor.Offset(1, m_CBVSRVDescriptorSize);
 	for (UINT i = 0; i < (UINT)tex2DList.size(); ++i) 
 	{
 		srvDesc.Format = tex2DList[i]->GetDesc().Format;
@@ -772,8 +799,8 @@ void GameApp::BuildDescriptorHeaps()
 	m_NullCubeSrvIndex = m_ShadowMapHeapIndex + 1;
 	m_NullTexSrvIndex = m_NullCubeSrvIndex + 1;
 
-	auto srvCpuStart = m_SrvDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
-	auto srvGpuStart = m_SrvDescriptorHeap->GetGPUDescriptorHandleForHeapStart();
+	auto srvCpuStart = m_SRVHeap->GetCPUDescriptorHandleForHeapStart();
+	auto srvGpuStart = m_SRVHeap->GetGPUDescriptorHandleForHeapStart();
 	auto dsvCpuStart = m_DSVHeap->GetCPUDescriptorHandleForHeapStart();
 
 	auto nullSrv = CD3DX12_CPU_DESCRIPTOR_HANDLE(srvCpuStart, m_NullCubeSrvIndex, m_CBVSRVDescriptorSize);
