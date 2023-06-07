@@ -139,6 +139,8 @@ void Light::RotateY(float rad)
     SetPositionXM(m_Target);
 
     XMMATRIX R = XMMatrixRotationRollPitchYawFromVector(XMLoadFloat3(&m_Rotation));
+    XMStoreFloat3(&m_Up, XMVector3Normalize(R.r[1]));
+    XMStoreFloat3(&m_Direction, XMVector3Normalize(R.r[2]));
 
     XMVECTOR directionVec = XMLoadFloat3(&m_Direction);
     XMVECTOR newPosition = XMVectorMultiplyAdd(XMVectorReplicate(-m_Distance), directionVec, XMLoadFloat3(&m_Position));

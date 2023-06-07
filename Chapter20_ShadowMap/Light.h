@@ -52,7 +52,7 @@ protected:
 	DirectX::XMFLOAT3 m_Position = { 0.0f,0.0f,0.0f };
 	DirectX::XMFLOAT3 m_Target = { 0.0f,0.0f,0.0f };
 	DirectX::XMFLOAT3 m_Up = { 0.0f,1.0f,0.0f };
-	DirectX::XMFLOAT3 m_Rotation = {};	// Ğı×ªÅ·À­½Ç(»¡¶ÈÖÆ)
+	DirectX::XMFLOAT3 m_Rotation = {};	// æ—‹è½¬æ¬§æ‹‰è§’(å¼§åº¦åˆ¶)
 
 	DirectX::XMFLOAT4X4 m_View = MathHelper::Identity4x4();
 	DirectX::XMFLOAT4X4 m_Proj = MathHelper::Identity4x4();
@@ -71,7 +71,7 @@ protected:
 
 class DirectionalLight :public Light 
 {
-	// ±¾ÖÊÉÏÊÇÒÔÕı½»Í¶Ó°µÄ·½Ê½£¬Í¶Ó°ÒõÓ°ÌùÍ¼ÖÁ³¡¾°
+	// æœ¬è´¨ä¸Šæ˜¯ä»¥æ­£äº¤æŠ•å½±çš„æ–¹å¼ï¼ŒæŠ•å½±é˜´å½±è´´å›¾è‡³åœºæ™¯
 public:
 	DirectionalLight();
 	~DirectionalLight() override;
@@ -80,7 +80,7 @@ public:
 
 class SpotLight :public Light 
 {
-	// ±¾ÖÊÉÏÊÇÒÔÍ¸ÊÓÍ¶Ó°µÄ·½Ê½£¬Í¶Ó°ÒõÓ°ÌùÍ¼ÖÁ³¡¾°
+	// æœ¬è´¨ä¸Šæ˜¯ä»¥é€è§†æŠ•å½±çš„æ–¹å¼ï¼ŒæŠ•å½±é˜´å½±è´´å›¾è‡³åœºæ™¯
 public:
 	SpotLight();
 	~SpotLight() override;

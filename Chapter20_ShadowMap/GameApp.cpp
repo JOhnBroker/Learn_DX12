@@ -112,13 +112,15 @@ bool GameApp::InitResource()
 		XMStoreFloat3(&lightPos, lightPosV);
 		m_Lights[i]->SetPositionXM(lightPos);
 		m_Lights[i]->SetTargetXM(m_SceneBounds.Center);
+		m_Lights[i]->SetDistance(0.5f * m_SceneBounds.Radius);
 		m_Lights[i]->UpdateViewMatrix();
 	}
-	XMFLOAT3 lightPos = {};
-	XMVECTOR lightPosV = -10.0f * m_Lights[0]->GetLightDirectionXM();
-	XMStoreFloat3(&lightPos, lightPosV);
-	m_Lights[0]->SetPositionXM(lightPos);
-	m_Lights[0]->UpdateViewMatrix();
+	// Perspective
+	//XMFLOAT3 lightPos = {};
+	//XMVECTOR lightPosV = -10.0f * m_Lights[0]->GetLightDirectionXM();
+	//XMStoreFloat3(&lightPos, lightPosV);
+	//m_Lights[0]->SetPositionXM(lightPos);
+	//m_Lights[0]->UpdateViewMatrix();
 
 	m_ShadowMap = std::make_unique<ShadowMap>(m_pd3dDevice.Get(), pow(2, m_ShadowMapSize) * 256, pow(2, m_ShadowMapSize) * 256);
 
@@ -296,6 +298,8 @@ void GameApp::Update(const GameTimer& timer)
 			m_ShadowMap->OnResize(newSize, newSize);
 		}
 		ImGui::Checkbox("Enable ShadowMap debug", &m_ShadowMapDebugEnable);
+		XMFLOAT3 lightPos = m_Lights[0]->GetPosition();
+		ImGui::Text("Light Position\n%.2f %.2f %.2f", lightPos.x, lightPos.y, lightPos.z);
 	}
 	
 	if (ImGui::IsKeyDown(ImGuiKey_LeftArrow))
@@ -572,11 +576,12 @@ void GameApp::UpdateMainPassCB(const GameTimer& gt)
 	m_MainPassCB.AmbientLight = { 0.25f, 0.25f, 0.35f, 1.0f };
 	m_MainPassCB.Lights[0].m_Direction = m_Lights[0]->GetLightDirection();
 	m_MainPassCB.Lights[0].m_Strength = { 0.9f, 0.8f, 0.7f };
+	// Perspective
+	//m_MainPassCB.Lights[0].m_FalloffStart = 10.0f;
+	//m_MainPassCB.Lights[0].m_FalloffEnd = 100.0f;
+	//m_MainPassCB.Lights[0].m_Position = m_Lights[0]->GetPosition();
 	m_MainPassCB.Lights[1].m_Direction = m_Lights[1]->GetLightDirection();
 	m_MainPassCB.Lights[1].m_Strength = { 0.4f, 0.4f, 0.4f };
-	m_MainPassCB.Lights[1].m_FalloffStart = 10.0f;
-	m_MainPassCB.Lights[1].m_FalloffEnd = 100.0f;
-	m_MainPassCB.Lights[1].m_Position = m_Lights[0]->GetPosition();
 	m_MainPassCB.Lights[2].m_Direction = m_Lights[2]->GetLightDirection();
 	m_MainPassCB.Lights[2].m_Strength = { 0.2f, 0.2f, 0.2f };
 	
@@ -598,6 +603,10 @@ void GameApp::UpdateShadowTransform(const GameTimer& gt)
 	{
 		spotLight = std::static_pointer_cast<SpotLight>(m_Lights[0]);
 	}
+
+	m_Lights[0]->RotateX(0.1f * gt.DeltaTime());
+	m_Lights[0]->RotateY(0.1f * gt.DeltaTime());
+	m_Lights[0]->UpdateViewMatrix();
 
 	XMFLOAT3 lightPos = m_Lights[0]->GetPosition();
 	XMFLOAT3 sphereCenterLS;
