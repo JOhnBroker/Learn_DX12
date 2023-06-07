@@ -1,5 +1,5 @@
 #ifndef NUM_DIR_LIGHT
-	#define NUM_DIR_LIGHT 3
+	#define NUM_DIR_LIGHT 1
 #endif
 
 #ifndef NUM_POINT_LIGHT
@@ -7,7 +7,7 @@
 #endif
 
 #ifndef NUM_SPOT_LIGHT
-	#define NUM_SPOT_LIGHT 0
+	#define NUM_SPOT_LIGHT 2
 #endif
 
 #include "LightingUtil.hlsl"
@@ -28,7 +28,7 @@ struct MaterialData
 
 TextureCube gCubeMap : register(t0);
 Texture2D gShadowMap : register(t1);
-Texture2D gDiffuseMap[12] : register(t2);
+Texture2D gDiffuseMap[10] : register(t2);
 
 StructuredBuffer<MaterialData> gMaterialData : register(t0, space1);
 

@@ -114,6 +114,11 @@ bool GameApp::InitResource()
 		m_Lights[i]->SetTargetXM(m_SceneBounds.Center);
 		m_Lights[i]->UpdateViewMatrix();
 	}
+	XMFLOAT3 lightPos = {};
+	XMVECTOR lightPosV = -10.0f * m_Lights[0]->GetLightDirectionXM();
+	XMStoreFloat3(&lightPos, lightPosV);
+	m_Lights[0]->SetPositionXM(lightPos);
+	m_Lights[0]->UpdateViewMatrix();
 
 	m_ShadowMap = std::make_unique<ShadowMap>(m_pd3dDevice.Get(), pow(2, m_ShadowMapSize) * 256, pow(2, m_ShadowMapSize) * 256);
 
@@ -135,7 +140,7 @@ bool GameApp::InitResource()
 void GameApp::CreateRTVAndDSVDescriptorHeaps()
 {
 	D3D12_DESCRIPTOR_HEAP_DESC rtvHeapDesc;
-	rtvHeapDesc.NumDescriptors = SwapChainBufferCount;
+	rtvHeapDesc.NumDescriptors = SwapChainBufferCount + 1;
 	rtvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
 	rtvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
 	rtvHeapDesc.NodeMask = 0;
@@ -151,7 +156,7 @@ void GameApp::CreateRTVAndDSVDescriptorHeaps()
 		&dsvHeapDesc, IID_PPV_ARGS(m_DSVHeap.GetAddressOf())));
 
 	D3D12_DESCRIPTOR_HEAP_DESC srvHeapDesc = {};
-	srvHeapDesc.NumDescriptors = 12;
+	srvHeapDesc.NumDescriptors = 14;
 	srvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
 	srvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
 	HR(m_pd3dDevice->CreateDescriptorHeap(&srvHeapDesc, IID_PPV_ARGS(&m_SRVHeap)));
@@ -367,7 +372,7 @@ void GameApp::Draw(const GameTimer& timer)
 	CD3DX12_GPU_DESCRIPTOR_HANDLE skyTexDescriptor(m_SRVHeap->GetGPUDescriptorHandleForHeapStart());
 	skyTexDescriptor.Offset(m_SkyTexHeapIndex, m_CBVSRVDescriptorSize);
 	m_CommandList->SetGraphicsRootDescriptorTable(3, skyTexDescriptor);
-	m_CommandList->SetGraphicsRootDescriptorTable(4, m_ShadowMap->GetGpuSrv());
+	m_CommandList->SetGraphicsRootDescriptorTable(4, m_ShadowMap->GetSrv());
 
 	if (m_ShowMode == ShowMode::HardShadow) 
 	{
@@ -383,51 +388,15 @@ void GameApp::Draw(const GameTimer& timer)
 	DrawRenderItems(m_CommandList.Get(), m_RitemLayer[(int)RenderLayer::Sky]);
 
 	if (m_ShadowMapDebugEnable) 
-	{
-		//m_CommandList->ClearRenderTargetView(CurrentBackBufferView(), DirectX::Colors::LightSteelBlue, 0, nullptr);
-		//m_CommandList->ClearDepthStencilView(DepthStencilView(), D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, 1.0f, 0, 0, nullptr);
-		//
-		//m_CommandList->OMSetRenderTargets(1, &CurrentBackBufferView(), true, &DepthStencilView());
-
-		//m_CommandList->SetPipelineState(m_PSOs["shadow_debug"].Get());
-		//DrawRenderItems(m_CommandList.Get(), m_RitemLayer[(int)RenderLayer::Opaque]);
-		
-		auto matBuffer = m_CurrFrameResource->MaterialBuffer->Resource();
-		m_CommandList->SetGraphicsRootShaderResourceView(2, matBuffer->GetGPUVirtualAddress());
-		m_CommandList->SetGraphicsRootDescriptorTable(3, m_NullCubeSrv);
-		m_CommandList->SetGraphicsRootDescriptorTable(4, m_NullTexSrv);
-		m_CommandList->SetGraphicsRootDescriptorTable(5, m_SRVHeap->GetGPUDescriptorHandleForHeapStart());
-
-		m_CommandList->RSSetViewports(1, &m_ShadowMap->GetViewport());
-		m_CommandList->RSSetScissorRects(1, &m_ShadowMap->GetScissorRect());
-
-		m_CommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_ShadowMap->GetResource(),
-			D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_DEPTH_WRITE));
-
-		UINT passCBByteSize = d3dUtil::CalcConstantBufferByteSize(sizeof(PassConstants));
-
-		m_CommandList->ClearDepthStencilView(m_ShadowMap->GetDsv(),
-			D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, 1.0f, 0, 0, nullptr);
-
-		m_CommandList->OMSetRenderTargets(0, &m_ShadowMap->GetCpuSrv(), false, &m_ShadowMap->GetDsv());
-
-		auto passCB = m_CurrFrameResource->PassCB->Resource();
-		D3D12_GPU_VIRTUAL_ADDRESS passCBAddress = passCB->GetGPUVirtualAddress() + 1 * passCBByteSize;
-		m_CommandList->SetGraphicsRootConstantBufferView(1, passCBAddress);
-
-		m_CommandList->SetPipelineState(m_PSOs["shadow_debug"].Get());
-
-		DrawRenderItems(m_CommandList.Get(), m_RitemLayer[(int)RenderLayer::Opaque]);
-
-		m_CommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_ShadowMap->GetResource(),
-			D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_GENERIC_READ));
-
+	{		
+		RenderShadowMapToTexture();
+		m_CommandList->OMSetRenderTargets(1, &CurrentBackBufferView(), true, &DepthStencilView());
 		if (ImGui::Begin("Depth buffer", &m_ShadowMapDebugEnable)) 
 		{
 			ImVec2 winSize = ImGui::GetWindowSize();
 			float smaller = (std::min)(winSize.x - 20, winSize.y - 36);
 
-			ImGui::Image((ImTextureID)m_ShadowMap->GetGpuSrv().ptr, ImVec2(smaller, smaller));
+			ImGui::Image((ImTextureID)m_ShadowMap->GetDebugSrv().ptr, ImVec2(smaller, smaller));
 		}
 		ImGui::End();
 	}
@@ -478,32 +447,6 @@ void GameApp::OnMouseDown(WPARAM btnState, int x, int y)
 
 void GameApp::AnimateMaterials(const GameTimer& gt)
 {
-	//auto wavesMat = m_Materials["water"].get();
-	//float& tu0 = wavesMat->m_MatTransform(3, 0);
-	//float& tv0 = wavesMat->m_MatTransform(3, 1);
-	//float& tu1 = wavesMat->m_MatTransform1(3, 0);
-	//float& tv1 = wavesMat->m_MatTransform1(3, 1);
-	//
-	//tu0 += 0.1f * gt.DeltaTime();
-	//tv0 += 0.02f * gt.DeltaTime();
-	//tu1 += 0.02f * gt.DeltaTime();
-	//tv1 += 0.1f * gt.DeltaTime();
-	//
-	//if (tu0 >= 1.0f)
-	//	tu0 -= 1.0f;
-	//if (tv0 >= 1.0f)
-	//	tv0 -= 1.0f;
-	//if (tu1 >= 1.0f)
-	//	tu1 -= 1.0f;
-	//if (tv1 >= 1.0f)
-	//	tv1 -= 1.0f;
-	//
-	//wavesMat->m_MatTransform(3, 0) = tu0;
-	//wavesMat->m_MatTransform(3, 1) = tv0;
-	//wavesMat->m_MatTransform1(3, 0) = tu1;
-	//wavesMat->m_MatTransform1(3, 1) = tv1;
-	//
-	//wavesMat->m_NumFramesDirty = g_numFrameResources;
 }
 
 void GameApp::UpdateCamera(const GameTimer& gt)
@@ -631,6 +574,9 @@ void GameApp::UpdateMainPassCB(const GameTimer& gt)
 	m_MainPassCB.Lights[0].m_Strength = { 0.9f, 0.8f, 0.7f };
 	m_MainPassCB.Lights[1].m_Direction = m_Lights[1]->GetLightDirection();
 	m_MainPassCB.Lights[1].m_Strength = { 0.4f, 0.4f, 0.4f };
+	m_MainPassCB.Lights[1].m_FalloffStart = 10.0f;
+	m_MainPassCB.Lights[1].m_FalloffEnd = 100.0f;
+	m_MainPassCB.Lights[1].m_Position = m_Lights[0]->GetPosition();
 	m_MainPassCB.Lights[2].m_Direction = m_Lights[2]->GetLightDirection();
 	m_MainPassCB.Lights[2].m_Strength = { 0.2f, 0.2f, 0.2f };
 	
@@ -669,7 +615,7 @@ void GameApp::UpdateShadowTransform(const GameTimer& gt)
 	}
 	if (spotLight != nullptr) 
 	{
-		spotLight->SetFrustum(0.5f * MathHelper::Pi, 1.0f, n, f);
+		spotLight->SetFrustum(0.5f * MathHelper::Pi, 1.0f, 1.0f, f);
 	}
 }
 
@@ -706,7 +652,7 @@ void GameApp::BuildRootSignature()
 	CD3DX12_DESCRIPTOR_RANGE texTable1;
 	texTable1.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 1, 0);
 	CD3DX12_DESCRIPTOR_RANGE texTable2;
-	texTable2.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 12, 2, 0);
+	texTable2.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 10, 2, 0);
 
 	CD3DX12_ROOT_PARAMETER slotRootParameter[6];
 
@@ -747,6 +693,8 @@ void GameApp::BuildRootSignature()
 void GameApp::BuildDescriptorHeaps()
 {
 	CD3DX12_CPU_DESCRIPTOR_HANDLE hDescriptor(m_SRVHeap->GetCPUDescriptorHandleForHeapStart());
+	// ImGui使用了第一个SRV
+	hDescriptor.Offset(1, m_CBVSRVDescriptorSize);
 
 	std::vector<ComPtr<ID3D12Resource>> tex2DList =
 	{
@@ -767,7 +715,6 @@ void GameApp::BuildDescriptorHeaps()
 	srvDesc.Texture2D.MostDetailedMip = 0;
 	srvDesc.Texture2D.ResourceMinLODClamp = 0.0f;
 
-	//hDescriptor.Offset(1, m_CBVSRVDescriptorSize);
 	for (UINT i = 0; i < (UINT)tex2DList.size(); ++i) 
 	{
 		srvDesc.Format = tex2DList[i]->GetDesc().Format;
@@ -776,7 +723,7 @@ void GameApp::BuildDescriptorHeaps()
 		hDescriptor.Offset(1, m_CBVSRVDescriptorSize);
 	}
 
-	m_SkyTexHeapIndex = (UINT)tex2DList.size();
+	m_SkyTexHeapIndex = (UINT)tex2DList.size() + 1;
 
 	srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURECUBE;
 	srvDesc.TextureCube.MostDetailedMip = 0;
@@ -784,24 +731,26 @@ void GameApp::BuildDescriptorHeaps()
 	srvDesc.TextureCube.ResourceMinLODClamp = 0.0f;
 	srvDesc.Format = grassSkyMap->GetDesc().Format;
 	m_pd3dDevice->CreateShaderResourceView(grassSkyMap.Get(), &srvDesc, hDescriptor);
-
 	hDescriptor.Offset(1, m_CBVSRVDescriptorSize);
+
 	srvDesc.TextureCube.MipLevels = snowSkyMap->GetDesc().MipLevels;
 	srvDesc.Format = snowSkyMap->GetDesc().Format;
 	m_pd3dDevice->CreateShaderResourceView(snowSkyMap.Get(), &srvDesc, hDescriptor);
-
 	hDescriptor.Offset(1, m_CBVSRVDescriptorSize);
+
 	srvDesc.TextureCube.MipLevels = sunsetSkyMap->GetDesc().MipLevels;
 	srvDesc.Format = sunsetSkyMap->GetDesc().Format;
 	m_pd3dDevice->CreateShaderResourceView(sunsetSkyMap.Get(), &srvDesc, hDescriptor);
 
+	// ShadowMap中有两个SRV
 	m_ShadowMapHeapIndex = m_SkyTexHeapIndex + 3;
-	m_NullCubeSrvIndex = m_ShadowMapHeapIndex + 1;
+	m_NullCubeSrvIndex = m_ShadowMapHeapIndex + 2;
 	m_NullTexSrvIndex = m_NullCubeSrvIndex + 1;
 
 	auto srvCpuStart = m_SRVHeap->GetCPUDescriptorHandleForHeapStart();
 	auto srvGpuStart = m_SRVHeap->GetGPUDescriptorHandleForHeapStart();
 	auto dsvCpuStart = m_DSVHeap->GetCPUDescriptorHandleForHeapStart();
+	auto rtvCpuStart = m_RTVHeap->GetCPUDescriptorHandleForHeapStart();
 
 	auto nullSrv = CD3DX12_CPU_DESCRIPTOR_HANDLE(srvCpuStart, m_NullCubeSrvIndex, m_CBVSRVDescriptorSize);
 	m_NullCubeSrv = CD3DX12_GPU_DESCRIPTOR_HANDLE(srvGpuStart, m_NullCubeSrvIndex, m_CBVSRVDescriptorSize);
@@ -820,7 +769,10 @@ void GameApp::BuildDescriptorHeaps()
 	m_ShadowMap->BuildDescriptors(
 		CD3DX12_CPU_DESCRIPTOR_HANDLE(srvCpuStart, m_ShadowMapHeapIndex, m_CBVSRVDescriptorSize),
 		CD3DX12_GPU_DESCRIPTOR_HANDLE(srvGpuStart, m_ShadowMapHeapIndex, m_CBVSRVDescriptorSize),
-		CD3DX12_CPU_DESCRIPTOR_HANDLE(dsvCpuStart, 1, m_DSVDescriptorSize));
+		CD3DX12_CPU_DESCRIPTOR_HANDLE(dsvCpuStart, 1, m_DSVDescriptorSize),
+		CD3DX12_CPU_DESCRIPTOR_HANDLE(rtvCpuStart, SwapChainBufferCount, m_RTVDescriptorSize),
+		CD3DX12_CPU_DESCRIPTOR_HANDLE(srvCpuStart, m_ShadowMapHeapIndex + 1, m_CBVSRVDescriptorSize),
+		CD3DX12_GPU_DESCRIPTOR_HANDLE(srvGpuStart, m_ShadowMapHeapIndex + 1, m_CBVSRVDescriptorSize));
 }
 
 void GameApp::BuildShadersAndInputLayout()
@@ -846,6 +798,8 @@ void GameApp::BuildShadersAndInputLayout()
 	m_Shaders["shadowVS"] = d3dUtil::CompileShader(L"..\\Shader\\Chapter20\\Shadows.hlsl", nullptr, "VS", "vs_5_1");
 	m_Shaders["shadowPS"]	= d3dUtil::CompileShader(L"..\\Shader\\Chapter20\\Shadows.hlsl", nullptr, "PS", "ps_5_1");
 	m_Shaders["shadowAlphaTestedPS"]	= d3dUtil::CompileShader(L"..\\Shader\\Chapter20\\Shadows.hlsl", alphaTestDefines, "PS", "ps_5_1");
+
+	m_Shaders["fullScreenVS"] = d3dUtil::CompileShader(L"..\\Shader\\Chapter20\\FullScreenTriangle.hlsl", nullptr, "FullScreenTriangleTexcoordVS", "vs_5_1");
 	m_Shaders["shadowDebugPS"]	= d3dUtil::CompileShader(L"..\\Shader\\Chapter20\\Shadows.hlsl", nullptr, "Debug_PS", "ps_5_1");
 
 	m_InputLayout =
@@ -864,19 +818,16 @@ void GameApp::BuildShapeGeometry()
 	GeometryGenerator::MeshData grid = geoGen.CreateGrid(10.0f, 10.0f, 100, 100);
 	GeometryGenerator::MeshData sphere = geoGen.CreateSphere(0.5f, 20, 20);
 	GeometryGenerator::MeshData cylinder = geoGen.CreateCylinder(0.5f, 0.5f, 2.0f, 20, 20);
-	GeometryGenerator::MeshData quad = geoGen.CreateQuad(0.0f, 0.0f, 1.0f, 1.0f, 0.0f);
 
 	UINT boxVertexOffset = 0;
 	UINT gridVertexOffset = (UINT)box.Vertices.size();
 	UINT sphereVertexOffset = gridVertexOffset + (UINT)grid.Vertices.size();
 	UINT cylinderVertexOffset = sphereVertexOffset + (UINT)sphere.Vertices.size();
-	UINT quadVertexOffset = cylinderVertexOffset + (UINT)quad.Vertices.size();
 
 	UINT boxIndexOffset = 0;
 	UINT gridIndexOffset = (UINT)box.Indices32.size();
 	UINT sphereIndexOffset = gridIndexOffset + (UINT)grid.Indices32.size();
 	UINT cylinderIndexOffset = sphereIndexOffset + (UINT)sphere.Indices32.size();
-	UINT quadIndexOffset = cylinderIndexOffset + (UINT)quad.Indices32.size();
 
 	SubmeshGeometry boxSubmesh;
 	boxSubmesh.IndexCount = (UINT)box.Indices32.size();
@@ -898,17 +849,11 @@ void GameApp::BuildShapeGeometry()
 	cylinderSubmesh.BaseVertexLocation = cylinderVertexOffset;
 	cylinderSubmesh.StartIndexLocation = cylinderIndexOffset;
 
-	SubmeshGeometry quadSubmesh;
-	quadSubmesh.IndexCount = (UINT)quad.Indices32.size();
-	quadSubmesh.BaseVertexLocation = quadVertexOffset;
-	quadSubmesh.StartIndexLocation = quadIndexOffset;
-
 	auto totalVertexCount =
 		box.Vertices.size() +
 		grid.Vertices.size() +
 		sphere.Vertices.size() +
-		cylinder.Vertices.size() +
-		quad.Vertices.size();
+		cylinder.Vertices.size();
 
 	std::vector<Vertex> vertices(totalVertexCount);
 	
@@ -937,19 +882,12 @@ void GameApp::BuildShapeGeometry()
 		vertices[k].Normal = cylinder.Vertices[i].Normal;
 		vertices[k].TexC = cylinder.Vertices[i].TexC;
 	}
-	for (size_t i = 0; i < quad.Vertices.size(); ++i, ++k)
-	{
-		vertices[k].Pos = quad.Vertices[i].Position;
-		vertices[k].Normal = quad.Vertices[i].Normal;
-		vertices[k].TexC = quad.Vertices[i].TexC;
-	}
 
 	std::vector<std::uint16_t> indices;
 	indices.insert(indices.end(), std::begin(box.GetIndices16()), std::end(box.GetIndices16()));
 	indices.insert(indices.end(), std::begin(grid.GetIndices16()), std::end(grid.GetIndices16()));
 	indices.insert(indices.end(), std::begin(sphere.GetIndices16()), std::end(sphere.GetIndices16()));
 	indices.insert(indices.end(), std::begin(cylinder.GetIndices16()), std::end(cylinder.GetIndices16()));
-	indices.insert(indices.end(), std::begin(quad.GetIndices16()), std::end(quad.GetIndices16()));
 
 	const UINT vbByteSize = (UINT)vertices.size() * sizeof(Vertex);
 	const UINT ibByteSize = (UINT)indices.size() * sizeof(std::uint16_t);
@@ -978,7 +916,6 @@ void GameApp::BuildShapeGeometry()
 	geo->DrawArgs["grid"] = gridSubmesh;
 	geo->DrawArgs["sphere"] = sphereSubmesh;
 	geo->DrawArgs["column"] = cylinderSubmesh;
-	geo->DrawArgs["quad"] = quadSubmesh;
 	
 	m_Geometries[geo->Name] = std::move(geo);
 }
@@ -1108,17 +1045,22 @@ void GameApp::BuildPSOs()
 
 	// shadow debug
 	D3D12_GRAPHICS_PIPELINE_STATE_DESC shadowDebugPsoDesc = opaquePsoDesc;
+	shadowDebugPsoDesc.InputLayout = {};
 	shadowDebugPsoDesc.pRootSignature = m_RootSignature.Get();
 	shadowDebugPsoDesc.VS =
 	{
-		reinterpret_cast<BYTE*>(m_Shaders["shadowVS"]->GetBufferPointer()),
-		m_Shaders["shadowVS"]->GetBufferSize()
+		reinterpret_cast<BYTE*>(m_Shaders["fullScreenVS"]->GetBufferPointer()),
+		m_Shaders["fullScreenVS"]->GetBufferSize()
 	};
 	shadowDebugPsoDesc.PS =
 	{
 		reinterpret_cast<BYTE*>(m_Shaders["shadowDebugPS"]->GetBufferPointer()),
 		m_Shaders["shadowDebugPS"]->GetBufferSize()
 	};
+	shadowDebugPsoDesc.DepthStencilState = {};
+	shadowDebugPsoDesc.NumRenderTargets = 1;
+	shadowDebugPsoDesc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
+	shadowDebugPsoDesc.DSVFormat = DXGI_FORMAT_UNKNOWN;
 	HR(m_pd3dDevice->CreateGraphicsPipelineState(&shadowDebugPsoDesc, IID_PPV_ARGS(&m_PSOs["shadow_debug"])));
 	
 	// hard shadow
@@ -1164,8 +1106,8 @@ void GameApp::BuildMaterials()
 	auto bricks = std::make_unique<Material>();
 	bricks->m_Name = "bricks";
 	bricks->m_MatCBIndex = 0;
-	bricks->m_DiffuseSrvHeapIndex = 0;
-	bricks->m_NormalSrvHeapIndex = 1;
+	bricks->m_DiffuseSrvHeapIndex = 1;
+	bricks->m_NormalSrvHeapIndex = 2;
 	bricks->m_DiffuseAlbedo = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
 	bricks->m_FresnelR0 = XMFLOAT3(0.1f, 0.1f, 0.1f);
 	bricks->m_Roughness = 0.3f;
@@ -1173,8 +1115,8 @@ void GameApp::BuildMaterials()
 	auto tile = std::make_unique<Material>();
 	tile->m_Name = "tile";
 	tile->m_MatCBIndex = 1;
-	tile->m_DiffuseSrvHeapIndex = 2;
-	tile->m_NormalSrvHeapIndex = 3;
+	tile->m_DiffuseSrvHeapIndex = 3;
+	tile->m_NormalSrvHeapIndex = 4;
 	tile->m_DiffuseAlbedo = XMFLOAT4(0.9f, 0.9f, 0.9f, 1.0f);
 	tile->m_FresnelR0 = XMFLOAT3(0.2f, 0.2f, 0.2f);
 	tile->m_Roughness = 0.1f;
@@ -1182,8 +1124,8 @@ void GameApp::BuildMaterials()
 	auto mirror = std::make_unique<Material>();
 	mirror->m_Name = "mirror";
 	mirror->m_MatCBIndex = 2;
-	mirror->m_DiffuseSrvHeapIndex = 4;
-	mirror->m_NormalSrvHeapIndex = 5;
+	mirror->m_DiffuseSrvHeapIndex = 5;
+	mirror->m_NormalSrvHeapIndex = 6;
 	mirror->m_DiffuseAlbedo = XMFLOAT4(0.0f, 0.0f, 0.1f, 1.0f);
 	mirror->m_FresnelR0 = XMFLOAT3(0.98f, 0.98f, 0.98f);
 	mirror->m_Roughness = 0.1f;
@@ -1192,8 +1134,8 @@ void GameApp::BuildMaterials()
 	auto skullMat = std::make_unique<Material>();
 	skullMat->m_Name = "skullMat";
 	skullMat->m_MatCBIndex = 3;
-	skullMat->m_DiffuseSrvHeapIndex = 4;
-	skullMat->m_NormalSrvHeapIndex = 5;
+	skullMat->m_DiffuseSrvHeapIndex = 5;
+	skullMat->m_NormalSrvHeapIndex = 6;
 	skullMat->m_DiffuseAlbedo = XMFLOAT4(0.8f, 0.8f, 0.8f, 1.0f);
 	skullMat->m_FresnelR0 = XMFLOAT3(0.2f, 0.2f, 0.2f);
 	skullMat->m_Roughness = 0.2f;
@@ -1202,7 +1144,7 @@ void GameApp::BuildMaterials()
 	sky->m_Name = "sky";
 	sky->m_MatCBIndex = 4;
 	sky->m_DiffuseSrvHeapIndex = m_SkyTexHeapIndex;
-	sky->m_NormalSrvHeapIndex = 5;
+	sky->m_NormalSrvHeapIndex = 6;
 	sky->m_DiffuseAlbedo = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
 	sky->m_FresnelR0 = XMFLOAT3(0.2f, 0.2f, 0.2f);
 	sky->m_Roughness = 0.2f;
@@ -1286,20 +1228,6 @@ void GameApp::BuildRenderItems()
 	
 	m_RitemLayer[(int)RenderLayer::Opaque].push_back(gridRitem.get());
 	m_AllRitems.push_back(std::move(gridRitem));
-
-	auto quadRitem = std::make_unique<RenderItem>();
-	quadRitem->World = MathHelper::Identity4x4();
-	quadRitem->TexTransform = MathHelper::Identity4x4();
-	quadRitem->ObjCBIndex = 5;
-	quadRitem->Mat = m_Materials["bricks"].get();
-	quadRitem->Geo = m_Geometries["shapeGeo"].get();
-	quadRitem->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
-	quadRitem->IndexCount = quadRitem->Geo->DrawArgs["quad"].IndexCount;
-	quadRitem->StartIndexLocation = quadRitem->Geo->DrawArgs["quad"].StartIndexLocation;
-	quadRitem->BaseVertexLocation = quadRitem->Geo->DrawArgs["quad"].BaseVertexLocation;
-
-	m_RitemLayer[(int)RenderLayer::Opaque].push_back(quadRitem.get());
-	m_AllRitems.push_back(std::move(quadRitem));
 }
 
 void GameApp::DrawRenderItems(ID3D12GraphicsCommandList* cmdList, const std::vector<RenderItem*>& ritems)
@@ -1365,6 +1293,25 @@ void GameApp::DrawSceneToShadowMap()
 
 	m_CommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_ShadowMap->GetResource(),
 		D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_GENERIC_READ));
+}
+
+void GameApp::RenderShadowMapToTexture()
+{
+	m_CommandList->RSSetViewports(1, &m_ShadowMap->GetViewport());
+	m_CommandList->RSSetScissorRects(1, &m_ShadowMap->GetScissorRect());
+
+	m_CommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_ShadowMap->GetDebugResource(),
+		D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_RENDER_TARGET));
+
+	m_CommandList->OMSetRenderTargets(1, &m_ShadowMap->GetDebugRtv(), true, nullptr);
+
+	m_CommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+	m_CommandList->SetPipelineState(m_PSOs["shadow_debug"].Get());
+	m_CommandList->DrawInstanced(3, 1, 0, 0);
+
+	m_CommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_ShadowMap->GetDebugResource(),
+		D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_GENERIC_READ));
 }
 
 void GameApp::ReadDataFromFile(std::vector<Vertex>& vertices, std::vector<std::int32_t>& indices, BoundingBox& bounds)
