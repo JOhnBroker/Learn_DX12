@@ -159,7 +159,7 @@ private:
 	bool m_ShadowMapDebugEnable = false;
 	CameraMode m_CameraMode = CameraMode::FirstPerson;
 	ShowMode m_ShowMode = ShowMode::SoftShadow;
-	LightMode m_LightMode = LightMode::Orthogonal;
+	LightMode m_LightMode = LightMode::Perspective;
 	POINT m_LastMousePos;
 	std::string m_VertexFileName = "..\\Models\\skull.txt";
 };

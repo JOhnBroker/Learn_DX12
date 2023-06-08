@@ -1,15 +1,3 @@
-#ifndef NUM_DIR_LIGHT
-	#define NUM_DIR_LIGHT 1
-#endif
-
-#ifndef NUM_POINT_LIGHT
-	#define NUM_POINT_LIGHT 0
-#endif
-
-#ifndef NUM_SPOT_LIGHT
-	#define NUM_SPOT_LIGHT 2
-#endif
-
 #include "LightingUtil.hlsl"
 
 struct MaterialData

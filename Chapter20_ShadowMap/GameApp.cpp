@@ -107,9 +107,8 @@ bool GameApp::InitResource()
 	for (int i = 0; i < LIGHTCOUNT; ++i)
 	{
 		XMFLOAT3 lightPos = {};
-		XMVECTOR lightPosV = -2.0f * m_SceneBounds.Radius * m_Lights[i]->GetLightDirectionXM();
+		XMVECTOR lightPosV = -0.5f * m_SceneBounds.Radius * m_Lights[i]->GetLightDirectionXM();
 		XMStoreFloat3(&lightPos, lightPosV);
-		lightPos.y += 0.5f * m_SceneBounds.Radius;
 		m_Lights[i]->SetDirection(dirs[i].x, dirs[i].y, dirs[i].z);
 		m_Lights[i]->SetPositionXM(lightPos);
 		m_Lights[i]->SetTargetXM(m_SceneBounds.Center);
@@ -777,6 +776,7 @@ void GameApp::BuildShadersAndInputLayout()
 	const D3D_SHADER_MACRO hardShadowDefines[] =
 	{
 		"HARDSHADOW","1",
+		"NUM_DIR_LIGHT","3",
 		NULL,NULL
 	};
 
