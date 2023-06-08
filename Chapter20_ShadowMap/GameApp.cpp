@@ -65,7 +65,6 @@ bool GameApp::InitResource()
 		m_pCamera = camera;
 		camera->SetFrustum(0.25f * MathHelper::Pi, AspectRatio(), 1.0f, 1000.0f);
 		camera->SetViewPort(0.0f, 0.0f, (float)m_ClientWidth, (float)m_ClientHeight);
-		//camera->LookAt(XMFLOAT3(0.0f, 2.0f, -15.0f), XMFLOAT3(0.0f, 0.0f, -1.0f), XMFLOAT3(0.0f, 1.0f, 0.0f));
 		camera->LookAt(
 			XMFLOAT3(0.0f, 4.0f, -5.0f),
 			XMFLOAT3(0.0f, 1.0f, 0.0f),
@@ -89,38 +88,34 @@ bool GameApp::InitResource()
 	   XMFLOAT3(0.0f, -0.707f, -0.707f)
 	};
 
-	if (m_LightMode == LightMode::Orthogonal) 
+	if (m_LightMode == LightMode::Orthogonal)
 	{
 		for (int i = 0; i < LIGHTCOUNT; ++i)
 		{
 			m_Lights[i] = std::make_shared<DirectionalLight>();
 		}
-		
+
 	}
-	else if (m_LightMode == LightMode::Perspective) 
+	else if (m_LightMode == LightMode::Perspective)
 	{
 		for (int i = 0; i < LIGHTCOUNT; ++i)
 		{
 			m_Lights[i] = std::make_shared<SpotLight>();
 		}
 	}
+
 	for (int i = 0; i < LIGHTCOUNT; ++i)
 	{
 		XMFLOAT3 lightPos = {};
-		m_Lights[i]->SetDirection(dirs[i].x, dirs[i].y, dirs[i].z);
 		XMVECTOR lightPosV = -2.0f * m_SceneBounds.Radius * m_Lights[i]->GetLightDirectionXM();
 		XMStoreFloat3(&lightPos, lightPosV);
+		lightPos.y += 0.5f * m_SceneBounds.Radius;
+		m_Lights[i]->SetDirection(dirs[i].x, dirs[i].y, dirs[i].z);
 		m_Lights[i]->SetPositionXM(lightPos);
 		m_Lights[i]->SetTargetXM(m_SceneBounds.Center);
 		m_Lights[i]->SetDistance(0.5f * m_SceneBounds.Radius);
 		m_Lights[i]->UpdateViewMatrix();
 	}
-	// Perspective
-	//XMFLOAT3 lightPos = {};
-	//XMVECTOR lightPosV = -10.0f * m_Lights[0]->GetLightDirectionXM();
-	//XMStoreFloat3(&lightPos, lightPosV);
-	//m_Lights[0]->SetPositionXM(lightPos);
-	//m_Lights[0]->UpdateViewMatrix();
 
 	m_ShadowMap = std::make_unique<ShadowMap>(m_pd3dDevice.Get(), pow(2, m_ShadowMapSize) * 256, pow(2, m_ShadowMapSize) * 256);
 
@@ -196,44 +191,20 @@ void GameApp::Update(const GameTimer& timer)
 	const float dt = timer.DeltaTime();
 	if (ImGui::Begin("NormalMap demo"))
 	{
-		ImGui::Checkbox("Wireframe", &m_WireframeEnable);
-
-		static int curr_cameramode = static_cast<int>(m_CameraMode);
-		static const char* cameraMode[] = {
-				"First Person",
-				"Third Person",
+		static int curr_lightmode = static_cast<int>(m_LightMode);
+		static const char* lightMode[] = {
+				"Orthogonal",
+				"Perspective",
 		};
-		if (ImGui::Combo("Camera Mode", &curr_cameramode, cameraMode, ARRAYSIZE(cameraMode)))
+		if (ImGui::Combo("Camera Mode", &curr_lightmode, lightMode, ARRAYSIZE(lightMode)))
 		{
-			if (curr_cameramode == 0 && m_CameraMode != CameraMode::FirstPerson)
+			if (curr_lightmode == 0 && m_LightMode != LightMode::Orthogonal)
 			{
-				if (!cam1st)
-				{
-					cam1st = std::make_shared<FirstPersonCamera>();
-					cam1st->SetFrustum(0.25f * MathHelper::Pi, AspectRatio(), 1.0f, 1000.0f);
-					m_pCamera = cam1st;
-				}
-
-				cam1st->LookAt(XMFLOAT3(0.0f, 2.0f, -15.0f),
-					XMFLOAT3(0.0f, 0.0f, -1.0f),
-					XMFLOAT3(0.0f, 1.0f, 0.0f));
-				cam1st->UpdateViewMatrix();
-
-				m_CameraMode = CameraMode::FirstPerson;
+				m_LightMode = LightMode::Orthogonal;
 			}
-			else if (curr_cameramode == 1 && m_CameraMode != CameraMode::ThirdPerson)
+			else if (curr_lightmode == 1 && m_LightMode != LightMode::Perspective)
 			{
-				if (!cam3rd)
-				{
-					cam3rd = std::make_shared<ThirdPersonCamera>();
-					cam3rd->SetFrustum(0.25f * MathHelper::Pi, AspectRatio(), 1.0f, 1000.0f);
-					m_pCamera = cam3rd;
-				}
-				cam3rd->SetTarget(XMFLOAT3(0.0f, 0.0f, 1.0f));
-				cam3rd->SetDistance(10.0f);
-				cam3rd->SetDistanceMinMax(3.0f, 20.0f);
-				cam3rd->UpdateViewMatrix();
-				m_CameraMode = CameraMode::ThirdPerson;
+				m_LightMode = LightMode::Perspective;
 			}
 		}
 		
@@ -269,7 +240,7 @@ void GameApp::Update(const GameTimer& timer)
 			}
 
 		}
-		static int curr_skyCubemode = max(0, static_cast<int>(m_SkyTexHeapIndex) - 8);
+		static int curr_skyCubemode = max(0, static_cast<int>(m_SkyTexHeapIndex) - 7);
 		static const char* skyCubeMode[] = {
 				"grass",
 				"snow",
@@ -279,18 +250,18 @@ void GameApp::Update(const GameTimer& timer)
 		{
 			if (curr_skyCubemode == 0 )
 			{
-				m_SkyTexHeapIndex = 6;
+				m_SkyTexHeapIndex = 7;
 			}
 			else if (curr_skyCubemode == 1)
 			{
-				m_SkyTexHeapIndex = 7;
+				m_SkyTexHeapIndex = 8;
 			}
 			else if (curr_skyCubemode == 2) 
 			{
-				m_SkyTexHeapIndex = 8;
+				m_SkyTexHeapIndex = 9;
 			}
 		}
-		ImGui::SliderInt("ShadowMap size", &m_ShadowMapSize, 0, 4);
+		ImGui::SliderInt("ShadowMap level", &m_ShadowMapSize, 0, 4);
 		UINT newSize = pow(2, m_ShadowMapSize) * 256;
 		if (m_ShadowMap->GetWidth() != newSize)
 		{
@@ -338,13 +309,13 @@ void GameApp::Draw(const GameTimer& timer)
 
 	HR(cmdListAlloc->Reset());
 
-	if (m_WireframeEnable)
+	if (m_LightMode == LightMode::Orthogonal) 
 	{
-		HR(m_CommandList->Reset(cmdListAlloc.Get(), m_PSOs["opaque_wireframe"].Get()));
+		HR(m_CommandList->Reset(cmdListAlloc.Get(), m_PSOs["direLight"].Get()));
 	}
-	else 
+	else if (m_LightMode == LightMode::Perspective) 
 	{
-		HR(m_CommandList->Reset(cmdListAlloc.Get(), m_PSOs["opaque"].Get()));
+		HR(m_CommandList->Reset(cmdListAlloc.Get(), m_PSOs["spotLight"].Get()));
 	}
 
 	ID3D12DescriptorHeap* descriptorHeap[] = { m_SRVHeap.Get() };
@@ -384,7 +355,14 @@ void GameApp::Draw(const GameTimer& timer)
 	}
 	else
 	{
-		m_CommandList->SetPipelineState(m_PSOs["opaque"].Get());
+		if (m_LightMode == LightMode::Orthogonal)
+		{
+			m_CommandList->SetPipelineState(m_PSOs["direLight"].Get());
+		}
+		else if (m_LightMode == LightMode::Perspective)
+		{
+			m_CommandList->SetPipelineState(m_PSOs["spotLight"].Get());
+		}
 	}
 	DrawRenderItems(m_CommandList.Get(), m_RitemLayer[(int)RenderLayer::Opaque]);
 	
@@ -576,14 +554,18 @@ void GameApp::UpdateMainPassCB(const GameTimer& gt)
 	m_MainPassCB.AmbientLight = { 0.25f, 0.25f, 0.35f, 1.0f };
 	m_MainPassCB.Lights[0].m_Direction = m_Lights[0]->GetLightDirection();
 	m_MainPassCB.Lights[0].m_Strength = { 0.9f, 0.8f, 0.7f };
-	// Perspective
-	//m_MainPassCB.Lights[0].m_FalloffStart = 10.0f;
-	//m_MainPassCB.Lights[0].m_FalloffEnd = 100.0f;
-	//m_MainPassCB.Lights[0].m_Position = m_Lights[0]->GetPosition();
+	m_MainPassCB.Lights[0].m_FalloffEnd = 1000.0f;
+	m_MainPassCB.Lights[0].m_Position = m_Lights[0]->GetPosition();
+
 	m_MainPassCB.Lights[1].m_Direction = m_Lights[1]->GetLightDirection();
-	m_MainPassCB.Lights[1].m_Strength = { 0.4f, 0.4f, 0.4f };
+	m_MainPassCB.Lights[1].m_Strength = { 0.5f, 0.1f, 0.1f };
+	m_MainPassCB.Lights[1].m_Position = m_Lights[1]->GetPosition();
+	m_MainPassCB.Lights[1].m_FalloffEnd = 1000.0f;
+
 	m_MainPassCB.Lights[2].m_Direction = m_Lights[2]->GetLightDirection();
-	m_MainPassCB.Lights[2].m_Strength = { 0.2f, 0.2f, 0.2f };
+	m_MainPassCB.Lights[2].m_Strength = { 0.1f, 0.1f, 0.5f };
+	m_MainPassCB.Lights[2].m_Position = m_Lights[2]->GetPosition();
+	m_MainPassCB.Lights[2].m_FalloffEnd = 1000.0f;
 	
 	auto currPassCB = m_CurrFrameResource->PassCB.get();
 	currPassCB->CopyData(0, m_MainPassCB);
@@ -798,8 +780,21 @@ void GameApp::BuildShadersAndInputLayout()
 		NULL,NULL
 	};
 
+	const D3D_SHADER_MACRO direLightDefines[] =
+	{
+		"NUM_DIR_LIGHT","3",
+		NULL,NULL
+	};
+
+	const D3D_SHADER_MACRO spotLightDefines[] =
+	{
+		"NUM_SPOT_LIGHT","3",
+		NULL,NULL
+	};
+
 	m_Shaders["standardVS"] = d3dUtil::CompileShader(L"..\\Shader\\Chapter20\\Default.hlsl", nullptr, "VS", "vs_5_1");
-	m_Shaders["opaquePS"] = d3dUtil::CompileShader(L"..\\Shader\\Chapter20\\Default.hlsl", nullptr, "PS", "ps_5_1");
+	m_Shaders["opaquePS"] = d3dUtil::CompileShader(L"..\\Shader\\Chapter20\\Default.hlsl", direLightDefines, "PS", "ps_5_1");
+	m_Shaders["spotLightPS"] = d3dUtil::CompileShader(L"..\\Shader\\Chapter20\\Default.hlsl", spotLightDefines, "PS", "ps_5_1");
 	m_Shaders["hardshadowPS"] = d3dUtil::CompileShader(L"..\\Shader\\Chapter20\\Default.hlsl", hardShadowDefines, "PS", "ps_5_1");
 	m_Shaders["skyVS"] = d3dUtil::CompileShader(L"..\\Shader\\Chapter20\\Default.hlsl", nullptr, "Sky_VS", "vs_5_1");
 	m_Shaders["skyPS"] = d3dUtil::CompileShader(L"..\\Shader\\Chapter20\\Default.hlsl", nullptr, "Sky_PS", "ps_5_1");
@@ -999,12 +994,16 @@ void GameApp::BuildPSOs()
 	opaquePsoDesc.SampleDesc.Count = m_4xMsaaState ? 4 : 1;
 	opaquePsoDesc.SampleDesc.Quality = m_4xMsaaState ? (m_4xMsaaQuality - 1) : 0;
 	opaquePsoDesc.DSVFormat = m_DepthStencilFormat;
-	HR(m_pd3dDevice->CreateGraphicsPipelineState(&opaquePsoDesc, IID_PPV_ARGS(&m_PSOs["opaque"])));
+	HR(m_pd3dDevice->CreateGraphicsPipelineState(&opaquePsoDesc, IID_PPV_ARGS(&m_PSOs["direLight"])));
 
-	// wireframe object
-	D3D12_GRAPHICS_PIPELINE_STATE_DESC opaqueWireframePsoDesc = opaquePsoDesc;
-	opaqueWireframePsoDesc.RasterizerState.FillMode = D3D12_FILL_MODE_WIREFRAME;
-	HR(m_pd3dDevice->CreateGraphicsPipelineState(&opaqueWireframePsoDesc, IID_PPV_ARGS(&m_PSOs["opaque_wireframe"])));
+	// Perspective Light
+	D3D12_GRAPHICS_PIPELINE_STATE_DESC spotLightPso = opaquePsoDesc;
+	spotLightPso.PS =
+	{
+		reinterpret_cast<BYTE*>(m_Shaders["spotLightPS"]->GetBufferPointer()),
+		m_Shaders["spotLightPS"]->GetBufferSize()
+	};
+	HR(m_pd3dDevice->CreateGraphicsPipelineState(&spotLightPso, IID_PPV_ARGS(&m_PSOs["spotLight"])));
 
 	// sky
 	D3D12_GRAPHICS_PIPELINE_STATE_DESC skyPsoDesc = opaquePsoDesc;

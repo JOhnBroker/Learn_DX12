@@ -147,7 +147,7 @@ float4 ComputeLighting(Light gLights[MaxLights], Material mat,
 #if (NUM_SPOT_LIGHT > 0)
 	for(i = NUM_DIR_LIGHT + NUM_POINT_LIGHT; i< NUM_DIR_LIGHT + NUM_POINT_LIGHT + NUM_SPOT_LIGHT; ++i)
 	{
-		result += ComputeSpotLight(gLights[i], mat, pos, normal, toEye);
+		result += shadowFactor[i] * ComputeSpotLight(gLights[i], mat, pos, normal, toEye);
 	}
 #endif
 

@@ -156,7 +156,6 @@ private:
 	std::unique_ptr<ShadowMap> m_ShadowMap;
 
 	//Imgui
-	bool m_WireframeEnable = false;
 	bool m_ShadowMapDebugEnable = false;
 	CameraMode m_CameraMode = CameraMode::FirstPerson;
 	ShowMode m_ShowMode = ShowMode::SoftShadow;
