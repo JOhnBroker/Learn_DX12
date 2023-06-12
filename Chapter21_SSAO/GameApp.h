@@ -63,7 +63,7 @@ class GameApp : public D3DApp
 {
 public:
 	enum class CameraMode { FirstPerson, ThirdPerson };
-	enum class ShowMode { CPU_SSAO, GPU_SSAO, SSAO_SelfInter, SSAO_Gaussian };
+	enum class ShowMode { CPU_AO, SSAO, SSAO_SelfInter, SSAO_Gaussian };
 	enum class LightMode { Orthogonal, Perspective };
 public:
 	GameApp(HINSTANCE hInstance);
@@ -108,7 +108,7 @@ public:
 
 	void ClearRenderItem();
 
-	// CPU SSAO
+	// CPU AO
 	void BuildVertexAmbientOcclusion(std::vector<CPU_SSAO_Vertex>& vertices, const std::vector<std::uint32_t>& indices);
 
 
@@ -168,7 +168,7 @@ private:
 	//Imgui
 	bool m_ShadowMapDebugEnable = false;
 	CameraMode m_CameraMode = CameraMode::FirstPerson;
-	ShowMode m_ShowMode = ShowMode::CPU_SSAO;
+	ShowMode m_ShowMode = ShowMode::CPU_AO;
 	LightMode m_LightMode = LightMode::Orthogonal;
 	POINT m_LastMousePos;
 	std::string m_VertexFileName = "..\\Models\\skull.txt";

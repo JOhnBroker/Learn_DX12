@@ -216,24 +216,24 @@ void GameApp::Update(const GameTimer& timer)
 		};
 		if (ImGui::Combo("Show Mode", &curr_showmode, showMode, ARRAYSIZE(showMode)))
 		{
-			if (curr_showmode == 0 && m_ShowMode != ShowMode::CPU_SSAO) 
+			if (curr_showmode == 0 && m_ShowMode != ShowMode::CPU_AO)
 			{
 				BuildShapeGeometry();
 				BuildSkullGeometry();
-				m_ShowMode = ShowMode::CPU_SSAO;
+				m_ShowMode = ShowMode::CPU_AO;
 			}
-			else if (curr_showmode == 1 && m_ShowMode != ShowMode::GPU_SSAO)
+			else if (curr_showmode == 1 && m_ShowMode != ShowMode::SSAO)
 			{
-				if (m_ShowMode == ShowMode::CPU_SSAO) 
+				if (m_ShowMode == ShowMode::CPU_AO)
 				{
 					BuildShapeGeometry();
 					BuildSkullGeometry();
 				}
-				m_ShowMode = ShowMode::GPU_SSAO;
+				m_ShowMode = ShowMode::SSAO;
 			}
 			else if (curr_showmode == 2 && m_ShowMode != ShowMode::SSAO_SelfInter)
 			{
-				if (m_ShowMode == ShowMode::CPU_SSAO)
+				if (m_ShowMode == ShowMode::CPU_AO)
 				{
 					BuildShapeGeometry();
 					BuildSkullGeometry();
@@ -242,7 +242,7 @@ void GameApp::Update(const GameTimer& timer)
 			}
 			else if (curr_showmode == 3 && m_ShowMode != ShowMode::SSAO_Gaussian)
 			{
-				if (m_ShowMode == ShowMode::CPU_SSAO)
+				if (m_ShowMode == ShowMode::CPU_AO)
 				{
 					BuildShapeGeometry();
 					BuildSkullGeometry();
@@ -352,7 +352,7 @@ void GameApp::Draw(const GameTimer& timer)
 	m_CommandList->SetGraphicsRootDescriptorTable(3, skyTexDescriptor);
 	m_CommandList->SetGraphicsRootDescriptorTable(4, m_ShadowMap->GetSrv());
 
-	m_CommandList->SetPipelineState(m_PSOs["ssao_cpu"].Get());
+	m_CommandList->SetPipelineState(m_PSOs["ao"].Get());
 	DrawRenderItems(m_CommandList.Get(), m_RitemLayer[(int)RenderLayer::Opaque]);
 	
 	m_CommandList->SetPipelineState(m_PSOs["sky"].Get());
@@ -773,8 +773,8 @@ void GameApp::BuildShadersAndInputLayout()
 	m_Shaders["skyVS"] = d3dUtil::CompileShader(L"..\\Shader\\Chapter21\\Default.hlsl", nullptr, "Sky_VS", "vs_5_1");
 	m_Shaders["skyPS"] = d3dUtil::CompileShader(L"..\\Shader\\Chapter21\\Default.hlsl", nullptr, "Sky_PS", "ps_5_1");
 	// ssao
-	m_Shaders["ssaoVS"] = d3dUtil::CompileShader(L"..\\Shader\\Chapter21\\SSAO.hlsl", nullptr, "VS", "vs_5_1");
-	m_Shaders["ssaoPS"] = d3dUtil::CompileShader(L"..\\Shader\\Chapter21\\SSAO.hlsl", nullptr, "PS", "ps_5_1");
+	m_Shaders["aoVS"] = d3dUtil::CompileShader(L"..\\Shader\\Chapter21\\SSAO.hlsl", nullptr, "VS", "vs_5_1");
+	m_Shaders["aoPS"] = d3dUtil::CompileShader(L"..\\Shader\\Chapter21\\SSAO.hlsl", nullptr, "PS", "ps_5_1");
 	// shadow
 	m_Shaders["shadowVS"] = d3dUtil::CompileShader(L"..\\Shader\\Chapter21\\Shadows.hlsl", nullptr, "VS", "vs_5_1");
 	m_Shaders["shadowPS"]	= d3dUtil::CompileShader(L"..\\Shader\\Chapter21\\Shadows.hlsl", nullptr, "PS", "ps_5_1");
@@ -782,7 +782,7 @@ void GameApp::BuildShadersAndInputLayout()
 	// debug output
 	m_Shaders["fullScreenVS"] = d3dUtil::CompileShader(L"..\\Shader\\Chapter21\\FullScreenTriangle.hlsl", nullptr, "FullScreenTriangleTexcoordVS", "vs_5_1");
 	m_Shaders["shadowDebugPS"]	= d3dUtil::CompileShader(L"..\\Shader\\Chapter21\\Shadows.hlsl", nullptr, "Debug_PS", "ps_5_1");
-	m_Shaders["ssaoDebugPS"] = d3dUtil::CompileShader(L"..\\Shader\\Chapter21\\SSAO.hlsl", nullptr, "Debug_PS", "ps_5_1");
+	m_Shaders["aoDebugPS"] = d3dUtil::CompileShader(L"..\\Shader\\Chapter21\\SSAO.hlsl", nullptr, "Debug_AO_PS", "ps_5_1");
 
 	m_InputLayouts["opaque"] =
 	{
@@ -791,7 +791,7 @@ void GameApp::BuildShadersAndInputLayout()
 		{"TEXCOORD",0,DXGI_FORMAT_R32G32_FLOAT,0,24,D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA,0},
 		{"TANGENT",0,DXGI_FORMAT_R32G32B32_FLOAT,0,32,D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA,0}
 	};
-	m_InputLayouts["CPU_SSAO"] =
+	m_InputLayouts["CPU_AO"] =
 	{
 		{"POSITION",0,DXGI_FORMAT_R32G32B32_FLOAT,0,0,D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA,0},
 		{"NORMAL"  ,0,DXGI_FORMAT_R32G32B32_FLOAT,0,12,D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA,0},
@@ -846,7 +846,7 @@ void GameApp::BuildShapeGeometry()
 		cylinder.Vertices.size();
 
 	//Build CPU SSAO
-	if(m_ShowMode == ShowMode::CPU_SSAO)
+	if(m_ShowMode == ShowMode::CPU_AO)
 	{
 		std::vector<CPU_SSAO_Vertex> boxVertices(box.Vertices.size());
 		std::vector<CPU_SSAO_Vertex> gridVertices(grid.Vertices.size());
@@ -1039,7 +1039,7 @@ void GameApp::BuildSkullGeometry()
 	// read from file 
 	ReadDataFromFile(vertices, indices, bounds);
 
-	if (m_ShowMode == ShowMode::CPU_SSAO) 
+	if (m_ShowMode == ShowMode::CPU_AO)
 	{
 		std::vector<CPU_SSAO_Vertex> cpuVertices(vertices.size());
 		for (int i = 0; i < vertices.size(); ++i)
@@ -1213,20 +1213,20 @@ void GameApp::BuildPSOs()
 	shadowDebugPsoDesc.DSVFormat = DXGI_FORMAT_UNKNOWN;
 	HR(m_pd3dDevice->CreateGraphicsPipelineState(&shadowDebugPsoDesc, IID_PPV_ARGS(&m_PSOs["shadow_debug"])));
 
-	// ssao
+	// ao
 	D3D12_GRAPHICS_PIPELINE_STATE_DESC ssaoPsoDesc = opaquePsoDesc;
-	ssaoPsoDesc.InputLayout = { m_InputLayouts["CPU_SSAO"].data(),(UINT)m_InputLayouts["CPU_SSAO"].size() };
+	ssaoPsoDesc.InputLayout = { m_InputLayouts["CPU_AO"].data(),(UINT)m_InputLayouts["CPU_AO"].size() };
 	ssaoPsoDesc.VS =
 	{
-		reinterpret_cast<BYTE*>(m_Shaders["ssaoVS"]->GetBufferPointer()),
-		m_Shaders["ssaoVS"]->GetBufferSize()
+		reinterpret_cast<BYTE*>(m_Shaders["aoVS"]->GetBufferPointer()),
+		m_Shaders["aoVS"]->GetBufferSize()
 	};
 	ssaoPsoDesc.PS =
 	{
-		reinterpret_cast<BYTE*>(m_Shaders["ssaoDebugPS"]->GetBufferPointer()),
-		m_Shaders["ssaoDebugPS"]->GetBufferSize()
+		reinterpret_cast<BYTE*>(m_Shaders["aoDebugPS"]->GetBufferPointer()),
+		m_Shaders["aoDebugPS"]->GetBufferSize()
 	};
-	HR(m_pd3dDevice->CreateGraphicsPipelineState(&ssaoPsoDesc, IID_PPV_ARGS(&m_PSOs["ssao_cpu"])));
+	HR(m_pd3dDevice->CreateGraphicsPipelineState(&ssaoPsoDesc, IID_PPV_ARGS(&m_PSOs["ao"])));
 	// ssao debug
 
 }
@@ -1478,12 +1478,11 @@ void GameApp::BuildVertexAmbientOcclusion(std::vector<CPU_SSAO_Vertex>& vertices
 		// 防止自交
 		centroid += 0.001f * normal;
 
-		const int numSampleRays = 32;
+		const int numSampleRays = 512;
 		float numUnoccluded = 0;
 		for (int j = 0; j < numSampleRays; ++j) 
 		{
 			XMVECTOR randomDir = MathHelper::RandHemisphereUnitVec3(normal);
-
 			if (!octree.RayOctreeIntersect(centroid, randomDir)) 
 			{
 				numUnoccluded++;

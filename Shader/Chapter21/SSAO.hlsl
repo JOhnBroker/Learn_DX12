@@ -63,7 +63,7 @@ float4 PS(VertexOut pin) : SV_Target
     float3 bumpedNormalW = NormalSampleToWorldSpace(normalMapSample.xyz, pin.NormalW, pin.TangentW);
     
     float3 toEyeW = normalize(gEyePosW - pin.PosW);
-    float4 ambient = (1.0f - pin.AmbientOcc) * gAmbientLight * diffuseAlbedo;
+    float4 ambient = pin.AmbientOcc * gAmbientLight * diffuseAlbedo;
     float3 shadowFactor = float3(1.0f, 1.0f, 1.0f);
     shadowFactor[0] = CalcShadowFactor(pin.ShadowPosH);
     
@@ -83,9 +83,9 @@ float4 PS(VertexOut pin) : SV_Target
     return litColor;
 }
 
-float4 Debug_PS(VertexOut pin) : SV_Target
+float4 Debug_AO_PS(VertexOut pin) : SV_Target
 {
     float access = pin.AmbientOcc.x;
-    //access = saturate(pow(access, 0.5f));
+    access = saturate(pow(access, 6.0f));
     return float4(access, access, access, 1.0f);
 }

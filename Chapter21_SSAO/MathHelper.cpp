@@ -41,7 +41,7 @@ DirectX::XMVECTOR MathHelper::RandHemisphereUnitVec3(XMVECTOR n)
 		if (XMVector3Greater(XMVector3LengthSq(v), One))
 			continue;
 
-		if (XMVector3Less(XMVector3LengthSq(v), Zero))
+		if (XMVector3Less(XMVector3Dot(n, v), Zero))
 			continue;
 
 		return XMVector3Normalize(v);
