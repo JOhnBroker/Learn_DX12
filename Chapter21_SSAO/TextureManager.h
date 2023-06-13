@@ -20,24 +20,25 @@ public:
 	ID3D12Resource* CreateFromeMemory(std::string name, void* data, size_t byteWidth, bool enableMips = false, bool forceSRGB = false);
 	bool AddTexture(std::string name, ID3D12Resource* texture);
 	void RemoveTexture(std::string name);
-	ID3D12Resource* GetTexture(std::string name);
-	ID3D12Resource* GetNullTexture();
+	CD3DX12_GPU_DESCRIPTOR_HANDLE GetTexture(std::string name);
+	CD3DX12_GPU_DESCRIPTOR_HANDLE GetNullTexture();
 
-	void BuildSRVDescriptors(CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuSrv, CD3DX12_GPU_DESCRIPTOR_HANDLE hGpuSrv);
-	void BuildRTVDescriptors(CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuRtv);
-	void BuildDSVDescriptors(CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuDsv);
-
-private:
-	void BuildDescriptors();
-	void BuildResource();
+	void BuildDescriptor();
+	UINT GetSRVDescriptorCount();
+	UINT GetDSVDescriptorCount();
+	UINT GetRTVDescriptorCount();
 
 private:
 	template<class T>
 	using ComPtr = Microsoft::WRL::ComPtr<T>;
 
 	ComPtr<ID3D12Device> m_pDevice;
-	std::unordered_map<XID, ComPtr<ID3D12Resource>> m_Textures;
-	// 是存放Resource 还是存放Texture2D 好？
+	using TextureData = std::pair<INT, ComPtr<ID3D12Resource>>;
+	std::unordered_map<XID, TextureData> m_Textures;
+
+	CD3DX12_CPU_DESCRIPTOR_HANDLE m_hCpuSrv;
+	CD3DX12_GPU_DESCRIPTOR_HANDLE m_hGpuSrv;
+
 };
 
 #endif // !TEXTUREMANAGER_H

@@ -2,7 +2,7 @@
 
 namespace 
 {
-	// TextureManager µ•¿˝
+	// TextureManager Âçï‰æã
 	TextureManager* s_pInstance = nullptr;
 }
 
@@ -54,32 +54,31 @@ void TextureManager::RemoveTexture(std::string name)
 {
 }
 
-ID3D12Resource* TextureManager::GetTexture(std::string name)
+CD3DX12_GPU_DESCRIPTOR_HANDLE TextureManager::GetTexture(std::string name)
 {
-	return nullptr;
+	return CD3DX12_GPU_DESCRIPTOR_HANDLE();
 }
 
-ID3D12Resource* TextureManager::GetNullTexture()
+CD3DX12_GPU_DESCRIPTOR_HANDLE TextureManager::GetNullTexture()
 {
-	return nullptr;
+	return CD3DX12_GPU_DESCRIPTOR_HANDLE();
 }
 
-void TextureManager::BuildSRVDescriptors(CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuSrv, CD3DX12_GPU_DESCRIPTOR_HANDLE hGpuSrv)
-{
-}
-
-void TextureManager::BuildRTVDescriptors(CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuRtv)
+void TextureManager::BuildDescriptor()
 {
 }
 
-void TextureManager::BuildDSVDescriptors(CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuDsv)
+UINT TextureManager::GetSRVDescriptorCount()
 {
+	return 0;
 }
 
-void TextureManager::BuildDescriptors()
+UINT TextureManager::GetDSVDescriptorCount()
 {
+	return 0;
 }
 
-void TextureManager::BuildResource()
+UINT TextureManager::GetRTVDescriptorCount()
 {
+	return 0;
 }
