@@ -169,6 +169,7 @@
     </ClCompile>
     <ClCompile Include="Octree.cpp" />
     <ClCompile Include="ShadowMap.cpp" />
+    <ClCompile Include="Texture.cpp" />
     <ClCompile Include="TextureManager.cpp" />
     <ClCompile Include="Waves.cpp" />
   </ItemGroup>
