@@ -197,4 +197,15 @@ public:
 	std::unordered_map<std::string, SubmeshGeometry> DrawArgs;
 };
 
+//
+// 字符串转hash ID
+//
+using XID = size_t;
+inline XID StringToID(std::string str)
+{
+	// TODO 用string的坏处
+	static std::hash<std::string> hash;
+	return hash(str);
+}
+
 #endif

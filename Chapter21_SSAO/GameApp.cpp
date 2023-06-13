@@ -1478,7 +1478,7 @@ void GameApp::BuildVertexAmbientOcclusion(std::vector<CPU_SSAO_Vertex>& vertices
 		// 防止自交
 		centroid += 0.001f * normal;
 
-		const int numSampleRays = 512;
+		const int numSampleRays = 32;
 		float numUnoccluded = 0;
 		for (int j = 0; j < numSampleRays; ++j) 
 		{

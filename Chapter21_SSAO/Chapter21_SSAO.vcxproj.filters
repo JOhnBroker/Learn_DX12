@@ -52,6 +52,9 @@
     <ClCompile Include="Octree.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
+    <ClCompile Include="TextureManager.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="d3dApp.h">
@@ -115,6 +118,9 @@
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="Octree.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="TextureManager.h">
       <Filter>头文件</Filter>
     </ClInclude>
   </ItemGroup>

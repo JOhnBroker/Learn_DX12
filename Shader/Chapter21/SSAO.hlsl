@@ -85,7 +85,5 @@ float4 PS(VertexOut pin) : SV_Target
 
 float4 Debug_AO_PS(VertexOut pin) : SV_Target
 {
-    float access = pin.AmbientOcc.x;
-    access = saturate(pow(access, 6.0f));
-    return float4(access, access, access, 1.0f);
+    return float4(pin.AmbientOcc.xxx, 1.0f);
 }

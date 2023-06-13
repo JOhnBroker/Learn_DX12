@@ -108,7 +108,7 @@ bool Octree::RayOctreeIntersect(OctreeNode* parent, XMVECTOR rayPos, XMVECTOR ra
 		for (int i = 0; i < 8; ++i) 
 		{
 			float dist = 0.0f;
-			if (parent->Children[i]->Bounds.Intersects(rayDir, rayDir, dist))
+			if (parent->Children[i]->Bounds.Intersects(rayPos, rayDir, dist))
 			{
 				if (RayOctreeIntersect(parent->Children[i], rayPos, rayDir)) 
 				{
