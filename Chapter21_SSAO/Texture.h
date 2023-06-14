@@ -55,7 +55,7 @@ public:
 		uint32_t mipLevels = 1, uint32_t resourceFlag = (uint32_t)ResourceFlag::RENDER_TARGET | (uint32_t)ResourceFlag::SHADER_RESOURCE);
 	~Texture2D()override = default;
 
-	// ²»ÔÊÐí¿½±´£¬ÔÊÐíÒÆ¶¯
+	// ä¸å…è®¸æ‹·è´ï¼Œå…è®¸ç§»åŠ¨
 	Texture2D(const Texture2D&) = delete;
 	Texture2D& operator=(Texture2D&) = delete;
 	Texture2D(Texture2D&&) = default;
@@ -63,29 +63,164 @@ public:
 
 	void BuildDescriptor(ID3D12Device* device, CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuSrv,
 		CD3DX12_GPU_DESCRIPTOR_HANDLE hGpuSrv, CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuRtv);
-	void SetDescriptorCount(int srvCount, int rtvCount);
 	void GetDescriptorCount(int& srvCount, int rtvCount);
 
-	CD3DX12_CPU_DESCRIPTOR_HANDLE GetRenderTarget() { if (m_nRtvCount) return m_hCpuRtv; };
-	CD3DX12_GPU_DESCRIPTOR_HANDLE GetUnorderedAccess() { if (m_nSrvCount > 1) return m_hGpuUav; };
+	CD3DX12_CPU_DESCRIPTOR_HANDLE GetRenderTarget() 
+	{
+		if (m_nRtvCount)
+			return m_hCpuRtv;
+		return CD3DX12_CPU_DESCRIPTOR_HANDLE{};
+	};
+	CD3DX12_GPU_DESCRIPTOR_HANDLE GetUnorderedAccess() 
+	{ 
+		if (m_nSrvCount > 1)
+			return m_hGpuUav;
+		return CD3DX12_GPU_DESCRIPTOR_HANDLE{};
+	};
 
 	uint32_t GetMiopLevels() const { return m_MipLevels; };
 
 protected:
-	uint32_t m_nSrvCount = 0;
+	// é»˜è®¤åˆ›å»ºShader Resource View
+	uint32_t m_nSrvCount = 1;
 	uint32_t m_nRtvCount = 0;
 	uint32_t m_MipLevels = 1;
 	CD3DX12_CPU_DESCRIPTOR_HANDLE m_hCpuRtv = {};
 	CD3DX12_GPU_DESCRIPTOR_HANDLE m_hGpuUav = {};
 };
 
-class Texture2DMS :public ITexture {};
+class Texture2DMS :public ITexture 
+{
+public:
+	Texture2DMS(ID3D12Device* device, uint32_t width, uint32_t height,
+		DXGI_FORMAT format, const DXGI_SAMPLE_DESC& sampleDesc,
+		uint32_t resourceFlag = (uint32_t)ResourceFlag::RENDER_TARGET | (uint32_t)ResourceFlag::SHADER_RESOURCE);
+	~Texture2DMS()override = default;
 
-class TextureCube :public ITexture {};
+	void BuildDescriptor(ID3D12Device* device, CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuSrv,
+		CD3DX12_GPU_DESCRIPTOR_HANDLE hGpuSrv, CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuRtv);
+	void GetDescriptorCount(int& srvCount, int& rtvCount);
 
-class Texture2DArray :public ITexture {};
+	CD3DX12_CPU_DESCRIPTOR_HANDLE GetRenderTarget() 
+	{
+		if (m_nRtvCount)
+			return m_hCpuRtv;
+		return CD3DX12_CPU_DESCRIPTOR_HANDLE{};
+	}
+	uint32_t GetMsaaSamples()const { return m_MsaaSamples; }
 
-class Texture2DMSArray :public ITexture {};
+protected:
+	uint32_t m_nSrvCount = 1;
+	uint32_t m_nRtvCount = 0;
+	uint32_t m_MsaaSamples = 1;
+	CD3DX12_CPU_DESCRIPTOR_HANDLE m_hCpuRtv = {};
+};
+
+class TextureCube :public ITexture 
+{
+public:
+	TextureCube(ID3D12Device* device, uint32_t width, uint32_t height, DXGI_FORMAT format,
+		uint32_t mipLevels = 1,
+		uint32_t resourceFlag = (uint32_t)ResourceFlag::RENDER_TARGET | (uint32_t)ResourceFlag::SHADER_RESOURCE);
+	~TextureCube() override = default;
+
+	uint32_t GetMipLevels() const { return m_MipLevels; }
+	uint32_t GetArraySize() const { return m_ArraySize; }
+
+	void BuildDescriptor(ID3D12Device* device, CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuSrv,
+		CD3DX12_GPU_DESCRIPTOR_HANDLE hGpuSrv, CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuRtv);
+	void GetDescriptorCount(int& srvCount, int& rtvCount);
+
+	CD3DX12_CPU_DESCRIPTOR_HANDLE GetRenderTarget() { return m_TextureArrayRTV; }
+	CD3DX12_CPU_DESCRIPTOR_HANDLE GetRenderTarget(size_t arrayIndex) { return m_UnorderedAccessElements[arrayIndex]; }
+	//RWTexture2D
+	CD3DX12_CPU_DESCRIPTOR_HANDLE GetUnorderedAccess(size_t arrayIndex) { return m_UnorderedAccessElements[arrayIndex]; }
+
+	//Texture2DArray 
+	// ITexture::GetRenderTarget
+	//Texture2D
+	CD3DX12_GPU_DESCRIPTOR_HANDLE GetShaderResource(size_t arrayIndex) { return m_ShaderResourceElements[arrayIndex]; }
+
+protected:
+	uint32_t m_MipLevels = 1;
+	uint32_t m_ArraySize = 1;
+	uint32_t m_nSrvCount = 1;
+	uint32_t m_nRtvCount = 0;
+	CD3DX12_CPU_DESCRIPTOR_HANDLE m_TextureArrayRTV = {};
+	std::vector<CD3DX12_CPU_DESCRIPTOR_HANDLE> m_RenderTargetElements = {};
+	std::vector<CD3DX12_CPU_DESCRIPTOR_HANDLE> m_UnorderedAccessElements = {};
+	std::vector<CD3DX12_GPU_DESCRIPTOR_HANDLE> m_ShaderResourceElements = {};
+};
+
+class Texture2DArray :public ITexture 
+{
+public:
+	Texture2DArray(ID3D12Device* device, uint32_t width, uint32_t height, DXGI_FORMAT format,
+		uint32_t arraySize, uint32_t mipLevels = 1,
+		uint32_t resourceFlag = (uint32_t)ResourceFlag::RENDER_TARGET | (uint32_t)ResourceFlag::SHADER_RESOURCE);
+	~Texture2DArray() override = default;
+
+	uint32_t GetMipLevels() const { return m_MipLevels; }
+	uint32_t GetArraySize() const { return m_ArraySize; }
+	
+	void BuildDescriptor(ID3D12Device* device, CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuSrv,
+		CD3DX12_GPU_DESCRIPTOR_HANDLE hGpuSrv, CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuRtv);
+	void GetDescriptorCount(int& srvCount, int& rtvCount);
+
+	CD3DX12_CPU_DESCRIPTOR_HANDLE GetRenderTarget() { return m_TextureArrayRTV; }
+	CD3DX12_CPU_DESCRIPTOR_HANDLE GetRenderTarget(size_t arrayIndex) { return m_RenderTargetElements[arrayIndex]; }
+	//RWTexture2D
+	CD3DX12_CPU_DESCRIPTOR_HANDLE GetUnorderedAccess(size_t arrayIndex) { return m_UnorderedAccessElements[arrayIndex]; }
+	//Texture2DArray
+	// ITexture::GetRenderTarget
+	//Texture2D
+	CD3DX12_GPU_DESCRIPTOR_HANDLE GetShaderResource(size_t arrayIndex) { return m_ShaderResourceElements[arrayIndex]; }
+
+protected:
+	uint32_t m_MipLevels = 1;
+	uint32_t m_ArraySize = 1;
+	uint32_t m_nSrvCount = 1;
+	uint32_t m_nRtvCount = 0;
+	CD3DX12_CPU_DESCRIPTOR_HANDLE m_TextureArrayRTV = {};
+	std::vector<CD3DX12_CPU_DESCRIPTOR_HANDLE> m_RenderTargetElements = {};
+	std::vector<CD3DX12_CPU_DESCRIPTOR_HANDLE> m_UnorderedAccessElements = {};
+	std::vector<CD3DX12_GPU_DESCRIPTOR_HANDLE> m_ShaderResourceElements = {};
+};
+
+class Texture2DMSArray :public ITexture 
+{
+public:
+	Texture2DMSArray(ID3D12Device* device, uint32_t width, uint32_t height, DXGI_FORMAT format,
+		uint32_t arraySize, const DXGI_SAMPLE_DESC& sampleDesc, uint32_t mipLevels = 1,
+		uint32_t resourceFlag = (uint32_t)ResourceFlag::RENDER_TARGET | (uint32_t)ResourceFlag::SHADER_RESOURCE);
+	~Texture2DMSArray() override = default;
+
+	uint32_t GetArraySize() const { return m_ArraySize; }
+	uint32_t GetMsaaSamples() const { return m_MsaaSamples; }
+
+	void BuildDescriptor(ID3D12Device* device, CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuSrv,
+		CD3DX12_GPU_DESCRIPTOR_HANDLE hGpuSrv, CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuRtv);
+	void GetDescriptorCount(int& srvCount, int& rtvCount);
+
+	CD3DX12_CPU_DESCRIPTOR_HANDLE GetRenderTarget() { return m_TextureArrayRTV; }
+	CD3DX12_CPU_DESCRIPTOR_HANDLE GetRenderTarget(size_t arrayIndex) { return m_RenderTargetElements[arrayIndex]; }
+	//RWTexture2D
+	CD3DX12_CPU_DESCRIPTOR_HANDLE GetUnorderedAccess(size_t arrayIndex) { return m_UnorderedAccessElements[arrayIndex]; }
+	//Texture2DArray
+	// ITexture::GetRenderTarget
+	//Texture2D
+	CD3DX12_GPU_DESCRIPTOR_HANDLE GetShaderResource(size_t arrayIndex) { return m_ShaderResourceElements[arrayIndex]; }
+
+protected:
+	uint32_t m_ArraySize = 1;
+	uint32_t m_MsaaSamples = 1;
+	uint32_t m_nSrvCount = 1;
+	uint32_t m_nRtvCount = 0;
+	CD3DX12_CPU_DESCRIPTOR_HANDLE m_TextureArrayRTV = {};
+	std::vector<CD3DX12_CPU_DESCRIPTOR_HANDLE> m_RenderTargetElements = {};
+	std::vector<CD3DX12_CPU_DESCRIPTOR_HANDLE> m_UnorderedAccessElements = {};
+	std::vector<CD3DX12_GPU_DESCRIPTOR_HANDLE> m_ShaderResourceElements = {};
+};
 
 class Depth2D :public ITexture {};
 

@@ -31,6 +31,15 @@ Texture2D::Texture2D(ID3D12Device* device, uint32_t width, uint32_t height, DXGI
 		(resourceFlag& (uint32_t)ResourceFlag::RENDER_TARGET ? D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET : D3D12_RESOURCE_FLAG_NONE) })
 {
 	m_MipLevels = m_Resource->GetDesc().MipLevels;
+
+	if (resourceFlag & (uint32_t)ResourceFlag::UNORDERED_ACCESS) 
+	{
+		m_nSrvCount = 2;
+	}
+	if (resourceFlag & (uint32_t)ResourceFlag::RENDER_TARGET) 
+	{
+		m_nRtvCount = 1;
+	}
 }
 
 void Texture2D::BuildDescriptor(ID3D12Device* device, CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuSrv, CD3DX12_GPU_DESCRIPTOR_HANDLE hGpuSrv, CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuRtv)
@@ -66,14 +75,64 @@ void Texture2D::BuildDescriptor(ID3D12Device* device, CD3DX12_CPU_DESCRIPTOR_HAN
 	}
 }
 
-void Texture2D::SetDescriptorCount(int srvCount, int rtvCount)
-{
-	m_nSrvCount = srvCount;
-	m_nRtvCount = rtvCount;
-}
-
 void Texture2D::GetDescriptorCount(int& srvCount, int rtvCount)
 {
 	srvCount = m_nSrvCount;
 	rtvCount = m_nRtvCount;
+}
+
+Texture2DMS::Texture2DMS(ID3D12Device* device, uint32_t width, uint32_t height,
+	DXGI_FORMAT format, const DXGI_SAMPLE_DESC& sampleDesc, uint32_t resourceFlag)
+	:ITexture(device, D3D12_RESOURCE_DESC{ D3D12_RESOURCE_DIMENSION_TEXTURE2D,
+		0, width, height, 1, 1, format, sampleDesc, D3D12_TEXTURE_LAYOUT_UNKNOWN,
+		resourceFlag & (uint32_t)ResourceFlag::RENDER_TARGET ? D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET : D3D12_RESOURCE_FLAG_NONE }) 
+{
+	m_MsaaSamples = sampleDesc.Count;
+	
+	if (resourceFlag & (uint32_t)ResourceFlag::RENDER_TARGET) 
+	{
+		m_nRtvCount = 1;
+	}
+}
+
+void Texture2DMS::BuildDescriptor(ID3D12Device* device, CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuSrv, CD3DX12_GPU_DESCRIPTOR_HANDLE hGpuSrv, CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuRtv)
+{
+
+}
+
+void Texture2DMS::GetDescriptorCount(int& srvCount, int& rtvCount)
+{
+	srvCount = m_nSrvCount, rtvCount = m_nRtvCount;
+}
+
+void TextureCube::BuildDescriptor(ID3D12Device* device, CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuSrv, CD3DX12_GPU_DESCRIPTOR_HANDLE hGpuSrv, CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuRtv)
+{
+}
+
+void TextureCube::GetDescriptorCount(int& srvCount, int& rtvCount)
+{
+}
+
+Texture2DArray::Texture2DArray(ID3D12Device* device, uint32_t width, uint32_t height, DXGI_FORMAT format, uint32_t arraySize, uint32_t mipLevels, uint32_t resourceFlag)
+{
+}
+
+void Texture2DArray::BuildDescriptor(ID3D12Device* device, CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuSrv, CD3DX12_GPU_DESCRIPTOR_HANDLE hGpuSrv, CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuRtv)
+{
+}
+
+void Texture2DArray::GetDescriptorCount(int& srvCount, int& rtvCount)
+{
+}
+
+Texture2DMSArray::Texture2DMSArray(ID3D12Device* device, uint32_t width, uint32_t height, DXGI_FORMAT format, uint32_t arraySize, const DXGI_SAMPLE_DESC& sampleDesc, uint32_t mipLevels, uint32_t resourceFlag)
+{
+}
+
+void Texture2DMSArray::BuildDescriptor(ID3D12Device* device, CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuSrv, CD3DX12_GPU_DESCRIPTOR_HANDLE hGpuSrv, CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuRtv)
+{
+}
+
+void Texture2DMSArray::GetDescriptorCount(int& srvCount, int& rtvCount)
+{
 }
