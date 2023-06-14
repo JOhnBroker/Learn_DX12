@@ -24,3 +24,56 @@ void ITexture::BuildDescriptor(ID3D12Device* device, const D3D12_SHADER_RESOURCE
 	device->CreateShaderResourceView(m_Resource.Get(), &srvDesc, hCpuSrv);
 }
 
+Texture2D::Texture2D(ID3D12Device* device, uint32_t width, uint32_t height, DXGI_FORMAT format, uint32_t mipLevels, uint32_t resourceFlag) :
+	ITexture(device, D3D12_RESOURCE_DESC{ D3D12_RESOURCE_DIMENSION_TEXTURE2D , 0 , width , height , 1 ,
+		(UINT16)mipLevels, format, DXGI_SAMPLE_DESC {1,0}, D3D12_TEXTURE_LAYOUT_UNKNOWN,
+		(resourceFlag& (uint32_t)ResourceFlag::UNORDERED_ACCESS ? D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS: D3D12_RESOURCE_FLAG_NONE) |
+		(resourceFlag& (uint32_t)ResourceFlag::RENDER_TARGET ? D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET : D3D12_RESOURCE_FLAG_NONE) })
+{
+	m_MipLevels = m_Resource->GetDesc().MipLevels;
+}
+
+void Texture2D::BuildDescriptor(ID3D12Device* device, CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuSrv, CD3DX12_GPU_DESCRIPTOR_HANDLE hGpuSrv, CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuRtv)
+{
+	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+	srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+	srvDesc.Format = m_Resource->GetDesc().Format;
+	srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+	srvDesc.Texture2D.MostDetailedMip = 0;
+	srvDesc.Texture2D.MipLevels = m_MipLevels;
+	srvDesc.Texture2D.ResourceMinLODClamp = 0.0f;
+	srvDesc.Texture2D.PlaneSlice = 0;
+	ITexture::BuildDescriptor(device, srvDesc, hCpuSrv, hGpuSrv);
+	hCpuSrv.Offset(1, device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV));
+
+	if (m_nSrvCount > 1) 
+	{
+		D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
+		uavDesc.Format = m_Resource->GetDesc().Format;
+		uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
+		uavDesc.Texture2D.MipSlice = 0;
+		device->CreateUnorderedAccessView(m_Resource.Get(), nullptr, &uavDesc, hCpuSrv);
+	}
+
+	if (m_nRtvCount > 0) 
+	{
+		D3D12_RENDER_TARGET_VIEW_DESC rtvDesc = {};
+		rtvDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
+		rtvDesc.Format = m_Resource->GetDesc().Format;
+		rtvDesc.Texture2D.MipSlice = 0;
+		rtvDesc.Texture2D.PlaneSlice = 0;
+		device->CreateRenderTargetView(m_Resource.Get(), &rtvDesc, hCpuRtv);
+	}
+}
+
+void Texture2D::SetDescriptorCount(int srvCount, int rtvCount)
+{
+	m_nSrvCount = srvCount;
+	m_nRtvCount = rtvCount;
+}
+
+void Texture2D::GetDescriptorCount(int& srvCount, int rtvCount)
+{
+	srvCount = m_nSrvCount;
+	rtvCount = m_nRtvCount;
+}
