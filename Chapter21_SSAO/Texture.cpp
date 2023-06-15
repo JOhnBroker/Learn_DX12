@@ -105,6 +105,20 @@ void Texture2DMS::GetDescriptorCount(int& srvCount, int& rtvCount)
 	srvCount = m_nSrvCount, rtvCount = m_nRtvCount;
 }
 
+TextureCube::TextureCube(ID3D12Device* device, uint32_t width, uint32_t height, DXGI_FORMAT format, uint32_t mipLevels, uint32_t resourceFlag)
+	:ITexture(device, D3D12_RESOURCE_DESC{ D3D12_RESOURCE_DIMENSION_TEXTURE2D, 
+		0, width, height, 6,(UINT16)mipLevels, format, DXGI_SAMPLE_DESC {1,0}, 
+		D3D12_TEXTURE_LAYOUT_UNKNOWN, resourceFlag& (uint32_t)ResourceFlag::RENDER_TARGET ? D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET : D3D12_RESOURCE_FLAG_NONE })
+{
+	m_MipLevels = mipLevels;
+
+	m_nSrvCount = 6;
+	if (resourceFlag & (uint32_t)ResourceFlag::RENDER_TARGET) 
+	{
+		m_nRtvCount = 6;
+	}
+}
+
 void TextureCube::BuildDescriptor(ID3D12Device* device, CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuSrv, CD3DX12_GPU_DESCRIPTOR_HANDLE hGpuSrv, CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuRtv)
 {
 }
@@ -134,5 +148,53 @@ void Texture2DMSArray::BuildDescriptor(ID3D12Device* device, CD3DX12_CPU_DESCRIP
 }
 
 void Texture2DMSArray::GetDescriptorCount(int& srvCount, int& rtvCount)
+{
+}
+
+Depth2D::Depth2D(ID3D12Device* device, uint32_t width, uint32_t height, DepthStencilBitsFlag depthStencilBitsFlag, uint32_t bindFlags)
+{
+}
+
+void Depth2D::BuildDescriptor(ID3D12Device* device, CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuSrv, CD3DX12_GPU_DESCRIPTOR_HANDLE hGpuSrv, CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuDsv)
+{
+}
+
+void Depth2D::GetDescriptorCount(int& srvCount, int& dsvCount)
+{
+}
+
+Depth2DMS::Depth2DMS(ID3D12Device* device, uint32_t width, uint32_t height, const DXGI_SAMPLE_DESC& sampleDesc, DepthStencilBitsFlag depthStencilBitsFlag, uint32_t bindFlags)
+{
+}
+
+void Depth2DMS::BuildDescriptor(ID3D12Device* device, CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuSrv, CD3DX12_GPU_DESCRIPTOR_HANDLE hGpuSrv, CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuDsv)
+{
+}
+
+void Depth2DMS::GetDescriptorCount(int& srvCount, int& dsvCount)
+{
+}
+
+Depth2DArray::Depth2DArray(ID3D12Device* device, uint32_t width, uint32_t height, uint32_t arraySize, DepthStencilBitsFlag depthStencilBitsFlag, uint32_t resourceFlag)
+{
+}
+
+void Depth2DArray::BuildDescriptor(ID3D12Device* device, CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuSrv, CD3DX12_GPU_DESCRIPTOR_HANDLE hGpuSrv, CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuDsv)
+{
+}
+
+void Depth2DArray::GetDescriptorCount(int& srvCount, int& dsvCount)
+{
+}
+
+Depth2DMSArray::Depth2DMSArray(ID3D12Device* device, uint32_t width, uint32_t height, uint32_t arraySize, const DXGI_SAMPLE_DESC& sampleDesc, DepthStencilBitsFlag depthStencilBitsFlag, uint32_t resourceFlag)
+{
+}
+
+void Depth2DMSArray::BuildDescriptor(ID3D12Device* device, CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuSrv, CD3DX12_GPU_DESCRIPTOR_HANDLE hGpuSrv, CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuDsv)
+{
+}
+
+void Depth2DMSArray::GetDescriptorCount(int& srvCount, int& dsvCount)
 {
 }

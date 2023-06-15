@@ -33,7 +33,7 @@ public:
 	virtual ~ITexture() = 0 {};
 
 	ID3D12Resource* GetTexture() { return m_Resource.Get(); }
-	CD3DX12_GPU_DESCRIPTOR_HANDLE GetSRV() { return m_hGpuSrv; }
+	CD3DX12_GPU_DESCRIPTOR_HANDLE GetShaderResource() { return m_hGpuSrv; }
 
 	uint32_t GetWidth() const { return m_Width; }
 	uint32_t GetHeight() const { return m_Height; }
@@ -125,25 +125,38 @@ public:
 	~TextureCube() override = default;
 
 	uint32_t GetMipLevels() const { return m_MipLevels; }
-	uint32_t GetArraySize() const { return m_ArraySize; }
 
 	void BuildDescriptor(ID3D12Device* device, CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuSrv,
 		CD3DX12_GPU_DESCRIPTOR_HANDLE hGpuSrv, CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuRtv);
 	void GetDescriptorCount(int& srvCount, int& rtvCount);
 
-	CD3DX12_CPU_DESCRIPTOR_HANDLE GetRenderTarget() { return m_TextureArrayRTV; }
-	CD3DX12_CPU_DESCRIPTOR_HANDLE GetRenderTarget(size_t arrayIndex) { return m_UnorderedAccessElements[arrayIndex]; }
+	CD3DX12_CPU_DESCRIPTOR_HANDLE GetRenderTarget() {
+		if (m_nRtvCount) 
+			return m_TextureArrayRTV;
+		return CD3DX12_CPU_DESCRIPTOR_HANDLE{};
+	}
+	CD3DX12_CPU_DESCRIPTOR_HANDLE GetRenderTarget(size_t arrayIndex) { 
+		if (arrayIndex < m_RenderTargetElements.size())
+			return m_RenderTargetElements[arrayIndex];
+		return CD3DX12_CPU_DESCRIPTOR_HANDLE{};
+	}
 	//RWTexture2D
-	CD3DX12_CPU_DESCRIPTOR_HANDLE GetUnorderedAccess(size_t arrayIndex) { return m_UnorderedAccessElements[arrayIndex]; }
-
-	//Texture2DArray 
-	// ITexture::GetRenderTarget
+	CD3DX12_CPU_DESCRIPTOR_HANDLE GetUnorderedAccess(size_t arrayIndex) {
+		if (arrayIndex < m_UnorderedAccessElements.size())
+			return m_UnorderedAccessElements[arrayIndex];
+		return CD3DX12_CPU_DESCRIPTOR_HANDLE{};
+	}
+	//TextureCube
+	using ITexture::GetShaderResource;
 	//Texture2D
-	CD3DX12_GPU_DESCRIPTOR_HANDLE GetShaderResource(size_t arrayIndex) { return m_ShaderResourceElements[arrayIndex]; }
+	CD3DX12_GPU_DESCRIPTOR_HANDLE GetShaderResource(size_t arrayIndex) { 
+		if (arrayIndex < m_ShaderResourceElements.size())
+			return m_ShaderResourceElements[arrayIndex];
+		return CD3DX12_GPU_DESCRIPTOR_HANDLE{};
+	}
 
 protected:
 	uint32_t m_MipLevels = 1;
-	uint32_t m_ArraySize = 1;
 	uint32_t m_nSrvCount = 1;
 	uint32_t m_nRtvCount = 0;
 	CD3DX12_CPU_DESCRIPTOR_HANDLE m_TextureArrayRTV = {};
@@ -167,14 +180,30 @@ public:
 		CD3DX12_GPU_DESCRIPTOR_HANDLE hGpuSrv, CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuRtv);
 	void GetDescriptorCount(int& srvCount, int& rtvCount);
 
-	CD3DX12_CPU_DESCRIPTOR_HANDLE GetRenderTarget() { return m_TextureArrayRTV; }
-	CD3DX12_CPU_DESCRIPTOR_HANDLE GetRenderTarget(size_t arrayIndex) { return m_RenderTargetElements[arrayIndex]; }
+	CD3DX12_CPU_DESCRIPTOR_HANDLE GetRenderTarget() {
+		if (m_nRtvCount)
+			return m_TextureArrayRTV;
+		return CD3DX12_CPU_DESCRIPTOR_HANDLE{};
+	}
+	CD3DX12_CPU_DESCRIPTOR_HANDLE GetRenderTarget(size_t arrayIndex) {
+		if (arrayIndex < m_RenderTargetElements.size())
+			return m_RenderTargetElements[arrayIndex];
+		return CD3DX12_CPU_DESCRIPTOR_HANDLE{};
+	}
 	//RWTexture2D
-	CD3DX12_CPU_DESCRIPTOR_HANDLE GetUnorderedAccess(size_t arrayIndex) { return m_UnorderedAccessElements[arrayIndex]; }
-	//Texture2DArray
-	// ITexture::GetRenderTarget
+	CD3DX12_CPU_DESCRIPTOR_HANDLE GetUnorderedAccess(size_t arrayIndex) {
+		if (arrayIndex < m_UnorderedAccessElements.size())
+			return m_UnorderedAccessElements[arrayIndex];
+		return CD3DX12_CPU_DESCRIPTOR_HANDLE{};
+	}
+	//Texture2DArray 
+	using ITexture::GetShaderResource;
 	//Texture2D
-	CD3DX12_GPU_DESCRIPTOR_HANDLE GetShaderResource(size_t arrayIndex) { return m_ShaderResourceElements[arrayIndex]; }
+	CD3DX12_GPU_DESCRIPTOR_HANDLE GetShaderResource(size_t arrayIndex) {
+		if (arrayIndex < m_ShaderResourceElements.size())
+			return m_ShaderResourceElements[arrayIndex];
+		return CD3DX12_GPU_DESCRIPTOR_HANDLE{};
+	}
 
 protected:
 	uint32_t m_MipLevels = 1;
@@ -202,14 +231,24 @@ public:
 		CD3DX12_GPU_DESCRIPTOR_HANDLE hGpuSrv, CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuRtv);
 	void GetDescriptorCount(int& srvCount, int& rtvCount);
 
-	CD3DX12_CPU_DESCRIPTOR_HANDLE GetRenderTarget() { return m_TextureArrayRTV; }
-	CD3DX12_CPU_DESCRIPTOR_HANDLE GetRenderTarget(size_t arrayIndex) { return m_RenderTargetElements[arrayIndex]; }
-	//RWTexture2D
-	CD3DX12_CPU_DESCRIPTOR_HANDLE GetUnorderedAccess(size_t arrayIndex) { return m_UnorderedAccessElements[arrayIndex]; }
-	//Texture2DArray
-	// ITexture::GetRenderTarget
-	//Texture2D
-	CD3DX12_GPU_DESCRIPTOR_HANDLE GetShaderResource(size_t arrayIndex) { return m_ShaderResourceElements[arrayIndex]; }
+	CD3DX12_CPU_DESCRIPTOR_HANDLE GetRenderTarget() {
+		if (m_nRtvCount)
+			return m_TextureArrayRTV;
+		return CD3DX12_CPU_DESCRIPTOR_HANDLE{};
+	}
+	CD3DX12_CPU_DESCRIPTOR_HANDLE GetRenderTarget(size_t arrayIndex) {
+		if (arrayIndex < m_RenderTargetElements.size())
+			return m_RenderTargetElements[arrayIndex];
+		return CD3DX12_CPU_DESCRIPTOR_HANDLE{};
+	}
+	//Texture2DMSArray 
+	using ITexture::GetShaderResource;
+	//Texture2DMS
+	CD3DX12_GPU_DESCRIPTOR_HANDLE GetShaderResource(size_t arrayIndex) {
+		if (arrayIndex < m_ShaderResourceElements.size())
+			return m_ShaderResourceElements[arrayIndex];
+		return CD3DX12_GPU_DESCRIPTOR_HANDLE{};
+	}
 
 protected:
 	uint32_t m_ArraySize = 1;
@@ -218,17 +257,158 @@ protected:
 	uint32_t m_nRtvCount = 0;
 	CD3DX12_CPU_DESCRIPTOR_HANDLE m_TextureArrayRTV = {};
 	std::vector<CD3DX12_CPU_DESCRIPTOR_HANDLE> m_RenderTargetElements = {};
-	std::vector<CD3DX12_CPU_DESCRIPTOR_HANDLE> m_UnorderedAccessElements = {};
 	std::vector<CD3DX12_GPU_DESCRIPTOR_HANDLE> m_ShaderResourceElements = {};
 };
 
-class Depth2D :public ITexture {};
 
-class Depth2DMS :public ITexture {};
+enum class DepthStencilBitsFlag
+{
+	Depth_16Bits = 0,
+	Depth_24Bits_Stencil_8Bits = 1,
+	Depth_32Bits = 2,
+	Depth_32Bits_Stencil_8Bits_Unused_24Bits = 3,
+};
 
-class Depth2DArray : public ITexture{};
+class Depth2D :public ITexture 
+{
+public:
+	Depth2D(ID3D12Device* device, uint32_t width, uint32_t height, 
+		DepthStencilBitsFlag  depthStencilBitsFlag = DepthStencilBitsFlag::Depth_24Bits_Stencil_8Bits, 
+		uint32_t bindFlags = (uint32_t)ResourceFlag::DEPTH_STENCIL | (uint32_t)ResourceFlag::SHADER_RESOURCE);
+	~Depth2D() override = default;
 
-class Depth2DMSArray :public ITexture {};
+	void BuildDescriptor(ID3D12Device* device, CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuSrv,
+		CD3DX12_GPU_DESCRIPTOR_HANDLE hGpuSrv, CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuDsv);
+	void GetDescriptorCount(int& srvCount, int& dsvCount);
+
+	CD3DX12_CPU_DESCRIPTOR_HANDLE GetDepthStencil() 
+	{
+		if (m_nDsvCount)
+			return m_hCpuDsv;
+		return CD3DX12_CPU_DESCRIPTOR_HANDLE{};
+	}
+
+protected:
+	uint32_t m_nSrvCount = 1;
+	uint32_t m_nDsvCount = 0;
+	CD3DX12_CPU_DESCRIPTOR_HANDLE m_hCpuDsv = {};
+};
+
+class Depth2DMS :public ITexture 
+{
+public:
+	Depth2DMS(ID3D12Device* device, uint32_t width, uint32_t height,
+		const DXGI_SAMPLE_DESC& sampleDesc,
+		DepthStencilBitsFlag depthStencilBitsFlag = DepthStencilBitsFlag::Depth_24Bits_Stencil_8Bits,
+		uint32_t bindFlags = (uint32_t)ResourceFlag::DEPTH_STENCIL | (uint32_t)ResourceFlag::SHADER_RESOURCE);
+	~Depth2DMS() override = default;
+
+	uint32_t GetMsaaSamples() const { return m_MsaaSamples; }
+
+	void BuildDescriptor(ID3D12Device* device, CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuSrv,
+		CD3DX12_GPU_DESCRIPTOR_HANDLE hGpuSrv, CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuDsv);
+	void GetDescriptorCount(int& srvCount, int& dsvCount);
+
+	CD3DX12_CPU_DESCRIPTOR_HANDLE GetDepthStencil()
+	{
+		if (m_nDsvCount)
+			return m_hCpuDsv;
+		return CD3DX12_CPU_DESCRIPTOR_HANDLE{};
+	}
+
+protected:
+	uint32_t m_nSrvCount = 1;
+	uint32_t m_nDsvCount = 0;
+	uint32_t m_MsaaSamples = 1;
+	CD3DX12_CPU_DESCRIPTOR_HANDLE m_hCpuDsv = {};
+};
+
+class Depth2DArray : public ITexture
+{
+public:
+	Depth2DArray(ID3D12Device* device, uint32_t width, uint32_t height, uint32_t arraySize,
+		DepthStencilBitsFlag depthStencilBitsFlag = DepthStencilBitsFlag::Depth_24Bits_Stencil_8Bits, 
+		uint32_t resourceFlag = (uint32_t)ResourceFlag::DEPTH_STENCIL | (uint32_t)ResourceFlag::SHADER_RESOURCE);
+	~Depth2DArray() override = default;
+
+	uint32_t GetArraySize() const { return m_ArraySize; }
+
+	void BuildDescriptor(ID3D12Device* device, CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuSrv,
+		CD3DX12_GPU_DESCRIPTOR_HANDLE hGpuSrv, CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuDsv);
+	void GetDescriptorCount(int& srvCount, int& dsvCount);
+
+	CD3DX12_CPU_DESCRIPTOR_HANDLE GetDepthStencil() {
+		if (m_nDsvCount)
+			return m_DepthArrayDSV;
+		return CD3DX12_CPU_DESCRIPTOR_HANDLE{};
+	}
+	CD3DX12_CPU_DESCRIPTOR_HANDLE GetDepthStencil(size_t arrayIndex) {
+		if (arrayIndex < m_DepthStencilElements.size())
+			return m_DepthStencilElements[arrayIndex];
+		return CD3DX12_CPU_DESCRIPTOR_HANDLE{};
+	}
+	// TextureArray
+	using ITexture::GetShaderResource;
+	// Texture2D
+	CD3DX12_GPU_DESCRIPTOR_HANDLE GetShaderResource(size_t arrayIndex) {
+		if (arrayIndex < m_ShaderResourceElements.size())
+			return m_ShaderResourceElements[arrayIndex];
+		return CD3DX12_GPU_DESCRIPTOR_HANDLE{};
+	}
+
+protected:
+	uint32_t m_ArraySize = 1;
+	uint32_t m_nSrvCount = 1;
+	uint32_t m_nDsvCount = 0;
+	CD3DX12_CPU_DESCRIPTOR_HANDLE m_DepthArrayDSV = {};
+	std::vector<CD3DX12_CPU_DESCRIPTOR_HANDLE> m_DepthStencilElements = {};
+	std::vector<CD3DX12_GPU_DESCRIPTOR_HANDLE> m_ShaderResourceElements = {};
+};
+
+class Depth2DMSArray :public ITexture
+{
+public:
+	Depth2DMSArray(ID3D12Device* device, uint32_t width, uint32_t height, uint32_t arraySize,
+		const DXGI_SAMPLE_DESC& sampleDesc,
+		DepthStencilBitsFlag depthStencilBitsFlag = DepthStencilBitsFlag::Depth_24Bits_Stencil_8Bits,
+		uint32_t resourceFlag = (uint32_t)ResourceFlag::DEPTH_STENCIL | (uint32_t)ResourceFlag::SHADER_RESOURCE);
+	~Depth2DMSArray() override = default;
+
+	uint32_t GetArraySize() const { return m_ArraySize; }
+	uint32_t GetMsaaSamples() const { return m_MsaaSamples; }
+
+	void BuildDescriptor(ID3D12Device* device, CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuSrv,
+		CD3DX12_GPU_DESCRIPTOR_HANDLE hGpuSrv, CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuDsv);
+	void GetDescriptorCount(int& srvCount, int& dsvCount);
+
+	CD3DX12_CPU_DESCRIPTOR_HANDLE GetDepthStencil() {
+		if (m_nDsvCount)
+			return m_DepthArrayDSV;
+		return CD3DX12_CPU_DESCRIPTOR_HANDLE{};
+	}
+	CD3DX12_CPU_DESCRIPTOR_HANDLE GetDepthStencil(size_t arrayIndex) {
+		if (arrayIndex < m_DepthStencilElements.size())
+			return m_DepthStencilElements[arrayIndex];
+		return CD3DX12_CPU_DESCRIPTOR_HANDLE{};
+	}
+	// Texture2DMSArray
+	using ITexture::GetShaderResource;
+	// Texture2DMS
+	CD3DX12_GPU_DESCRIPTOR_HANDLE GetShaderResource(size_t arrayIndex) {
+		if (arrayIndex < m_ShaderResourceElements.size())
+			return m_ShaderResourceElements[arrayIndex];
+		return CD3DX12_GPU_DESCRIPTOR_HANDLE{};
+	}
+
+protected:
+	uint32_t m_ArraySize = 1;
+	uint32_t m_MsaaSamples = 1;
+	uint32_t m_nSrvCount = 1;
+	uint32_t m_nDsvCount = 0;
+	CD3DX12_CPU_DESCRIPTOR_HANDLE m_DepthArrayDSV = {};
+	std::vector<CD3DX12_CPU_DESCRIPTOR_HANDLE> m_DepthStencilElements = {};
+	std::vector<CD3DX12_GPU_DESCRIPTOR_HANDLE> m_ShaderResourceElements = {};
+};
 
 #endif // !TEXTURE_H
 
