@@ -278,7 +278,7 @@ class Depth2D :public ITexture
 public:
 	Depth2D(ID3D12Device* device, uint32_t width, uint32_t height, 
 		DepthStencilBitsFlag  depthStencilBitsFlag = DepthStencilBitsFlag::Depth_24Bits_Stencil_8Bits, 
-		uint32_t bindFlags = (uint32_t)ResourceFlag::DEPTH_STENCIL | (uint32_t)ResourceFlag::SHADER_RESOURCE);
+		uint32_t resourceFlag = (uint32_t)ResourceFlag::DEPTH_STENCIL | (uint32_t)ResourceFlag::SHADER_RESOURCE);
 	~Depth2D() override = default;
 
 	void BuildDescriptor(ID3D12Device* device, CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuSrv,
@@ -289,14 +289,15 @@ public:
 	CD3DX12_CPU_DESCRIPTOR_HANDLE GetDepthStencil() 
 	{
 		if (m_nDsvCount)
-			return m_hCpuDsv;
+			return m_DepthStencilView;
 		return CD3DX12_CPU_DESCRIPTOR_HANDLE{};
 	}
 
 protected:
 	uint32_t m_nSrvCount = 1;
 	uint32_t m_nDsvCount = 0;
-	CD3DX12_CPU_DESCRIPTOR_HANDLE m_hCpuDsv = {};
+	DepthStencilBitsFlag m_DepthStencilBitsFlag = DepthStencilBitsFlag::Depth_24Bits_Stencil_8Bits;
+	CD3DX12_CPU_DESCRIPTOR_HANDLE m_DepthStencilView = {};
 };
 
 class Depth2DMS :public ITexture 
@@ -305,7 +306,7 @@ public:
 	Depth2DMS(ID3D12Device* device, uint32_t width, uint32_t height,
 		const DXGI_SAMPLE_DESC& sampleDesc,
 		DepthStencilBitsFlag depthStencilBitsFlag = DepthStencilBitsFlag::Depth_24Bits_Stencil_8Bits,
-		uint32_t bindFlags = (uint32_t)ResourceFlag::DEPTH_STENCIL | (uint32_t)ResourceFlag::SHADER_RESOURCE);
+		uint32_t resourceFlag = (uint32_t)ResourceFlag::DEPTH_STENCIL | (uint32_t)ResourceFlag::SHADER_RESOURCE);
 	~Depth2DMS() override = default;
 
 	uint32_t GetMsaaSamples() const { return m_MsaaSamples; }
@@ -318,7 +319,7 @@ public:
 	CD3DX12_CPU_DESCRIPTOR_HANDLE GetDepthStencil()
 	{
 		if (m_nDsvCount)
-			return m_hCpuDsv;
+			return m_DepthStencilView;
 		return CD3DX12_CPU_DESCRIPTOR_HANDLE{};
 	}
 
@@ -326,7 +327,8 @@ protected:
 	uint32_t m_nSrvCount = 1;
 	uint32_t m_nDsvCount = 0;
 	uint32_t m_MsaaSamples = 1;
-	CD3DX12_CPU_DESCRIPTOR_HANDLE m_hCpuDsv = {};
+	DepthStencilBitsFlag m_DepthStencilBitsFlag = DepthStencilBitsFlag::Depth_24Bits_Stencil_8Bits;
+	CD3DX12_CPU_DESCRIPTOR_HANDLE m_DepthStencilView = {};
 };
 
 class Depth2DArray : public ITexture
@@ -367,6 +369,7 @@ protected:
 	uint32_t m_nSrvCount = 1;
 	uint32_t m_nDsvCount = 0;
 	uint32_t m_ArraySize = 1;
+	DepthStencilBitsFlag m_DepthStencilBitsFlag = DepthStencilBitsFlag::Depth_24Bits_Stencil_8Bits;
 	CD3DX12_CPU_DESCRIPTOR_HANDLE m_DepthArrayDSV = {};
 	std::vector<CD3DX12_CPU_DESCRIPTOR_HANDLE> m_DepthStencilElements = {};
 	//std::vector<CD3DX12_GPU_DESCRIPTOR_HANDLE> m_ShaderResourceElements = {};
@@ -413,6 +416,7 @@ protected:
 	uint32_t m_nDsvCount = 0;
 	uint32_t m_ArraySize = 1;
 	uint32_t m_MsaaSamples = 1;
+	DepthStencilBitsFlag m_DepthStencilBitsFlag = DepthStencilBitsFlag::Depth_24Bits_Stencil_8Bits;
 	CD3DX12_CPU_DESCRIPTOR_HANDLE m_DepthArrayDSV = {};
 	std::vector<CD3DX12_CPU_DESCRIPTOR_HANDLE> m_DepthStencilElements = {};
 	//std::vector<CD3DX12_GPU_DESCRIPTOR_HANDLE> m_ShaderResourceElements = {};

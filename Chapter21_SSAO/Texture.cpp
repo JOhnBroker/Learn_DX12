@@ -356,12 +356,13 @@ static DXGI_FORMAT GetDepthDSVFormat(DepthStencilBitsFlag flag)
 }
 
 Depth2D::Depth2D(ID3D12Device* device, uint32_t width, uint32_t height,
-	DepthStencilBitsFlag depthStencilBitsFlag, uint32_t bindFlags)
+	DepthStencilBitsFlag depthStencilBitsFlag, uint32_t resourceFlag)
 	:ITexture(device, D3D12_RESOURCE_DESC{ D3D12_RESOURCE_DIMENSION_TEXTURE2D , 0, width, height, 1, 1, 
 		GetDepthTextureFormat(depthStencilBitsFlag), DXGI_SAMPLE_DESC{1,0},D3D12_TEXTURE_LAYOUT_UNKNOWN,
-		bindFlags & (uint32_t)ResourceFlag::DEPTH_STENCIL ? D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL : D3D12_RESOURCE_FLAG_NONE }) 
+		resourceFlag& (uint32_t)ResourceFlag::DEPTH_STENCIL ? D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL : D3D12_RESOURCE_FLAG_NONE })
 {
-	if (bindFlags & (uint32_t)ResourceFlag::DEPTH_STENCIL) 
+	m_DepthStencilBitsFlag = depthStencilBitsFlag;
+	if (resourceFlag & (uint32_t)ResourceFlag::DEPTH_STENCIL)
 	{
 		m_nDsvCount += 1;
 	}
@@ -371,6 +372,26 @@ void Depth2D::BuildDescriptor(ID3D12Device* device, CD3DX12_CPU_DESCRIPTOR_HANDL
 	CD3DX12_GPU_DESCRIPTOR_HANDLE hGpuSrv, CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuDsv,
 	UINT uiSrvDescriptorSize, UINT uiDsvDescriptorSize)
 {
+	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+	srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+	srvDesc.Format = GetDepthSRVFormat(m_DepthStencilBitsFlag);
+	srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+	srvDesc.Texture2D.MostDetailedMip = 0;
+	srvDesc.Texture2D.MipLevels = -1;
+	srvDesc.Texture2D.ResourceMinLODClamp = 0.0f;
+	srvDesc.Texture2D.PlaneSlice = 0;
+	ITexture::BuildDescriptor(device, srvDesc, hCpuSrv, hGpuSrv);
+	
+	for (int i = 0; i < m_nDsvCount; ++i) 
+	{
+		D3D12_DEPTH_STENCIL_VIEW_DESC dsvDesc;
+		dsvDesc.Flags = D3D12_DSV_FLAG_NONE;
+		dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
+		dsvDesc.Format = GetDepthDSVFormat(m_DepthStencilBitsFlag);
+		dsvDesc.Texture2D.MipSlice = 0;
+		device->CreateDepthStencilView(m_Resource.Get(), &dsvDesc, hCpuDsv);
+		m_DepthStencilView = hCpuDsv;
+	}
 }
 
 void Depth2D::GetDescriptorCount(int& srvCount, int& dsvCount)
@@ -380,14 +401,41 @@ void Depth2D::GetDescriptorCount(int& srvCount, int& dsvCount)
 }
 
 Depth2DMS::Depth2DMS(ID3D12Device* device, uint32_t width, uint32_t height,
-	const DXGI_SAMPLE_DESC& sampleDesc, DepthStencilBitsFlag depthStencilBitsFlag, uint32_t bindFlags)
+	const DXGI_SAMPLE_DESC& sampleDesc, DepthStencilBitsFlag depthStencilBitsFlag, uint32_t resourceFlag)
+	:ITexture(device, D3D12_RESOURCE_DESC{ D3D12_RESOURCE_DIMENSION_TEXTURE2D , 0, width, height,
+		1, 1, GetDepthTextureFormat(depthStencilBitsFlag), sampleDesc, D3D12_TEXTURE_LAYOUT_UNKNOWN,
+		resourceFlag& (uint32_t)ResourceFlag::DEPTH_STENCIL ? D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL : D3D12_RESOURCE_FLAG_NONE })
 {
+	m_MsaaSamples = sampleDesc.Count;
+	m_DepthStencilBitsFlag = depthStencilBitsFlag;
+
+	if (resourceFlag & (uint32_t)ResourceFlag::DEPTH_STENCIL)
+	{
+		m_nDsvCount += 1;
+	}
 }
 
 void Depth2DMS::BuildDescriptor(ID3D12Device* device, CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuSrv,
 	CD3DX12_GPU_DESCRIPTOR_HANDLE hGpuSrv, CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuDsv,
 	UINT uiSrvDescriptorSize, UINT uiDsvDescriptorSize)
 {
+	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+	srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+	srvDesc.Format = GetDepthSRVFormat(m_DepthStencilBitsFlag);
+	srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2DMS;
+	srvDesc.Texture2DMS.UnusedField_NothingToDefine = 0;
+	ITexture::BuildDescriptor(device, srvDesc, hCpuSrv, hGpuSrv);
+
+	for (int i = 0; i < m_nDsvCount; ++i)
+	{
+		D3D12_DEPTH_STENCIL_VIEW_DESC dsvDesc;
+		dsvDesc.Flags = D3D12_DSV_FLAG_NONE;
+		dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2DMS;
+		dsvDesc.Format = GetDepthDSVFormat(m_DepthStencilBitsFlag);
+		dsvDesc.Texture2DMS.UnusedField_NothingToDefine = 0;
+		device->CreateDepthStencilView(m_Resource.Get(), &dsvDesc, hCpuDsv);
+		m_DepthStencilView = hCpuDsv;
+	}
 }
 
 void Depth2DMS::GetDescriptorCount(int& srvCount, int& dsvCount)
@@ -398,13 +446,49 @@ void Depth2DMS::GetDescriptorCount(int& srvCount, int& dsvCount)
 
 Depth2DArray::Depth2DArray(ID3D12Device* device, uint32_t width, uint32_t height, uint32_t arraySize,
 	DepthStencilBitsFlag depthStencilBitsFlag, uint32_t resourceFlag)
+	: ITexture(device, D3D12_RESOURCE_DESC{ D3D12_RESOURCE_DIMENSION_TEXTURE2D, 0, width, height,
+		(UINT16)arraySize, 1, GetDepthTextureFormat(depthStencilBitsFlag), DXGI_SAMPLE_DESC{1,0}, D3D12_TEXTURE_LAYOUT_UNKNOWN, 
+		resourceFlag& (uint32_t)ResourceFlag::DEPTH_STENCIL ? D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL : D3D12_RESOURCE_FLAG_NONE })
 {
+	m_ArraySize = arraySize;
+	m_DepthStencilBitsFlag = depthStencilBitsFlag;
+
+	if (resourceFlag & (uint32_t)ResourceFlag::DEPTH_STENCIL) 
+	{
+		m_nDsvCount += m_ArraySize;
+	}
 }
 
 void Depth2DArray::BuildDescriptor(ID3D12Device* device, CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuSrv,
 	CD3DX12_GPU_DESCRIPTOR_HANDLE hGpuSrv, CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuDsv,
 	UINT uiSrvDescriptorSize, UINT uiDsvDescriptorSize)
 {
+	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+	srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+	srvDesc.Format = GetDepthSRVFormat(m_DepthStencilBitsFlag);
+	srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2DARRAY;
+	srvDesc.Texture2DArray.MostDetailedMip = 0;
+	srvDesc.Texture2DArray.MipLevels = -1;
+	srvDesc.Texture2DArray.FirstArraySlice = 0;
+	srvDesc.Texture2DArray.ArraySize = m_ArraySize;
+	srvDesc.Texture2DArray.PlaneSlice = 0;
+	srvDesc.Texture2DArray.ResourceMinLODClamp = 0.0f;
+	ITexture::BuildDescriptor(device, srvDesc, hCpuSrv, hGpuSrv);
+
+	for (int i = 0; i < m_nDsvCount; ++i)
+	{
+		D3D12_DEPTH_STENCIL_VIEW_DESC dsvDesc;
+		dsvDesc.Flags = D3D12_DSV_FLAG_NONE;
+		dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2DARRAY;
+		dsvDesc.Format = GetDepthDSVFormat(m_DepthStencilBitsFlag);
+		dsvDesc.Texture2DArray.MipSlice = 0;
+		dsvDesc.Texture2DArray.FirstArraySlice = i;
+		dsvDesc.Texture2DArray.ArraySize = 0;
+		device->CreateDepthStencilView(m_Resource.Get(), &dsvDesc, hCpuDsv);
+		m_DepthStencilElements[i] = hCpuDsv;
+		hCpuDsv.Offset(1, uiDsvDescriptorSize);
+	}
+	m_DepthArrayDSV = m_DepthStencilElements[0];
 }
 
 void Depth2DArray::GetDescriptorCount(int& srvCount, int& dsvCount)
@@ -415,13 +499,45 @@ void Depth2DArray::GetDescriptorCount(int& srvCount, int& dsvCount)
 
 Depth2DMSArray::Depth2DMSArray(ID3D12Device* device, uint32_t width, uint32_t height, uint32_t arraySize,
 	const DXGI_SAMPLE_DESC& sampleDesc, DepthStencilBitsFlag depthStencilBitsFlag, uint32_t resourceFlag)
+	: ITexture(device, D3D12_RESOURCE_DESC{ D3D12_RESOURCE_DIMENSION_TEXTURE2D, 0, width, height,
+		(UINT16)arraySize, 1, GetDepthTextureFormat(depthStencilBitsFlag), sampleDesc, D3D12_TEXTURE_LAYOUT_UNKNOWN,
+		resourceFlag& (uint32_t)ResourceFlag::DEPTH_STENCIL ? D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL : D3D12_RESOURCE_FLAG_NONE })
 {
+	m_ArraySize = arraySize;
+	m_MsaaSamples = sampleDesc.Count;
+	m_DepthStencilBitsFlag = depthStencilBitsFlag;
+
+	if (resourceFlag & (uint32_t)ResourceFlag::DEPTH_STENCIL) 
+	{
+		m_nDsvCount += m_ArraySize;
+	}
 }
 
 void Depth2DMSArray::BuildDescriptor(ID3D12Device* device, CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuSrv,
 	CD3DX12_GPU_DESCRIPTOR_HANDLE hGpuSrv, CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuDsv,
 	UINT uiSrvDescriptorSize, UINT uiDsvDescriptorSize)
 {
+	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+	srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+	srvDesc.Format = GetDepthSRVFormat(m_DepthStencilBitsFlag);
+	srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2DMSARRAY;
+	srvDesc.Texture2DMSArray.FirstArraySlice = 0;
+	srvDesc.Texture2DMSArray.ArraySize = m_ArraySize;
+	ITexture::BuildDescriptor(device, srvDesc, hCpuSrv, hGpuSrv);
+
+	for (int i = 0; i < m_nDsvCount; ++i)
+	{
+		D3D12_DEPTH_STENCIL_VIEW_DESC dsvDesc;
+		dsvDesc.Flags = D3D12_DSV_FLAG_NONE;
+		dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2DMSARRAY;
+		dsvDesc.Format = GetDepthDSVFormat(m_DepthStencilBitsFlag);
+		dsvDesc.Texture2DMSArray.FirstArraySlice = i;
+		dsvDesc.Texture2DMSArray.ArraySize = m_ArraySize;
+		device->CreateDepthStencilView(m_Resource.Get(), &dsvDesc, hCpuDsv);
+		m_DepthStencilElements[i] = hCpuDsv;
+		hCpuDsv.Offset(1, uiDsvDescriptorSize);
+	}
+	m_DepthArrayDSV = m_DepthStencilElements[0];
 }
 
 void Depth2DMSArray::GetDescriptorCount(int& srvCount, int& dsvCount)
