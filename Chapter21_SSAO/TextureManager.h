@@ -2,11 +2,15 @@
 #define TEXTUREMANAGER_H
 
 #include "d3dUtil.h"
+#include "Texture.h"
 #include <string>
 
 class TextureManager
 {
 public:
+	template<class T>
+	using ComPtr = Microsoft::WRL::ComPtr<T>;
+
 	TextureManager();
 	~TextureManager();
 	TextureManager(TextureManager&) = delete;
@@ -15,30 +19,39 @@ public:
 	TextureManager& operator=(TextureManager&&) = default;
 
 	static TextureManager& Get();
-	void Init(ID3D12Device* device);
-	ID3D12Resource* CreateFromeFile(std::string filename, bool enableMips = false, bool forceSRGB = false);
-	ID3D12Resource* CreateFromeMemory(std::string name, void* data, size_t byteWidth, bool enableMips = false, bool forceSRGB = false);
-	bool AddTexture(std::string name, ID3D12Resource* texture);
+	void Init(ID3D12Device* device, ID3D12GraphicsCommandList* cmdList);
+	ITexture* CreateFromeFile(std::string filename, std::string name, bool isCube = false, bool forceSRGB = false);
+	ITexture* CreateFromeMemory(std::string name, void* data, size_t byteWidth, bool isCube = false, bool forceSRGB = false);
+	bool AddTexture(std::string name, std::shared_ptr<ITexture> texture);
 	void RemoveTexture(std::string name);
-	CD3DX12_GPU_DESCRIPTOR_HANDLE GetTexture(std::string name);
-	CD3DX12_GPU_DESCRIPTOR_HANDLE GetNullTexture();
+	ITexture* GetTexture(std::string name);
+	CD3DX12_GPU_DESCRIPTOR_HANDLE GetNullTexture() { return m_NullTex; }
+	CD3DX12_GPU_DESCRIPTOR_HANDLE GetNullCubeTexture() { return m_NullCubeTex; }
 
-	void BuildDescriptor();
-	UINT GetSRVDescriptorCount();
-	UINT GetDSVDescriptorCount();
-	UINT GetRTVDescriptorCount();
+	void BuildDescriptor(
+		CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuSrv, CD3DX12_GPU_DESCRIPTOR_HANDLE hGpuSrv,
+		CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuDsv, CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuRtv,
+		UINT uiSrvDescriptorSize, UINT uiDsvDescriptorSize, UINT uiRtvDescriptorSize);
+	UINT GetSRVDescriptorCount() { return m_nSRVCount; }
+	UINT GetDSVDescriptorCount() { return m_nDSVCount; }
+	UINT GetRTVDescriptorCount() { return m_nRTVCount; }
 
 private:
-	template<class T>
-	using ComPtr = Microsoft::WRL::ComPtr<T>;
-
 	ComPtr<ID3D12Device> m_pDevice;
-	using TextureData = std::pair<INT, ComPtr<ID3D12Resource>>;
-	std::unordered_map<XID, TextureData> m_Textures;
+	ComPtr<ID3D12GraphicsCommandList> m_pCommandList;
+	std::unordered_map<XID, std::shared_ptr<ITexture>> m_Textures;
+
+	UINT m_nSRVCount = 0;
+	UINT m_nDSVCount = 0;
+	UINT m_nRTVCount = 0;
 
 	CD3DX12_CPU_DESCRIPTOR_HANDLE m_hCpuSrv;
 	CD3DX12_GPU_DESCRIPTOR_HANDLE m_hGpuSrv;
+	CD3DX12_CPU_DESCRIPTOR_HANDLE m_hCpuDsv;
+	CD3DX12_CPU_DESCRIPTOR_HANDLE m_hCpuRtv;
 
+	CD3DX12_GPU_DESCRIPTOR_HANDLE m_NullTex;
+	CD3DX12_GPU_DESCRIPTOR_HANDLE m_NullCubeTex;
 };
 
 #endif // !TEXTUREMANAGER_H

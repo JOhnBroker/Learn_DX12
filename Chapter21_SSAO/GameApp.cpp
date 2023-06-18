@@ -54,7 +54,8 @@ bool GameApp::Initialize()
 bool GameApp::InitResource()
 {
 	bool bResult = false;
-
+	
+	// Initialize scene aabb
 	m_SceneBounds.Center = XMFLOAT3(0.0f, 0.0f, 0.0f);
 	m_SceneBounds.Radius = sqrtf(10.0f * 10.0f + 15.0f * 15.0f);
 
@@ -116,17 +117,20 @@ bool GameApp::InitResource()
 		m_Lights[i]->UpdateViewMatrix();
 	}
 
+	// Initialize texture resource
+	m_TextureManager.Init(m_pd3dDevice.Get(), m_CommandList.Get());
+
 	m_ShadowMap = std::make_unique<ShadowMap>(m_pd3dDevice.Get(), pow(2, m_ShadowMapSize) * 256, pow(2, m_ShadowMapSize) * 256);
 
-	LoadTexture("bricksTex", L"..\\Textures\\bricks2.dds");
-	LoadTexture("bricksNorTex", L"..\\Textures\\bricks2_nmap.dds");
-	LoadTexture("tileTex", L"..\\Textures\\tile.dds");
-	LoadTexture("tileNorTex", L"..\\Textures\\tile_nmap.dds");
-	LoadTexture("whiteTex", L"..\\Textures\\white1x1.dds");
-	LoadTexture("whiteNorTex", L"..\\Textures\\default_nmap.dds");
-	LoadTexture("grassCube", L"..\\Textures\\grasscube1024.dds");
-	LoadTexture("snowCube", L"..\\Textures\\snowcube1024.dds");
-	LoadTexture("sunsetCube", L"..\\Textures\\sunset1024.dds");
+	m_TextureManager.CreateFromeFile("..\\Textures\\bricks2.dds"		, "bricksTex");
+	m_TextureManager.CreateFromeFile("..\\Textures\\bricks2_nmap.dds"	, "bricksNorTex");
+	m_TextureManager.CreateFromeFile("..\\Textures\\tile.dds"			, "tileTex");
+	m_TextureManager.CreateFromeFile("..\\Textures\\tile_nmap.dds"		, "tileNorTex");
+	m_TextureManager.CreateFromeFile("..\\Textures\\white1x1.dds"		, "whiteTex");
+	m_TextureManager.CreateFromeFile("..\\Textures\\default_nmap.dds"	, "whiteNorTex");
+	m_TextureManager.CreateFromeFile("..\\Textures\\grasscube1024.dds"	, "grassCube", true);
+	m_TextureManager.CreateFromeFile("..\\Textures\\snowcube1024.dds"	, "snowCube", true);
+	m_TextureManager.CreateFromeFile("..\\Textures\\sunset1024.dds"		, "sunsetCube", true);
 
 	bResult = true;
 
@@ -327,8 +331,8 @@ void GameApp::Draw(const GameTimer& timer)
 
 	auto matBuffer = m_CurrFrameResource->MaterialBuffer->Resource();
 	m_CommandList->SetGraphicsRootShaderResourceView(2, matBuffer->GetGPUVirtualAddress());
-	m_CommandList->SetGraphicsRootDescriptorTable(3, m_NullCubeSrv);
-	m_CommandList->SetGraphicsRootDescriptorTable(4, m_NullTexSrv);
+	m_CommandList->SetGraphicsRootDescriptorTable(3, m_TextureManager.GetNullCubeTexture());
+	m_CommandList->SetGraphicsRootDescriptorTable(4, m_TextureManager.GetNullTexture());
 	m_CommandList->SetGraphicsRootDescriptorTable(5, m_SRVHeap->GetGPUDescriptorHandleForHeapStart());
 
 	DrawSceneToShadowMap();
@@ -672,87 +676,21 @@ void GameApp::BuildRootSignature()
 
 void GameApp::BuildDescriptorHeaps()
 {
-	CD3DX12_CPU_DESCRIPTOR_HANDLE hDescriptor(m_SRVHeap->GetCPUDescriptorHandleForHeapStart());
-	// ImGui使用了第一个SRV
-	hDescriptor.Offset(1, m_CBVSRVDescriptorSize);
-
-	std::vector<ComPtr<ID3D12Resource>> tex2DList =
-	{
-		m_Textures["bricksTex"]->m_Resource,
-		m_Textures["bricksNorTex"]->m_Resource,
-		m_Textures["tileTex"]->m_Resource,
-		m_Textures["tileNorTex"]->m_Resource,
-		m_Textures["whiteTex"]->m_Resource,
-		m_Textures["whiteNorTex"]->m_Resource,
-	};
-	auto grassSkyMap = m_Textures["grassCube"]->m_Resource;
-	auto snowSkyMap = m_Textures["snowCube"]->m_Resource;
-	auto sunsetSkyMap = m_Textures["sunsetCube"]->m_Resource;
-
-	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
-	srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-	srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
-	srvDesc.Texture2D.MostDetailedMip = 0;
-	srvDesc.Texture2D.ResourceMinLODClamp = 0.0f;
-
-	for (UINT i = 0; i < (UINT)tex2DList.size(); ++i) 
-	{
-		srvDesc.Format = tex2DList[i]->GetDesc().Format;
-		srvDesc.Texture2D.MipLevels = tex2DList[i]->GetDesc().MipLevels;
-		m_pd3dDevice->CreateShaderResourceView(tex2DList[i].Get(), &srvDesc, hDescriptor);
-		hDescriptor.Offset(1, m_CBVSRVDescriptorSize);
-	}
-
-	m_SkyTexHeapIndex = (UINT)tex2DList.size() + 1;
-
-	srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURECUBE;
-	srvDesc.TextureCube.MostDetailedMip = 0;
-	srvDesc.TextureCube.MipLevels = grassSkyMap->GetDesc().MipLevels;
-	srvDesc.TextureCube.ResourceMinLODClamp = 0.0f;
-	srvDesc.Format = grassSkyMap->GetDesc().Format;
-	m_pd3dDevice->CreateShaderResourceView(grassSkyMap.Get(), &srvDesc, hDescriptor);
-	hDescriptor.Offset(1, m_CBVSRVDescriptorSize);
-
-	srvDesc.TextureCube.MipLevels = snowSkyMap->GetDesc().MipLevels;
-	srvDesc.Format = snowSkyMap->GetDesc().Format;
-	m_pd3dDevice->CreateShaderResourceView(snowSkyMap.Get(), &srvDesc, hDescriptor);
-	hDescriptor.Offset(1, m_CBVSRVDescriptorSize);
-
-	srvDesc.TextureCube.MipLevels = sunsetSkyMap->GetDesc().MipLevels;
-	srvDesc.Format = sunsetSkyMap->GetDesc().Format;
-	m_pd3dDevice->CreateShaderResourceView(sunsetSkyMap.Get(), &srvDesc, hDescriptor);
-
-	// ShadowMap中有两个SRV
-	m_ShadowMapHeapIndex = m_SkyTexHeapIndex + 3;
-	m_NullCubeSrvIndex = m_ShadowMapHeapIndex + 2;
-	m_NullTexSrvIndex = m_NullCubeSrvIndex + 1;
-
 	auto srvCpuStart = m_SRVHeap->GetCPUDescriptorHandleForHeapStart();
 	auto srvGpuStart = m_SRVHeap->GetGPUDescriptorHandleForHeapStart();
 	auto dsvCpuStart = m_DSVHeap->GetCPUDescriptorHandleForHeapStart();
 	auto rtvCpuStart = m_RTVHeap->GetCPUDescriptorHandleForHeapStart();
 
-	auto nullSrv = CD3DX12_CPU_DESCRIPTOR_HANDLE(srvCpuStart, m_NullCubeSrvIndex, m_CBVSRVDescriptorSize);
-	m_NullCubeSrv = CD3DX12_GPU_DESCRIPTOR_HANDLE(srvGpuStart, m_NullCubeSrvIndex, m_CBVSRVDescriptorSize);
-	m_NullTexSrv = CD3DX12_GPU_DESCRIPTOR_HANDLE(srvGpuStart, m_NullTexSrvIndex, m_CBVSRVDescriptorSize);
-
-	m_pd3dDevice->CreateShaderResourceView(nullptr, &srvDesc, nullSrv);
-	nullSrv.Offset(1, m_CBVSRVDescriptorSize);
-
-	srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
-	srvDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-	srvDesc.Texture2D.MostDetailedMip = 0;
-	srvDesc.Texture2D.MipLevels = 1;
-	srvDesc.Texture2D.ResourceMinLODClamp = 0.0f;
-	m_pd3dDevice->CreateShaderResourceView(nullptr, &srvDesc, nullSrv);
-
-	m_ShadowMap->BuildDescriptors(
-		CD3DX12_CPU_DESCRIPTOR_HANDLE(srvCpuStart, m_ShadowMapHeapIndex, m_CBVSRVDescriptorSize),
-		CD3DX12_GPU_DESCRIPTOR_HANDLE(srvGpuStart, m_ShadowMapHeapIndex, m_CBVSRVDescriptorSize),
+	// ImGui使用了第一个SRV
+	// 默认深度模版Buffer使用了第一个DSV
+	m_TextureManager.BuildDescriptor(
+		CD3DX12_CPU_DESCRIPTOR_HANDLE(srvCpuStart, 1, m_CBVSRVDescriptorSize),
+		CD3DX12_GPU_DESCRIPTOR_HANDLE(srvGpuStart, 1, m_CBVSRVDescriptorSize),
 		CD3DX12_CPU_DESCRIPTOR_HANDLE(dsvCpuStart, 1, m_DSVDescriptorSize),
 		CD3DX12_CPU_DESCRIPTOR_HANDLE(rtvCpuStart, SwapChainBufferCount, m_RTVDescriptorSize),
-		CD3DX12_CPU_DESCRIPTOR_HANDLE(srvCpuStart, m_ShadowMapHeapIndex + 1, m_CBVSRVDescriptorSize),
-		CD3DX12_GPU_DESCRIPTOR_HANDLE(srvGpuStart, m_ShadowMapHeapIndex + 1, m_CBVSRVDescriptorSize));
+		m_CBVSRVDescriptorSize,
+		m_DSVDescriptorSize,
+		m_RTVDescriptorSize);
 }
 
 void GameApp::BuildShadersAndInputLayout()
@@ -1433,15 +1371,6 @@ void GameApp::RenderShadowMapToTexture()
 
 	m_CommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_ShadowMap->GetDebugResource(),
 		D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_GENERIC_READ));
-}
-
-void GameApp::ClearRenderItem()
-{
-	for (int i = 0; i < static_cast<int>(RenderLayer::Count); ++i) 
-	{
-		m_RitemLayer[i].clear();
-	}
-	m_AllRitems.clear();
 }
 
 void GameApp::BuildVertexAmbientOcclusion(std::vector<CPU_SSAO_Vertex>& vertices, const std::vector<std::uint32_t>& indices)

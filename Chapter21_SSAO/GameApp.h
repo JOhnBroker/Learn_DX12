@@ -14,6 +14,8 @@
 #include "Camera.h"
 #include "Octree.h"
 
+#include "TextureManager.h"
+
 #include "CubeRenderTarget.h"
 #include "ShadowMap.h"
 
@@ -106,11 +108,8 @@ public:
 	void DrawSceneToShadowMap();
 	void RenderShadowMapToTexture();
 
-	void ClearRenderItem();
-
 	// CPU AO
 	void BuildVertexAmbientOcclusion(std::vector<CPU_SSAO_Vertex>& vertices, const std::vector<std::uint32_t>& indices);
-
 
 	void ReadDataFromFile(std::vector<Vertex>& vertices, std::vector<std::uint32_t>& indices, BoundingBox& bounds);
 	void ReadDataFromFile(std::vector<Vertex>& vertices, std::vector<std::uint32_t>& indices, BoundingSphere& bounds);
@@ -144,6 +143,8 @@ private:
 	DirectX::BoundingSphere m_SceneBounds;
 	std::shared_ptr<Camera> m_pCamera = nullptr;
 
+	TextureManager m_TextureManager;
+
 	// other
 	RenderItem* m_SkullRitem = nullptr;
 	
@@ -158,17 +159,12 @@ private:
 
 	//shadow
 	int m_ShadowMapSize = 0;
-	UINT m_ShadowMapHeapIndex = 0;
-	UINT m_NullCubeSrvIndex = 0;
-	UINT m_NullTexSrvIndex = 0;
-	CD3DX12_GPU_DESCRIPTOR_HANDLE m_NullCubeSrv;
-	CD3DX12_GPU_DESCRIPTOR_HANDLE m_NullTexSrv;
 	std::unique_ptr<ShadowMap> m_ShadowMap;
 
 	//Imgui
 	bool m_ShadowMapDebugEnable = false;
 	CameraMode m_CameraMode = CameraMode::FirstPerson;
-	ShowMode m_ShowMode = ShowMode::CPU_AO;
+	ShowMode m_ShowMode = ShowMode::SSAO;
 	LightMode m_LightMode = LightMode::Orthogonal;
 	POINT m_LastMousePos;
 	std::string m_VertexFileName = "..\\Models\\skull.txt";

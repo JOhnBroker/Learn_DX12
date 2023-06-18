@@ -208,4 +208,24 @@ inline XID StringToID(std::string str)
 	return hash(str);
 }
 
+// 字符串转换函数
+inline std::wstring UTF8ToWString(std::string utf8str)
+{
+	if (utf8str.empty()) return std::wstring();
+	int cbMultiByte = static_cast<int>(utf8str.size());
+	int req = MultiByteToWideChar(65001, 0, utf8str.data(), cbMultiByte, nullptr, 0);
+	std::wstring res(req, 0);
+	MultiByteToWideChar(65001, 0, utf8str.data(), cbMultiByte, &res[0], req);
+	return res;
+}
+
+inline std::string WStringToUTF8(std::wstring wstr)
+{
+	if (wstr.empty()) return std::string();
+	int cbMultiByte = static_cast<int>(wstr.size());
+	int req = WideCharToMultiByte(65001, 0, wstr.data(), cbMultiByte, nullptr, 0, nullptr, nullptr);
+	std::string res(req, 0);
+	WideCharToMultiByte(65001, 0, wstr.data(), cbMultiByte, &res[0], req, nullptr, nullptr);
+	return res;
+}
 #endif
