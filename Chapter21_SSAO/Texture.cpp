@@ -1,25 +1,32 @@
 #include "Texture.h"
 
 ITexture::ITexture(ID3D12Device* device, const D3D12_RESOURCE_DESC& texDesc,
-	ComPtr<ID3D12Resource> resource, ComPtr<ID3D12Resource> uploadHead) 
+	ComPtr<ID3D12Resource> resource, ComPtr<ID3D12Resource> uploadHead,
+	D3D12_CLEAR_VALUE clearValue)
 	:m_Width(texDesc.Width), m_Height(texDesc.Height)
 {
+	D3D12_CLEAR_VALUE* optClear = nullptr;
 	m_Resource.Reset();
 	m_UploadHeap.Reset();
-	if (resource != nullptr && m_UploadHeap != nullptr) 
+	if (resource != nullptr) 
 	{
-		m_Resource = std::move(resource);
-		m_UploadHeap = std::move(uploadHead);
+		m_Resource = resource;
+		m_UploadHeap = uploadHead;
 	}
 	else 
 	{
+		if (clearValue.Format != DXGI_FORMAT_UNKNOWN) 
+		{
+			optClear = &clearValue;
+		}
+
 		// TODO : 区分创建资源的用途 还有D3D12_HEAP_TYPE_UPLOAD、D3D12_HEAP_TYPE_READBACK
 		HR(device->CreateCommittedResource(
 			&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
 			D3D12_HEAP_FLAG_NONE,
 			&texDesc,
 			D3D12_RESOURCE_STATE_GENERIC_READ,
-			nullptr,
+			optClear,
 			IID_PPV_ARGS(&m_Resource)));
 	}
 }
@@ -352,9 +359,10 @@ static DXGI_FORMAT GetDepthDSVFormat(DepthStencilBitsFlag flag)
 
 Depth2D::Depth2D(ID3D12Device* device, uint32_t width, uint32_t height,
 	DepthStencilBitsFlag depthStencilBitsFlag, uint32_t resourceFlag)
-	:ITexture(device, D3D12_RESOURCE_DESC{ D3D12_RESOURCE_DIMENSION_TEXTURE2D , 0, width, height, 1, 1, 
+	:ITexture(device, D3D12_RESOURCE_DESC{ D3D12_RESOURCE_DIMENSION_TEXTURE2D , 0, width, height, 1, 1,
 		GetDepthTextureFormat(depthStencilBitsFlag), DXGI_SAMPLE_DESC{1,0},D3D12_TEXTURE_LAYOUT_UNKNOWN,
-		resourceFlag& (uint32_t)ResourceFlag::DEPTH_STENCIL ? D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL : D3D12_RESOURCE_FLAG_NONE })
+		resourceFlag& (uint32_t)ResourceFlag::DEPTH_STENCIL ? D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL : D3D12_RESOURCE_FLAG_NONE },
+		nullptr, nullptr, D3D12_CLEAR_VALUE{ GetDepthDSVFormat(depthStencilBitsFlag),1.0f,0 })
 {
 	m_TextureType = TextureType::Depth2D;
 	m_DepthStencilBitsFlag = depthStencilBitsFlag;
@@ -396,7 +404,8 @@ Depth2DMS::Depth2DMS(ID3D12Device* device, uint32_t width, uint32_t height,
 	const DXGI_SAMPLE_DESC& sampleDesc, DepthStencilBitsFlag depthStencilBitsFlag, uint32_t resourceFlag)
 	:ITexture(device, D3D12_RESOURCE_DESC{ D3D12_RESOURCE_DIMENSION_TEXTURE2D , 0, width, height,
 		1, 1, GetDepthTextureFormat(depthStencilBitsFlag), sampleDesc, D3D12_TEXTURE_LAYOUT_UNKNOWN,
-		resourceFlag& (uint32_t)ResourceFlag::DEPTH_STENCIL ? D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL : D3D12_RESOURCE_FLAG_NONE })
+		resourceFlag& (uint32_t)ResourceFlag::DEPTH_STENCIL ? D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL : D3D12_RESOURCE_FLAG_NONE },
+		nullptr, nullptr, D3D12_CLEAR_VALUE{ GetDepthDSVFormat(depthStencilBitsFlag),1.0f,0 })
 {
 	m_TextureType = TextureType::Depth2DMS;
 	m_MsaaSamples = sampleDesc.Count;
@@ -437,7 +446,8 @@ Depth2DArray::Depth2DArray(ID3D12Device* device, uint32_t width, uint32_t height
 	DepthStencilBitsFlag depthStencilBitsFlag, uint32_t resourceFlag)
 	: ITexture(device, D3D12_RESOURCE_DESC{ D3D12_RESOURCE_DIMENSION_TEXTURE2D, 0, width, height,
 		(UINT16)arraySize, 1, GetDepthTextureFormat(depthStencilBitsFlag), DXGI_SAMPLE_DESC{1,0}, D3D12_TEXTURE_LAYOUT_UNKNOWN, 
-		resourceFlag& (uint32_t)ResourceFlag::DEPTH_STENCIL ? D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL : D3D12_RESOURCE_FLAG_NONE })
+		resourceFlag& (uint32_t)ResourceFlag::DEPTH_STENCIL ? D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL : D3D12_RESOURCE_FLAG_NONE },
+		nullptr, nullptr, D3D12_CLEAR_VALUE{ GetDepthDSVFormat(depthStencilBitsFlag),1.0f,0 })
 {
 	m_TextureType = TextureType::Depth2DArray;
 	m_ArraySize = arraySize;
@@ -487,7 +497,8 @@ Depth2DMSArray::Depth2DMSArray(ID3D12Device* device, uint32_t width, uint32_t he
 	const DXGI_SAMPLE_DESC& sampleDesc, DepthStencilBitsFlag depthStencilBitsFlag, uint32_t resourceFlag)
 	: ITexture(device, D3D12_RESOURCE_DESC{ D3D12_RESOURCE_DIMENSION_TEXTURE2D, 0, width, height,
 		(UINT16)arraySize, 1, GetDepthTextureFormat(depthStencilBitsFlag), sampleDesc, D3D12_TEXTURE_LAYOUT_UNKNOWN,
-		resourceFlag& (uint32_t)ResourceFlag::DEPTH_STENCIL ? D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL : D3D12_RESOURCE_FLAG_NONE })
+		resourceFlag& (uint32_t)ResourceFlag::DEPTH_STENCIL ? D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL : D3D12_RESOURCE_FLAG_NONE },
+		nullptr, nullptr, D3D12_CLEAR_VALUE{ GetDepthDSVFormat(depthStencilBitsFlag),1.0f,0 })
 {
 	m_TextureType = TextureType::Depth2DMSArray;
 	m_ArraySize = arraySize;

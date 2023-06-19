@@ -39,31 +39,32 @@ ITexture* TextureManager::CreateFromeFile(std::string filename, std::string name
 {
 	uint32_t width = 0, height = 0, mipLevels = 1;
 	DXGI_FORMAT format = DXGI_FORMAT_UNKNOWN;
+	ComPtr<ID3D12Resource> resource;
+	ComPtr<ID3D12Resource> uploadHeap;
 
 	XID nameID = StringToID(filename);
 	std::wstring wstrName = UTF8ToWString(filename);
 
-	auto texture = std::make_shared<Texture>();
 	HR(DirectX::CreateDDSTextureFromFile12(m_pDevice.Get(), m_pCommandList.Get(),
-			wstrName.c_str(), texture->m_Resource, texture->m_UploadHeap));
+			wstrName.c_str(), resource, uploadHeap));
 
-	width = texture->m_Resource->GetDesc().Width;
-	height = texture->m_Resource->GetDesc().Height;
-	mipLevels = texture->m_Resource->GetDesc().MipLevels;
-	format = texture->m_Resource->GetDesc().Format;
+	width		= resource->GetDesc().Width;
+	height		= resource->GetDesc().Height;
+	mipLevels	= resource->GetDesc().MipLevels;
+	format		= resource->GetDesc().Format;
 
 	if (isCube) 
 	{
 		auto texCube = std::make_shared<TextureCube>(m_pDevice.Get(), width, height,
 			format, mipLevels, (uint32_t)ResourceFlag::SHADER_RESOURCE,
-			texture->m_Resource, texture->m_UploadHeap);
+			resource, uploadHeap);
 		AddTexture(name, texCube);
 	}
 	else 
 	{
 		auto text2D = std::make_shared<Texture2D>(m_pDevice.Get(), width, height,
 			format, mipLevels, (uint32_t)ResourceFlag::SHADER_RESOURCE,
-			texture->m_Resource, texture->m_UploadHeap);
+			resource, uploadHeap);
 		AddTexture(name, text2D);
 	}
 	return GetTexture(name);
@@ -95,16 +96,13 @@ ITexture* TextureManager::CreateFromeMemory(std::string name, void* data, size_t
 bool TextureManager::AddTexture(std::string name, std::shared_ptr<ITexture> texture)
 {
 	XID nameID = StringToID(name);
-
-#if (defined(DEBUG) || defined(_DEBUG)) && (GRAPHICS_DEBUGGER_OBJECT_NAME)
-	::D3D12SetDebugObjectName(texture->GetTexture().Get(), name.c_str());
-#endif
 	return m_Textures.try_emplace(nameID, texture).second;
 }
 
 void TextureManager::RemoveTexture(std::string name)
 {
 	XID nameID = StringToID(name);
+	RemoveTextureIndex(name);
 	m_Textures.erase(nameID);
 }
 
@@ -118,11 +116,23 @@ ITexture* TextureManager::GetTexture(std::string name)
 	return nullptr;	
 }
 
+// when texture don't exit, return -1 
+int TextureManager::GetTextureIndex(std::string name)
+{
+	XID nameID = StringToID(name);
+	if (m_TexturesIndex.count(nameID))
+	{
+		return m_TexturesIndex[nameID];
+	}
+	return -1;
+}
+
 void TextureManager::BuildDescriptor(
 	CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuSrv, CD3DX12_GPU_DESCRIPTOR_HANDLE hGpuSrv,
 	CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuDsv, CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuRtv,
 	UINT uiSrvDescriptorSize, UINT uiDsvDescriptorSize, UINT uiRtvDescriptorSize)
 {
+	int index = 1;
 	m_hCpuSrv = hCpuSrv;
 	m_hGpuSrv = hGpuSrv;
 	m_hCpuDsv = hCpuDsv;
@@ -141,6 +151,7 @@ void TextureManager::BuildDescriptor(
 	m_NullTex = hGpuSrv;
 	hCpuSrv.Offset(1, uiSrvDescriptorSize);
 	hGpuSrv.Offset(1, uiSrvDescriptorSize);
+	AddTextureIndex("nullTex", index++);
 
 	nullDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURECUBE;
 	nullDesc.Format = DXGI_FORMAT_BC1_UNORM;
@@ -151,14 +162,15 @@ void TextureManager::BuildDescriptor(
 	m_NullCubeTex = hGpuSrv;
 	hCpuSrv.Offset(1, uiSrvDescriptorSize);
 	hGpuSrv.Offset(1, uiSrvDescriptorSize);
+	AddTextureIndex("nullCubeTex", index++);
 
 	m_nSRVCount += 2;
 
 	for (auto& it : m_Textures) 
 	{
-		TextureType type = it.second->GetTextureType();
 		it.second->BuildDescriptor(m_pDevice.Get(),hCpuSrv, hGpuSrv, hCpuDsv,
 			hCpuRtv, uiSrvDescriptorSize, uiDsvDescriptorSize, uiRtvDescriptorSize);
+		AddTextureIndex(it.first, index++);
 	}
 
 	for (auto& it : m_Textures)
@@ -167,4 +179,21 @@ void TextureManager::BuildDescriptor(
 		m_nDSVCount += it.second->GetDSVDescriptorCount();
 		m_nRTVCount += it.second->GetRTVDescriptorCount();
 	}
+}
+
+bool TextureManager::AddTextureIndex(std::string name, int index)
+{
+	XID nameID = StringToID(name);
+	return m_TexturesIndex.try_emplace(nameID, index).second;
+}
+
+bool TextureManager::AddTextureIndex(XID nameID, int index)
+{
+	return m_TexturesIndex.try_emplace(nameID, index).second;
+}
+
+void TextureManager::RemoveTextureIndex(std::string name)
+{
+	XID nameID = StringToID(name);
+	m_TexturesIndex.erase(nameID);
 }

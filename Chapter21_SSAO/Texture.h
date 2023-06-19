@@ -45,11 +45,12 @@ public:
 
 	ITexture(ID3D12Device* device, const D3D12_RESOURCE_DESC& texDesc,
 		ComPtr<ID3D12Resource> resource = nullptr,
-		ComPtr<ID3D12Resource> uploadHead = nullptr);
+		ComPtr<ID3D12Resource> uploadHead = nullptr,
+		D3D12_CLEAR_VALUE clearValue = {});
 	virtual ~ITexture() = 0 {};
 
-	ComPtr<ID3D12Resource> GetTexture() { return m_Resource; }
-	ComPtr<ID3D12Resource> GetUploadHeap() { return m_UploadHeap; }
+	ID3D12Resource* GetTexture() { return m_Resource.Get(); }
+	ID3D12Resource* GetUploadHeap() { return m_UploadHeap.Get(); }
 	CD3DX12_GPU_DESCRIPTOR_HANDLE GetShaderResource() { return m_hGpuSrv; }
 	CD3DX12_GPU_DESCRIPTOR_HANDLE GetUnorderedAccess() { return m_hGpuUav; }
 	CD3DX12_CPU_DESCRIPTOR_HANDLE GetRenderTarget() { return m_hCpuRtv; }

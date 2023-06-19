@@ -29,12 +29,12 @@ UINT ShadowMap::GetHeight()const
 
 ID3D12Resource*  ShadowMap::GetResource()
 {
-	return m_ShadowMap->GetTexture().Get();
+	return m_ShadowMap->GetTexture();
 }
 
 ID3D12Resource* ShadowMap::GetDebugResource()
 {
-	return m_ShadowMap_Debug->GetTexture().Get();
+	return m_ShadowMap_Debug->GetTexture();
 }
 
 CD3DX12_GPU_DESCRIPTOR_HANDLE ShadowMap::GetSrv()const

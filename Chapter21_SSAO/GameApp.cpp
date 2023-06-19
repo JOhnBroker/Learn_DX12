@@ -121,7 +121,7 @@ bool GameApp::InitResource()
 	m_TextureManager.Init(m_pd3dDevice.Get(), m_CommandList.Get());
 
 	m_ShadowMap = std::make_unique<ShadowMap>(m_pd3dDevice.Get(), pow(2, m_ShadowMapSize) * 256, pow(2, m_ShadowMapSize) * 256);
-
+	
 	m_TextureManager.CreateFromeFile("..\\Textures\\bricks2.dds"		, "bricksTex");
 	m_TextureManager.CreateFromeFile("..\\Textures\\bricks2_nmap.dds"	, "bricksNorTex");
 	m_TextureManager.CreateFromeFile("..\\Textures\\tile.dds"			, "tileTex");
@@ -181,12 +181,12 @@ void GameApp::Update(const GameTimer& timer)
 
 	// animate skull
 
-	//XMMATRIX skullScale = XMMatrixScaling(0.2f, 0.2f, 0.2f);
-	//XMMATRIX skullOffset = XMMatrixTranslation(3.0f, 2.0f, 0.0f);
-	//XMMATRIX skullLocalRotate = XMMatrixRotationY(2.0f * timer.TotalTime());
-	//XMMATRIX skullGlobalRotate = XMMatrixRotationY(0.5f * timer.TotalTime());
-	//XMStoreFloat4x4(&m_SkullRitem->World, skullScale * skullLocalRotate * skullOffset * skullGlobalRotate);
-	//m_SkullRitem->NumFramesDirty = g_numFrameResources;
+	XMMATRIX skullScale = XMMatrixScaling(0.2f, 0.2f, 0.2f);
+	XMMATRIX skullOffset = XMMatrixTranslation(3.0f, 2.0f, 0.0f);
+	XMMATRIX skullLocalRotate = XMMatrixRotationY(2.0f * timer.TotalTime());
+	XMMATRIX skullGlobalRotate = XMMatrixRotationY(0.5f * timer.TotalTime());
+	XMStoreFloat4x4(&m_SkullRitem->World, skullScale * skullLocalRotate * skullOffset * skullGlobalRotate);
+	m_SkullRitem->NumFramesDirty = g_numFrameResources;
 
 	// ImGui
 	ImGuiIO& io = ImGui::GetIO();
@@ -254,7 +254,7 @@ void GameApp::Update(const GameTimer& timer)
 				m_ShowMode = ShowMode::SSAO_Gaussian;
 			}
 		}
-		static int curr_skyCubemode = max(0, static_cast<int>(m_SkyTexHeapIndex) - 7);
+		static int curr_skyCubemode = max(0, static_cast<int>(m_SkyTexHeapIndex) - m_TextureManager.GetTextureIndex("grassCube"));
 		static const char* skyCubeMode[] = {
 				"grass",
 				"snow",
@@ -264,15 +264,15 @@ void GameApp::Update(const GameTimer& timer)
 		{
 			if (curr_skyCubemode == 0 )
 			{
-				m_SkyTexHeapIndex = 7;
+				m_SkyTexHeapIndex = m_TextureManager.GetTextureIndex("grassCube");
 			}
 			else if (curr_skyCubemode == 1)
 			{
-				m_SkyTexHeapIndex = 8;
+				m_SkyTexHeapIndex = m_TextureManager.GetTextureIndex("snowCube");
 			}
 			else if (curr_skyCubemode == 2) 
 			{
-				m_SkyTexHeapIndex = 9;
+				m_SkyTexHeapIndex = m_TextureManager.GetTextureIndex("sunsetCube");
 			}
 		}
 		ImGui::SliderInt("ShadowMap level", &m_ShadowMapSize, 0, 4);
@@ -356,7 +356,21 @@ void GameApp::Draw(const GameTimer& timer)
 	m_CommandList->SetGraphicsRootDescriptorTable(3, skyTexDescriptor);
 	m_CommandList->SetGraphicsRootDescriptorTable(4, m_ShadowMap->GetSrv());
 
-	m_CommandList->SetPipelineState(m_PSOs["ao"].Get());
+	switch (m_ShowMode)
+	{
+	case GameApp::ShowMode::CPU_AO:
+		m_CommandList->SetPipelineState(m_PSOs["ao"].Get());
+		break;
+	case GameApp::ShowMode::SSAO:
+		m_CommandList->SetPipelineState(m_PSOs["opaque"].Get());
+		break;
+	case GameApp::ShowMode::SSAO_SelfInter:
+		break;
+	case GameApp::ShowMode::SSAO_Gaussian:
+		break;
+	default:
+		break;
+	}
 	DrawRenderItems(m_CommandList.Get(), m_RitemLayer[(int)RenderLayer::Opaque]);
 	
 	m_CommandList->SetPipelineState(m_PSOs["sky"].Get());
@@ -1183,8 +1197,8 @@ void GameApp::BuildMaterials()
 	auto bricks = std::make_unique<Material>();
 	bricks->m_Name = "bricks";
 	bricks->m_MatCBIndex = 0;
-	bricks->m_DiffuseSrvHeapIndex = 1;
-	bricks->m_NormalSrvHeapIndex = 2;
+	bricks->m_DiffuseSrvHeapIndex = m_TextureManager.GetTextureIndex("bricksTex");
+	bricks->m_NormalSrvHeapIndex = m_TextureManager.GetTextureIndex("bricksNorTex");
 	bricks->m_DiffuseAlbedo = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
 	bricks->m_FresnelR0 = XMFLOAT3(0.1f, 0.1f, 0.1f);
 	bricks->m_Roughness = 0.3f;
@@ -1192,8 +1206,8 @@ void GameApp::BuildMaterials()
 	auto tile = std::make_unique<Material>();
 	tile->m_Name = "tile";
 	tile->m_MatCBIndex = 1;
-	tile->m_DiffuseSrvHeapIndex = 3;
-	tile->m_NormalSrvHeapIndex = 4;
+	tile->m_DiffuseSrvHeapIndex = m_TextureManager.GetTextureIndex("tileTex");
+	tile->m_NormalSrvHeapIndex = m_TextureManager.GetTextureIndex("tileNorTex");
 	tile->m_DiffuseAlbedo = XMFLOAT4(0.9f, 0.9f, 0.9f, 1.0f);
 	tile->m_FresnelR0 = XMFLOAT3(0.2f, 0.2f, 0.2f);
 	tile->m_Roughness = 0.1f;
@@ -1201,8 +1215,8 @@ void GameApp::BuildMaterials()
 	auto mirror = std::make_unique<Material>();
 	mirror->m_Name = "mirror";
 	mirror->m_MatCBIndex = 2;
-	mirror->m_DiffuseSrvHeapIndex = 5;
-	mirror->m_NormalSrvHeapIndex = 6;
+	mirror->m_DiffuseSrvHeapIndex = m_TextureManager.GetTextureIndex("whiteTex");
+	mirror->m_NormalSrvHeapIndex = m_TextureManager.GetTextureIndex("whiteNorTex");
 	mirror->m_DiffuseAlbedo = XMFLOAT4(0.0f, 0.0f, 0.1f, 1.0f);
 	mirror->m_FresnelR0 = XMFLOAT3(0.98f, 0.98f, 0.98f);
 	mirror->m_Roughness = 0.1f;
@@ -1211,8 +1225,8 @@ void GameApp::BuildMaterials()
 	auto skullMat = std::make_unique<Material>();
 	skullMat->m_Name = "skullMat";
 	skullMat->m_MatCBIndex = 3;
-	skullMat->m_DiffuseSrvHeapIndex = 5;
-	skullMat->m_NormalSrvHeapIndex = 6;
+	skullMat->m_DiffuseSrvHeapIndex = m_TextureManager.GetTextureIndex("whiteTex");
+	skullMat->m_NormalSrvHeapIndex = m_TextureManager.GetTextureIndex("whiteNorTex");
 	skullMat->m_DiffuseAlbedo = XMFLOAT4(0.8f, 0.8f, 0.8f, 1.0f);
 	skullMat->m_FresnelR0 = XMFLOAT3(0.2f, 0.2f, 0.2f);
 	skullMat->m_Roughness = 0.2f;
@@ -1221,7 +1235,7 @@ void GameApp::BuildMaterials()
 	sky->m_Name = "sky";
 	sky->m_MatCBIndex = 4;
 	sky->m_DiffuseSrvHeapIndex = m_SkyTexHeapIndex;
-	sky->m_NormalSrvHeapIndex = 6;
+	sky->m_NormalSrvHeapIndex = m_TextureManager.GetTextureIndex("whiteNorTex");
 	sky->m_DiffuseAlbedo = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
 	sky->m_FresnelR0 = XMFLOAT3(0.2f, 0.2f, 0.2f);
 	sky->m_Roughness = 0.2f;
@@ -1246,7 +1260,7 @@ void GameApp::BuildRenderItems()
 	skyRitem->StartIndexLocation = skyRitem->Geo->DrawArgs["sphere"].StartIndexLocation;
 	skyRitem->BaseVertexLocation = skyRitem->Geo->DrawArgs["sphere"].BaseVertexLocation;
 
-	//m_RitemLayer[(int)RenderLayer::Sky].push_back(skyRitem.get());
+	m_RitemLayer[(int)RenderLayer::Sky].push_back(skyRitem.get());
 	m_AllRitems.push_back(std::move(skyRitem));
 
 	auto columnRitem = std::make_unique<RenderItem>();
@@ -1260,7 +1274,7 @@ void GameApp::BuildRenderItems()
 	columnRitem->StartIndexLocation = columnRitem->Geo->DrawArgs["column"].StartIndexLocation;
 	columnRitem->BaseVertexLocation = columnRitem->Geo->DrawArgs["column"].BaseVertexLocation;
 
-	//m_RitemLayer[(int)RenderLayer::Opaque].push_back(columnRitem.get());
+	m_RitemLayer[(int)RenderLayer::Opaque].push_back(columnRitem.get());
 	m_AllRitems.push_back(std::move(columnRitem));
 
 	auto sphereRitem = std::make_unique<RenderItem>();
@@ -1274,7 +1288,7 @@ void GameApp::BuildRenderItems()
 	sphereRitem->StartIndexLocation = sphereRitem->Geo->DrawArgs["sphere"].StartIndexLocation;
 	sphereRitem->BaseVertexLocation = sphereRitem->Geo->DrawArgs["sphere"].BaseVertexLocation;
 	
-	//m_RitemLayer[(int)RenderLayer::Opaque].push_back(sphereRitem.get());
+	m_RitemLayer[(int)RenderLayer::Opaque].push_back(sphereRitem.get());
 	m_AllRitems.push_back(std::move(sphereRitem));
 
 	auto skullRitem = std::make_unique<RenderItem>();
@@ -1303,7 +1317,7 @@ void GameApp::BuildRenderItems()
 	gridRitem->StartIndexLocation = gridRitem->Geo->DrawArgs["grid"].StartIndexLocation;
 	gridRitem->BaseVertexLocation = gridRitem->Geo->DrawArgs["grid"].BaseVertexLocation;
 	
-	//m_RitemLayer[(int)RenderLayer::Opaque].push_back(gridRitem.get());
+	m_RitemLayer[(int)RenderLayer::Opaque].push_back(gridRitem.get());
 	m_AllRitems.push_back(std::move(gridRitem));
 }
 

@@ -25,6 +25,7 @@ public:
 	bool AddTexture(std::string name, std::shared_ptr<ITexture> texture);
 	void RemoveTexture(std::string name);
 	ITexture* GetTexture(std::string name);
+	int GetTextureIndex(std::string name);
 	CD3DX12_GPU_DESCRIPTOR_HANDLE GetNullTexture() { return m_NullTex; }
 	CD3DX12_GPU_DESCRIPTOR_HANDLE GetNullCubeTexture() { return m_NullCubeTex; }
 
@@ -37,9 +38,15 @@ public:
 	UINT GetRTVDescriptorCount() { return m_nRTVCount; }
 
 private:
+	bool AddTextureIndex(std::string name, int index);
+	bool AddTextureIndex(XID nameID, int index);
+	void RemoveTextureIndex(std::string name);
+
+private:
 	ComPtr<ID3D12Device> m_pDevice;
 	ComPtr<ID3D12GraphicsCommandList> m_pCommandList;
 	std::unordered_map<XID, std::shared_ptr<ITexture>> m_Textures;
+	std::unordered_map<XID, int> m_TexturesIndex;
 
 	UINT m_nSRVCount = 0;
 	UINT m_nDSVCount = 0;
