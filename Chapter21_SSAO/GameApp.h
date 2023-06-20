@@ -114,7 +114,6 @@ public:
 	void ReadDataFromFile(std::vector<Vertex>& vertices, std::vector<std::uint32_t>& indices, BoundingBox& bounds);
 	void ReadDataFromFile(std::vector<Vertex>& vertices, std::vector<std::uint32_t>& indices, BoundingSphere& bounds);
 	std::array<const CD3DX12_STATIC_SAMPLER_DESC, STATICSAMPLERCOUNT>GetStaticSamplers();
-	void LoadTexture(std::string name, std::wstring filename);
 
 private:
 	template<class T>
@@ -129,7 +128,7 @@ private:
 
 	std::unordered_map<std::string, std::unique_ptr<MeshGeometry>> m_Geometries;
 	std::unordered_map<std::string, std::unique_ptr<Material>> m_Materials;
-	std::unordered_map<std::string, std::unique_ptr<Texture>> m_Textures;
+	TextureManager m_TextureManager;
 	std::unordered_map<std::string, ComPtr<ID3DBlob>> m_Shaders;
 	std::unordered_map<std::string, ComPtr<ID3D12PipelineState>>m_PSOs;
 
@@ -140,24 +139,19 @@ private:
 	PassConstants m_MainPassCB;
 	PassConstants m_ShadowPassCB;
 
+	// other
 	DirectX::BoundingSphere m_SceneBounds;
 	std::shared_ptr<Camera> m_pCamera = nullptr;
-
-	TextureManager m_TextureManager;
-
-	// other
 	RenderItem* m_SkullRitem = nullptr;
 	
 	// static SkyBox
 	UINT m_SkyTexHeapIndex = 0;
 	DirectX::XMFLOAT3 m_SkyBoxScale = { 5000.0f, 5000.0f, 5000.0f };
 
-	// light
+	// light & shadow
 	float m_SunTheta = 1.25f * XM_PI;
 	float m_SunPhi = XM_PIDIV4;
 	std::array<std::shared_ptr<Light>, LIGHTCOUNT> m_Lights;
-
-	//shadow
 	int m_ShadowMapSize = 0;
 	std::unique_ptr<ShadowMap> m_ShadowMap;
 

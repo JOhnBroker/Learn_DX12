@@ -61,8 +61,8 @@ public:
 	TextureType GetTextureType() { return m_TextureType; } 
 
 	virtual void BuildDescriptor(ID3D12Device* device,
-		CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuSrv, CD3DX12_GPU_DESCRIPTOR_HANDLE hGpuSrv,
-		CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuDsv, CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuRtv,
+		CD3DX12_CPU_DESCRIPTOR_HANDLE& hCpuSrv, CD3DX12_GPU_DESCRIPTOR_HANDLE& hGpuSrv,
+		CD3DX12_CPU_DESCRIPTOR_HANDLE& hCpuDsv, CD3DX12_CPU_DESCRIPTOR_HANDLE& hCpuRtv,
 		UINT uiSrvDescriptorSize, UINT uiDsvDescriptorSize, UINT uiRtvDescriptorSize) = 0;
 
 	UINT GetSRVDescriptorCount() { return m_nSrvCount; };
@@ -102,8 +102,8 @@ public:
 	uint32_t GetMiopLevels() const { return m_MipLevels; };
 
 	void BuildDescriptor(ID3D12Device* device,
-		CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuSrv, CD3DX12_GPU_DESCRIPTOR_HANDLE hGpuSrv,
-		CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuDsv, CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuRtv,
+		CD3DX12_CPU_DESCRIPTOR_HANDLE& hCpuSrv, CD3DX12_GPU_DESCRIPTOR_HANDLE& hGpuSrv,
+		CD3DX12_CPU_DESCRIPTOR_HANDLE& hCpuDsv, CD3DX12_CPU_DESCRIPTOR_HANDLE& hCpuRtv,
 		UINT uiSrvDescriptorSize, UINT uiDsvDescriptorSize, UINT uiRtvDescriptorSize) override;
 
 	CD3DX12_CPU_DESCRIPTOR_HANDLE GetRenderTarget() 
@@ -135,8 +135,8 @@ public:
 	uint32_t GetMsaaSamples()const { return m_MsaaSamples; }
 
 	void BuildDescriptor(ID3D12Device* device,
-		CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuSrv, CD3DX12_GPU_DESCRIPTOR_HANDLE hGpuSrv,
-		CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuDsv, CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuRtv,
+		CD3DX12_CPU_DESCRIPTOR_HANDLE& hCpuSrv, CD3DX12_GPU_DESCRIPTOR_HANDLE& hGpuSrv,
+		CD3DX12_CPU_DESCRIPTOR_HANDLE& hCpuDsv, CD3DX12_CPU_DESCRIPTOR_HANDLE& hCpuRtv,
 		UINT uiSrvDescriptorSize, UINT uiDsvDescriptorSize, UINT uiRtvDescriptorSize) override;
 
 	CD3DX12_CPU_DESCRIPTOR_HANDLE GetRenderTarget() 
@@ -162,8 +162,8 @@ public:
 	uint32_t GetMipLevels() const { return m_MipLevels; }
 
 	void BuildDescriptor(ID3D12Device* device,
-		CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuSrv, CD3DX12_GPU_DESCRIPTOR_HANDLE hGpuSrv,
-		CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuDsv, CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuRtv,
+		CD3DX12_CPU_DESCRIPTOR_HANDLE& hCpuSrv, CD3DX12_GPU_DESCRIPTOR_HANDLE& hGpuSrv,
+		CD3DX12_CPU_DESCRIPTOR_HANDLE& hCpuDsv, CD3DX12_CPU_DESCRIPTOR_HANDLE& hCpuRtv,
 		UINT uiSrvDescriptorSize, UINT uiDsvDescriptorSize, UINT uiRtvDescriptorSize) override;
 
 	CD3DX12_CPU_DESCRIPTOR_HANDLE GetRenderTarget() {
@@ -210,8 +210,8 @@ public:
 	uint32_t GetArraySize() const { return m_ArraySize; }
 	
 	void BuildDescriptor(ID3D12Device* device,
-		CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuSrv, CD3DX12_GPU_DESCRIPTOR_HANDLE hGpuSrv,
-		CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuDsv, CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuRtv,
+		CD3DX12_CPU_DESCRIPTOR_HANDLE& hCpuSrv, CD3DX12_GPU_DESCRIPTOR_HANDLE& hGpuSrv,
+		CD3DX12_CPU_DESCRIPTOR_HANDLE& hCpuDsv, CD3DX12_CPU_DESCRIPTOR_HANDLE& hCpuRtv,
 		UINT uiSrvDescriptorSize, UINT uiDsvDescriptorSize, UINT uiRtvDescriptorSize) override;
 
 	CD3DX12_CPU_DESCRIPTOR_HANDLE GetRenderTarget() {
@@ -259,8 +259,8 @@ public:
 	uint32_t GetMsaaSamples() const { return m_MsaaSamples; }
 
 	void BuildDescriptor(ID3D12Device* device,
-		CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuSrv, CD3DX12_GPU_DESCRIPTOR_HANDLE hGpuSrv,
-		CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuDsv, CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuRtv,
+		CD3DX12_CPU_DESCRIPTOR_HANDLE& hCpuSrv, CD3DX12_GPU_DESCRIPTOR_HANDLE& hGpuSrv,
+		CD3DX12_CPU_DESCRIPTOR_HANDLE& hCpuDsv, CD3DX12_CPU_DESCRIPTOR_HANDLE& hCpuRtv,
 		UINT uiSrvDescriptorSize, UINT uiDsvDescriptorSize, UINT uiRtvDescriptorSize) override;
 
 	CD3DX12_CPU_DESCRIPTOR_HANDLE GetRenderTarget() {
@@ -307,8 +307,8 @@ public:
 	~Depth2D() override = default;
 
 	void BuildDescriptor(ID3D12Device* device,
-		CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuSrv, CD3DX12_GPU_DESCRIPTOR_HANDLE hGpuSrv,
-		CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuDsv, CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuRtv,
+		CD3DX12_CPU_DESCRIPTOR_HANDLE& hCpuSrv, CD3DX12_GPU_DESCRIPTOR_HANDLE& hGpuSrv,
+		CD3DX12_CPU_DESCRIPTOR_HANDLE& hCpuDsv, CD3DX12_CPU_DESCRIPTOR_HANDLE& hCpuRtv,
 		UINT uiSrvDescriptorSize, UINT uiDsvDescriptorSize, UINT uiRtvDescriptorSize) override;
 
 	CD3DX12_CPU_DESCRIPTOR_HANDLE GetDepthStencil() 
@@ -334,8 +334,8 @@ public:
 	uint32_t GetMsaaSamples() const { return m_MsaaSamples; }
 
 	void BuildDescriptor(ID3D12Device* device,
-		CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuSrv, CD3DX12_GPU_DESCRIPTOR_HANDLE hGpuSrv,
-		CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuDsv, CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuRtv,
+		CD3DX12_CPU_DESCRIPTOR_HANDLE& hCpuSrv, CD3DX12_GPU_DESCRIPTOR_HANDLE& hGpuSrv,
+		CD3DX12_CPU_DESCRIPTOR_HANDLE& hCpuDsv, CD3DX12_CPU_DESCRIPTOR_HANDLE& hCpuRtv,
 		UINT uiSrvDescriptorSize, UINT uiDsvDescriptorSize, UINT uiRtvDescriptorSize) override;
 
 	CD3DX12_CPU_DESCRIPTOR_HANDLE GetDepthStencil()
@@ -361,8 +361,8 @@ public:
 	uint32_t GetArraySize() const { return m_ArraySize; }
 
 	void BuildDescriptor(ID3D12Device* device,
-		CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuSrv, CD3DX12_GPU_DESCRIPTOR_HANDLE hGpuSrv,
-		CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuDsv, CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuRtv,
+		CD3DX12_CPU_DESCRIPTOR_HANDLE& hCpuSrv, CD3DX12_GPU_DESCRIPTOR_HANDLE& hGpuSrv,
+		CD3DX12_CPU_DESCRIPTOR_HANDLE& hCpuDsv, CD3DX12_CPU_DESCRIPTOR_HANDLE& hCpuRtv,
 		UINT uiSrvDescriptorSize, UINT uiDsvDescriptorSize, UINT uiRtvDescriptorSize) override;
 
 	CD3DX12_CPU_DESCRIPTOR_HANDLE GetDepthStencil() {
@@ -404,8 +404,8 @@ public:
 	uint32_t GetMsaaSamples() const { return m_MsaaSamples; }
 
 	void BuildDescriptor(ID3D12Device* device,
-		CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuSrv, CD3DX12_GPU_DESCRIPTOR_HANDLE hGpuSrv,
-		CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuDsv, CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuRtv,
+		CD3DX12_CPU_DESCRIPTOR_HANDLE& hCpuSrv, CD3DX12_GPU_DESCRIPTOR_HANDLE& hGpuSrv,
+		CD3DX12_CPU_DESCRIPTOR_HANDLE& hCpuDsv, CD3DX12_CPU_DESCRIPTOR_HANDLE& hCpuRtv,
 		UINT uiSrvDescriptorSize, UINT uiDsvDescriptorSize, UINT uiRtvDescriptorSize) override;
 
 	CD3DX12_CPU_DESCRIPTOR_HANDLE GetDepthStencil() {

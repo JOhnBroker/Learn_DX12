@@ -28,11 +28,15 @@ public:
 	int GetTextureIndex(std::string name);
 	CD3DX12_GPU_DESCRIPTOR_HANDLE GetNullTexture() { return m_NullTex; }
 	CD3DX12_GPU_DESCRIPTOR_HANDLE GetNullCubeTexture() { return m_NullCubeTex; }
+	UINT GetTextureCount() { return m_Textures.size(); }
 
 	void BuildDescriptor(
 		CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuSrv, CD3DX12_GPU_DESCRIPTOR_HANDLE hGpuSrv,
 		CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuDsv, CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuRtv,
 		UINT uiSrvDescriptorSize, UINT uiDsvDescriptorSize, UINT uiRtvDescriptorSize);
+	void ReBuildDescriptor(std::string name, UINT oldIndex);
+	void ReBuildDescriptor(std::string name, UINT oldIndex, CD3DX12_GPU_DESCRIPTOR_HANDLE hGpuSrv,
+		CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuDsv, CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuRtv);
 	UINT GetSRVDescriptorCount() { return m_nSRVCount; }
 	UINT GetDSVDescriptorCount() { return m_nDSVCount; }
 	UINT GetRTVDescriptorCount() { return m_nRTVCount; }
@@ -47,6 +51,10 @@ private:
 	ComPtr<ID3D12GraphicsCommandList> m_pCommandList;
 	std::unordered_map<XID, std::shared_ptr<ITexture>> m_Textures;
 	std::unordered_map<XID, int> m_TexturesIndex;
+
+	UINT m_uiSrvDescriptorSize = 0;
+	UINT m_uiDsvDescriptorSize = 0;
+	UINT m_uiRtvDescriptorSize = 0;
 
 	UINT m_nSRVCount = 0;
 	UINT m_nDSVCount = 0;

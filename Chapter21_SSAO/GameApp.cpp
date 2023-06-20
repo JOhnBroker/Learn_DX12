@@ -194,23 +194,6 @@ void GameApp::Update(const GameTimer& timer)
 	const float dt = timer.DeltaTime();
 	if (ImGui::Begin("NormalMap demo"))
 	{
-		static int curr_lightmode = static_cast<int>(m_LightMode);
-		static const char* lightMode[] = {
-				"Orthogonal",
-				"Perspective",
-		};
-		if (ImGui::Combo("Camera Mode", &curr_lightmode, lightMode, ARRAYSIZE(lightMode)))
-		{
-			if (curr_lightmode == 0 && m_LightMode != LightMode::Orthogonal)
-			{
-				m_LightMode = LightMode::Orthogonal;
-			}
-			else if (curr_lightmode == 1 && m_LightMode != LightMode::Perspective)
-			{
-				m_LightMode = LightMode::Perspective;
-			}
-		}
-		
 		static int curr_showmode = static_cast<int>(m_ShowMode);
 		static const char* showMode[] = {
 				"CPU_SSAO",
@@ -565,12 +548,12 @@ void GameApp::UpdateMainPassCB(const GameTimer& gt)
 	m_MainPassCB.Lights[0].m_Position = m_Lights[0]->GetPosition();
 
 	m_MainPassCB.Lights[1].m_Direction = m_Lights[1]->GetLightDirection();
-	m_MainPassCB.Lights[1].m_Strength = { 0.5f, 0.1f, 0.1f };
+	m_MainPassCB.Lights[1].m_Strength = { 0.5f, 0.5f, 0.5f };
 	m_MainPassCB.Lights[1].m_Position = m_Lights[1]->GetPosition();
 	m_MainPassCB.Lights[1].m_FalloffEnd = 1000.0f;
 
 	m_MainPassCB.Lights[2].m_Direction = m_Lights[2]->GetLightDirection();
-	m_MainPassCB.Lights[2].m_Strength = { 0.1f, 0.1f, 0.5f };
+	m_MainPassCB.Lights[2].m_Strength = { 0.4f, 0.5f, 0.5f };
 	m_MainPassCB.Lights[2].m_Position = m_Lights[2]->GetPosition();
 	m_MainPassCB.Lights[2].m_FalloffEnd = 1000.0f;
 	
@@ -650,7 +633,7 @@ void GameApp::BuildRootSignature()
 	CD3DX12_DESCRIPTOR_RANGE texTable1;
 	texTable1.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 1, 0);
 	CD3DX12_DESCRIPTOR_RANGE texTable2;
-	texTable2.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 10, 2, 0);
+	texTable2.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, m_TextureManager.GetTextureCount(), 2, 0);
 
 	CD3DX12_ROOT_PARAMETER slotRootParameter[6];
 
@@ -705,12 +688,15 @@ void GameApp::BuildDescriptorHeaps()
 		m_CBVSRVDescriptorSize,
 		m_DSVDescriptorSize,
 		m_RTVDescriptorSize);
+
+	m_SkyTexHeapIndex = m_TextureManager.GetTextureIndex("grassCube");
 }
 
 void GameApp::BuildShadersAndInputLayout()
 {
 	const D3D_SHADER_MACRO alphaTestDefines[] =
 	{
+		"NUM_DIR_LIGHT","3",
 		"ALPHA_TEST", "1",
 		NULL, NULL
 	};
@@ -920,28 +906,24 @@ void GameApp::BuildShapeGeometry()
 			vertices[k].Pos = box.Vertices[i].Position;
 			vertices[k].Normal = box.Vertices[i].Normal;
 			vertices[k].TexC = box.Vertices[i].TexC;
-			vertices[k].TangentU = box.Vertices[i].TangentU;
 		}
 		for (size_t i = 0; i < grid.Vertices.size(); ++i, ++k)
 		{
 			vertices[k].Pos = grid.Vertices[i].Position;
 			vertices[k].Normal = grid.Vertices[i].Normal;
 			vertices[k].TexC = grid.Vertices[i].TexC;
-			vertices[k].TangentU = grid.Vertices[i].TangentU;
 		}
 		for (size_t i = 0; i < sphere.Vertices.size(); ++i, ++k)
 		{
 			vertices[k].Pos = sphere.Vertices[i].Position;
 			vertices[k].Normal = sphere.Vertices[i].Normal;
 			vertices[k].TexC = sphere.Vertices[i].TexC;
-			vertices[k].TangentU = sphere.Vertices[i].TangentU;
 		}
 		for (size_t i = 0; i < cylinder.Vertices.size(); ++i, ++k)
 		{
 			vertices[k].Pos = cylinder.Vertices[i].Position;
 			vertices[k].Normal = cylinder.Vertices[i].Normal;
 			vertices[k].TexC = cylinder.Vertices[i].TexC;
-			vertices[k].TangentU = cylinder.Vertices[i].TangentU;
 		}
 
 		std::vector<std::uint16_t> indices;
@@ -1652,15 +1634,4 @@ std::array<const CD3DX12_STATIC_SAMPLER_DESC, STATICSAMPLERCOUNT> GameApp::GetSt
 			linearWrap, linearClamp,
 			anisotropicWrap ,anisotropicClamp,
 			shadow };
-}
-
-void GameApp::LoadTexture(std::string name, std::wstring filename)
-{
-	auto texture = std::make_unique<Texture>();
-
-	texture->m_Name = name;
-	texture->m_Filename = filename;
-	HR(DirectX::CreateDDSTextureFromFile12(m_pd3dDevice.Get(), m_CommandList.Get(),
-		texture->m_Filename.c_str(), texture->m_Resource, texture->m_UploadHeap));
-	m_Textures[name] = std::move(texture);
 }

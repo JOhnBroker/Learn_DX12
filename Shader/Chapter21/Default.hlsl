@@ -80,17 +80,8 @@ float4 PS (VertexOut pin) : SV_Target
     float3 toEyeW = normalize(gEyePosW - pin.PosW);
     float4 ambient = gAmbientLight * diffuseAlbedo;
     float3 shadowFactor = float3(1.0f, 1.0f, 1.0f);
-    
-#ifdef HARDSHADOW
-    float4 shadowPosH = pin.ShadowPosH;
-    shadowPosH.xyz /= shadowPosH.w;
-    
-    //shadowFactor[0] = gShadowMap.Sample(gSamLinearClamp, shadowPosH.xy).r >= shadowPosH.z;
-    shadowFactor[0] = gShadowMap.SampleCmpLevelZero(gSamShadow, shadowPosH.xy, shadowPosH.z).r;
-#else
     shadowFactor[0] = CalcShadowFactor(pin.ShadowPosH);
-#endif
-    
+
     const float shininess = (1.0f - roughness) * normalMapSample.a;
     Material mat = { diffuseAlbedo, fresnelR0, shininess };
 	float4 directLight = ComputeLighting(gLights, mat, pin.PosW, bumpedNormalW, toEyeW, shadowFactor);

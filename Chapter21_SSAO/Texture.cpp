@@ -54,8 +54,8 @@ Texture2D::Texture2D(ID3D12Device* device, uint32_t width, uint32_t height,
 }
 
 void Texture2D::BuildDescriptor(ID3D12Device* device,
-	CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuSrv, CD3DX12_GPU_DESCRIPTOR_HANDLE hGpuSrv,
-	CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuDsv, CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuRtv,
+	CD3DX12_CPU_DESCRIPTOR_HANDLE& hCpuSrv, CD3DX12_GPU_DESCRIPTOR_HANDLE& hGpuSrv,
+	CD3DX12_CPU_DESCRIPTOR_HANDLE& hCpuDsv, CD3DX12_CPU_DESCRIPTOR_HANDLE& hCpuRtv,
 	UINT uiSrvDescriptorSize, UINT uiDsvDescriptorSize, UINT uiRtvDescriptorSize)
 {
 	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
@@ -79,6 +79,8 @@ void Texture2D::BuildDescriptor(ID3D12Device* device,
 		uavDesc.Texture2D.MipSlice = 0;
 		device->CreateUnorderedAccessView(m_Resource.Get(), nullptr, &uavDesc, hCpuSrv);
 		m_hGpuUav = hGpuSrv;
+		hCpuSrv.Offset(1, uiSrvDescriptorSize);
+		hGpuSrv.Offset(1, uiSrvDescriptorSize);
 	}
 
 	if (m_nRtvCount > 0)
@@ -90,6 +92,7 @@ void Texture2D::BuildDescriptor(ID3D12Device* device,
 		rtvDesc.Texture2D.PlaneSlice = 0;
 		device->CreateRenderTargetView(m_Resource.Get(), &rtvDesc, hCpuRtv);
 		m_hCpuRtv = hCpuRtv;
+		hCpuRtv.Offset(1, uiRtvDescriptorSize);
 	}
 }
 
@@ -109,8 +112,8 @@ Texture2DMS::Texture2DMS(ID3D12Device* device, uint32_t width, uint32_t height,
 }
 
 void Texture2DMS::BuildDescriptor(ID3D12Device* device,
-	CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuSrv, CD3DX12_GPU_DESCRIPTOR_HANDLE hGpuSrv,
-	CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuDsv, CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuRtv,
+	CD3DX12_CPU_DESCRIPTOR_HANDLE& hCpuSrv, CD3DX12_GPU_DESCRIPTOR_HANDLE& hGpuSrv,
+	CD3DX12_CPU_DESCRIPTOR_HANDLE& hCpuDsv, CD3DX12_CPU_DESCRIPTOR_HANDLE& hCpuRtv,
 	UINT uiSrvDescriptorSize, UINT uiDsvDescriptorSize, UINT uiRtvDescriptorSize)
 {
 	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
@@ -121,6 +124,7 @@ void Texture2DMS::BuildDescriptor(ID3D12Device* device,
 	device->CreateShaderResourceView(m_Resource.Get(), &srvDesc, hCpuSrv);
 	m_hGpuSrv = hGpuSrv;
 	hCpuSrv.Offset(1, uiSrvDescriptorSize);
+	hGpuSrv.Offset(1, uiSrvDescriptorSize);
 
 	if (m_nRtvCount > 0)
 	{
@@ -130,6 +134,7 @@ void Texture2DMS::BuildDescriptor(ID3D12Device* device,
 		rtvDesc.Texture2DMS.UnusedField_NothingToDefine = 0;
 		device->CreateRenderTargetView(m_Resource.Get(), &rtvDesc, hCpuRtv);
 		m_hCpuRtv = hCpuRtv;
+		hCpuRtv.Offset(1, uiRtvDescriptorSize);
 	}
 }
 
@@ -156,8 +161,8 @@ TextureCube::TextureCube(ID3D12Device* device, uint32_t width, uint32_t height,
 }
 
 void TextureCube::BuildDescriptor(ID3D12Device* device,
-	CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuSrv, CD3DX12_GPU_DESCRIPTOR_HANDLE hGpuSrv,
-	CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuDsv, CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuRtv,
+	CD3DX12_CPU_DESCRIPTOR_HANDLE& hCpuSrv, CD3DX12_GPU_DESCRIPTOR_HANDLE& hGpuSrv,
+	CD3DX12_CPU_DESCRIPTOR_HANDLE& hCpuDsv, CD3DX12_CPU_DESCRIPTOR_HANDLE& hCpuRtv,
 	UINT uiSrvDescriptorSize, UINT uiDsvDescriptorSize, UINT uiRtvDescriptorSize)
 {
 	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
@@ -226,8 +231,8 @@ Texture2DArray::Texture2DArray(ID3D12Device* device, uint32_t width, uint32_t he
 }
 
 void Texture2DArray::BuildDescriptor(ID3D12Device* device,
-	CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuSrv, CD3DX12_GPU_DESCRIPTOR_HANDLE hGpuSrv,
-	CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuDsv, CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuRtv,
+	CD3DX12_CPU_DESCRIPTOR_HANDLE& hCpuSrv, CD3DX12_GPU_DESCRIPTOR_HANDLE& hGpuSrv,
+	CD3DX12_CPU_DESCRIPTOR_HANDLE& hCpuDsv, CD3DX12_CPU_DESCRIPTOR_HANDLE& hCpuRtv,
 	UINT uiSrvDescriptorSize, UINT uiDsvDescriptorSize, UINT uiRtvDescriptorSize)
 {
 	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
@@ -291,8 +296,8 @@ Texture2DMSArray::Texture2DMSArray(ID3D12Device* device, uint32_t width, uint32_
 }
 
 void Texture2DMSArray::BuildDescriptor(ID3D12Device* device,
-	CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuSrv, CD3DX12_GPU_DESCRIPTOR_HANDLE hGpuSrv,
-	CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuDsv, CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuRtv,
+	CD3DX12_CPU_DESCRIPTOR_HANDLE& hCpuSrv, CD3DX12_GPU_DESCRIPTOR_HANDLE& hGpuSrv,
+	CD3DX12_CPU_DESCRIPTOR_HANDLE& hCpuDsv, CD3DX12_CPU_DESCRIPTOR_HANDLE& hCpuRtv,
 	UINT uiSrvDescriptorSize, UINT uiDsvDescriptorSize, UINT uiRtvDescriptorSize)
 {
 	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
@@ -373,8 +378,8 @@ Depth2D::Depth2D(ID3D12Device* device, uint32_t width, uint32_t height,
 }
 
 void Depth2D::BuildDescriptor(ID3D12Device* device,
-	CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuSrv, CD3DX12_GPU_DESCRIPTOR_HANDLE hGpuSrv,
-	CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuDsv, CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuRtv,
+	CD3DX12_CPU_DESCRIPTOR_HANDLE& hCpuSrv, CD3DX12_GPU_DESCRIPTOR_HANDLE& hGpuSrv,
+	CD3DX12_CPU_DESCRIPTOR_HANDLE& hCpuDsv, CD3DX12_CPU_DESCRIPTOR_HANDLE& hCpuRtv,
 	UINT uiSrvDescriptorSize, UINT uiDsvDescriptorSize, UINT uiRtvDescriptorSize)
 {
 	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
@@ -387,6 +392,8 @@ void Depth2D::BuildDescriptor(ID3D12Device* device,
 	srvDesc.Texture2D.PlaneSlice = 0;
 	device->CreateShaderResourceView(m_Resource.Get(), &srvDesc, hCpuSrv);
 	m_hGpuSrv = hGpuSrv;
+	hCpuSrv.Offset(1, uiSrvDescriptorSize);
+	hGpuSrv.Offset(1, uiSrvDescriptorSize);
 	
 	for (UINT i = 0; i < m_nDsvCount; ++i)
 	{
@@ -397,6 +404,7 @@ void Depth2D::BuildDescriptor(ID3D12Device* device,
 		dsvDesc.Texture2D.MipSlice = 0;
 		device->CreateDepthStencilView(m_Resource.Get(), &dsvDesc, hCpuDsv);
 		m_hCpuDsv = hCpuDsv;
+		hCpuDsv.Offset(1, uiDsvDescriptorSize);
 	}
 }
 
@@ -418,8 +426,8 @@ Depth2DMS::Depth2DMS(ID3D12Device* device, uint32_t width, uint32_t height,
 }
 
 void Depth2DMS::BuildDescriptor(ID3D12Device* device,
-	CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuSrv, CD3DX12_GPU_DESCRIPTOR_HANDLE hGpuSrv,
-	CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuDsv, CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuRtv,
+	CD3DX12_CPU_DESCRIPTOR_HANDLE& hCpuSrv, CD3DX12_GPU_DESCRIPTOR_HANDLE& hGpuSrv,
+	CD3DX12_CPU_DESCRIPTOR_HANDLE& hCpuDsv, CD3DX12_CPU_DESCRIPTOR_HANDLE& hCpuRtv,
 	UINT uiSrvDescriptorSize, UINT uiDsvDescriptorSize, UINT uiRtvDescriptorSize)
 {
 	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
@@ -429,6 +437,8 @@ void Depth2DMS::BuildDescriptor(ID3D12Device* device,
 	srvDesc.Texture2DMS.UnusedField_NothingToDefine = 0;
 	device->CreateShaderResourceView(m_Resource.Get(), &srvDesc, hCpuSrv);
 	m_hGpuSrv = hGpuSrv;
+	hCpuSrv.Offset(1, uiSrvDescriptorSize);
+	hGpuSrv.Offset(1, uiSrvDescriptorSize);
 
 	for (UINT i = 0; i < m_nDsvCount; ++i)
 	{
@@ -439,6 +449,7 @@ void Depth2DMS::BuildDescriptor(ID3D12Device* device,
 		dsvDesc.Texture2DMS.UnusedField_NothingToDefine = 0;
 		device->CreateDepthStencilView(m_Resource.Get(), &dsvDesc, hCpuDsv);
 		m_hCpuDsv = hCpuDsv;
+		hCpuDsv.Offset(1, uiDsvDescriptorSize);
 	}
 }
 
@@ -460,8 +471,8 @@ Depth2DArray::Depth2DArray(ID3D12Device* device, uint32_t width, uint32_t height
 }
 
 void Depth2DArray::BuildDescriptor(ID3D12Device* device,
-	CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuSrv, CD3DX12_GPU_DESCRIPTOR_HANDLE hGpuSrv,
-	CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuDsv, CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuRtv,
+	CD3DX12_CPU_DESCRIPTOR_HANDLE& hCpuSrv, CD3DX12_GPU_DESCRIPTOR_HANDLE& hGpuSrv,
+	CD3DX12_CPU_DESCRIPTOR_HANDLE& hCpuDsv, CD3DX12_CPU_DESCRIPTOR_HANDLE& hCpuRtv,
 	UINT uiSrvDescriptorSize, UINT uiDsvDescriptorSize, UINT uiRtvDescriptorSize)
 {
 	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
@@ -476,6 +487,8 @@ void Depth2DArray::BuildDescriptor(ID3D12Device* device,
 	srvDesc.Texture2DArray.ResourceMinLODClamp = 0.0f;
 	device->CreateShaderResourceView(m_Resource.Get(), &srvDesc, hCpuSrv);
 	m_hGpuSrv = hGpuSrv;
+	hCpuSrv.Offset(1, uiSrvDescriptorSize);
+	hGpuSrv.Offset(1, uiSrvDescriptorSize);
 
 	for (UINT i = 0; i < m_nDsvCount; ++i)
 	{
@@ -512,8 +525,8 @@ Depth2DMSArray::Depth2DMSArray(ID3D12Device* device, uint32_t width, uint32_t he
 }
 
 void Depth2DMSArray::BuildDescriptor(ID3D12Device* device,
-	CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuSrv, CD3DX12_GPU_DESCRIPTOR_HANDLE hGpuSrv,
-	CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuDsv, CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuRtv,
+	CD3DX12_CPU_DESCRIPTOR_HANDLE& hCpuSrv, CD3DX12_GPU_DESCRIPTOR_HANDLE& hGpuSrv,
+	CD3DX12_CPU_DESCRIPTOR_HANDLE& hCpuDsv, CD3DX12_CPU_DESCRIPTOR_HANDLE& hCpuRtv,
 	UINT uiSrvDescriptorSize, UINT uiDsvDescriptorSize, UINT uiRtvDescriptorSize)
 {
 	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
@@ -524,6 +537,8 @@ void Depth2DMSArray::BuildDescriptor(ID3D12Device* device,
 	srvDesc.Texture2DMSArray.ArraySize = m_ArraySize;
 	device->CreateShaderResourceView(m_Resource.Get(), &srvDesc, hCpuSrv);
 	m_hGpuSrv = hGpuSrv;
+	hCpuSrv.Offset(1, uiSrvDescriptorSize);
+	hGpuSrv.Offset(1, uiSrvDescriptorSize);
 
 	for (UINT i = 0; i < m_nDsvCount; ++i)
 	{
