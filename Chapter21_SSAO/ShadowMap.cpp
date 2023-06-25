@@ -87,32 +87,14 @@ void ShadowMap::BuildResource()
 {
 	TextureManager& textureManager = TextureManager::Get();
 
-	
-
 	if (bIsResize) 
 	{
-		UINT oldIndex = textureManager.GetTextureIndex(SHADOWMAP_NAME);
-		CD3DX12_GPU_DESCRIPTOR_HANDLE hGpuSrv = m_ShadowMap->GetShaderResource();
-		CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuDsv = m_ShadowMap->GetDepthStencil();
-		CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuRtv = m_ShadowMap->GetRenderTarget();
-
 		m_ShadowMap = std::make_shared<Depth2D>(m_pd3dDevice, m_Width, m_Height);
-		textureManager.RemoveTexture(SHADOWMAP_NAME);
-		textureManager.AddTexture(SHADOWMAP_NAME, m_ShadowMap);
-		textureManager.ReBuildDescriptor(SHADOWMAP_NAME, oldIndex, hGpuSrv, hCpuDsv, hCpuRtv);
-		//textureManager.ReBuildDescriptor(SHADOWMAP_NAME, oldIndex);
-
-		oldIndex = textureManager.GetTextureIndex(SHADOWMAP_DEBUG_NAME);
-		hGpuSrv = m_ShadowMap_Debug->GetShaderResource();
-		hCpuDsv = m_ShadowMap_Debug->GetDepthStencil();
-		hCpuRtv = m_ShadowMap_Debug->GetRenderTarget();
+		textureManager.ReBuildDescriptor(SHADOWMAP_NAME, m_ShadowMap);
 
 		m_ShadowMap_Debug = std::make_shared<Texture2D>(m_pd3dDevice, m_Width, m_Height,
 			DXGI_FORMAT_R8G8B8A8_UNORM);
-		textureManager.RemoveTexture(SHADOWMAP_DEBUG_NAME);
-		textureManager.AddTexture(SHADOWMAP_DEBUG_NAME, m_ShadowMap_Debug);
-		textureManager.ReBuildDescriptor(SHADOWMAP_DEBUG_NAME, oldIndex, hGpuSrv, hCpuDsv, hCpuRtv);
-		//textureManager.ReBuildDescriptor(SHADOWMAP_DEBUG_NAME, oldIndex);
+		textureManager.ReBuildDescriptor(SHADOWMAP_DEBUG_NAME, m_ShadowMap_Debug);
 	}
 	else 
 	{

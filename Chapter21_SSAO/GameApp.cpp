@@ -120,8 +120,6 @@ bool GameApp::InitResource()
 	// Initialize texture resource
 	m_TextureManager.Init(m_pd3dDevice.Get(), m_CommandList.Get());
 
-	m_ShadowMap = std::make_unique<ShadowMap>(m_pd3dDevice.Get(), pow(2, m_ShadowMapSize) * 256, pow(2, m_ShadowMapSize) * 256);
-	
 	m_TextureManager.CreateFromeFile("..\\Textures\\bricks2.dds"		, "bricksTex");
 	m_TextureManager.CreateFromeFile("..\\Textures\\bricks2_nmap.dds"	, "bricksNorTex");
 	m_TextureManager.CreateFromeFile("..\\Textures\\tile.dds"			, "tileTex");
@@ -131,6 +129,9 @@ bool GameApp::InitResource()
 	m_TextureManager.CreateFromeFile("..\\Textures\\grasscube1024.dds"	, "grassCube", true);
 	m_TextureManager.CreateFromeFile("..\\Textures\\snowcube1024.dds"	, "snowCube", true);
 	m_TextureManager.CreateFromeFile("..\\Textures\\sunset1024.dds"		, "sunsetCube", true);
+
+	m_ShadowMap = std::make_unique<ShadowMap>(m_pd3dDevice.Get(),
+		pow(2, m_ShadowMapSize) * 256, pow(2, m_ShadowMapSize) * 256);
 
 	bResult = true;
 
@@ -194,50 +195,28 @@ void GameApp::Update(const GameTimer& timer)
 	const float dt = timer.DeltaTime();
 	if (ImGui::Begin("NormalMap demo"))
 	{
-		static int curr_showmode = static_cast<int>(m_ShowMode);
+		static int curr_showmode = static_cast<int>(m_ShowMode) - 1;
 		static const char* showMode[] = {
-				"CPU_SSAO",
 				"GPU_SSAO",
 				"SSAO_SelfInter",
 				"SSAO_Gaussian"
 		};
 		if (ImGui::Combo("Show Mode", &curr_showmode, showMode, ARRAYSIZE(showMode)))
 		{
-			if (curr_showmode == 0 && m_ShowMode != ShowMode::CPU_AO)
+			if (curr_showmode == 0 && m_ShowMode != ShowMode::SSAO)
 			{
-				BuildShapeGeometry();
-				BuildSkullGeometry();
-				m_ShowMode = ShowMode::CPU_AO;
-			}
-			else if (curr_showmode == 1 && m_ShowMode != ShowMode::SSAO)
-			{
-				if (m_ShowMode == ShowMode::CPU_AO)
-				{
-					BuildShapeGeometry();
-					BuildSkullGeometry();
-				}
 				m_ShowMode = ShowMode::SSAO;
 			}
-			else if (curr_showmode == 2 && m_ShowMode != ShowMode::SSAO_SelfInter)
+			else if (curr_showmode == 1 && m_ShowMode != ShowMode::SSAO_SelfInter)
 			{
-				if (m_ShowMode == ShowMode::CPU_AO)
-				{
-					BuildShapeGeometry();
-					BuildSkullGeometry();
-				}
 				m_ShowMode = ShowMode::SSAO_SelfInter;
 			}
-			else if (curr_showmode == 3 && m_ShowMode != ShowMode::SSAO_Gaussian)
+			else if (curr_showmode == 2 && m_ShowMode != ShowMode::SSAO_Gaussian)
 			{
-				if (m_ShowMode == ShowMode::CPU_AO)
-				{
-					BuildShapeGeometry();
-					BuildSkullGeometry();
-				}
 				m_ShowMode = ShowMode::SSAO_Gaussian;
 			}
 		}
-		static int curr_skyCubemode = max(0, static_cast<int>(m_SkyTexHeapIndex) - m_TextureManager.GetTextureIndex("grassCube"));
+		static int curr_skyCubemode = max(0, static_cast<int>(m_SkyTexHeapIndex) - m_TextureManager.GetTextureSrvIndex("grassCube"));
 		static const char* skyCubeMode[] = {
 				"grass",
 				"snow",
@@ -247,15 +226,15 @@ void GameApp::Update(const GameTimer& timer)
 		{
 			if (curr_skyCubemode == 0 )
 			{
-				m_SkyTexHeapIndex = m_TextureManager.GetTextureIndex("grassCube");
+				m_SkyTexHeapIndex = m_TextureManager.GetTextureSrvIndex("grassCube");
 			}
 			else if (curr_skyCubemode == 1)
 			{
-				m_SkyTexHeapIndex = m_TextureManager.GetTextureIndex("snowCube");
+				m_SkyTexHeapIndex = m_TextureManager.GetTextureSrvIndex("snowCube");
 			}
 			else if (curr_skyCubemode == 2) 
 			{
-				m_SkyTexHeapIndex = m_TextureManager.GetTextureIndex("sunsetCube");
+				m_SkyTexHeapIndex = m_TextureManager.GetTextureSrvIndex("sunsetCube");
 			}
 		}
 		ImGui::SliderInt("ShadowMap level", &m_ShadowMapSize, 0, 4);
@@ -266,6 +245,7 @@ void GameApp::Update(const GameTimer& timer)
 			m_ShadowMap->OnResize(newSize, newSize);
 		}
 		ImGui::Checkbox("Enable ShadowMap debug", &m_ShadowMapDebugEnable);
+		ImGui::Checkbox("Enable AO debug", &m_AODebugEnable);
 		XMFLOAT3 lightPos = m_Lights[0]->GetPosition();
 		ImGui::Text("Light Position\n%.2f %.2f %.2f", lightPos.x, lightPos.y, lightPos.z);
 	}
@@ -310,7 +290,7 @@ void GameApp::Draw(const GameTimer& timer)
 
 	ID3D12DescriptorHeap* descriptorHeap[] = { m_SRVHeap.Get() };
 	m_CommandList->SetDescriptorHeaps(_countof(descriptorHeap), descriptorHeap);
-	m_CommandList->SetGraphicsRootSignature(m_RootSignature.Get());
+	m_CommandList->SetGraphicsRootSignature(m_RootSignatures["opaque"].Get());
 
 	auto matBuffer = m_CurrFrameResource->MaterialBuffer->Resource();
 	m_CommandList->SetGraphicsRootShaderResourceView(2, matBuffer->GetGPUVirtualAddress());
@@ -342,7 +322,14 @@ void GameApp::Draw(const GameTimer& timer)
 	switch (m_ShowMode)
 	{
 	case GameApp::ShowMode::CPU_AO:
-		m_CommandList->SetPipelineState(m_PSOs["ao"].Get());
+		if (m_AODebugEnable) 
+		{
+			m_CommandList->SetPipelineState(m_PSOs["ao_debug"].Get());
+		}
+		else 
+		{
+			m_CommandList->SetPipelineState(m_PSOs["ao"].Get());
+		}
 		break;
 	case GameApp::ShowMode::SSAO:
 		m_CommandList->SetPipelineState(m_PSOs["opaque"].Get());
@@ -668,7 +655,89 @@ void GameApp::BuildRootSignature()
 		0, 
 		serializedRootSig->GetBufferPointer(),
 		serializedRootSig->GetBufferSize(), 
-		IID_PPV_ARGS(m_RootSignature.GetAddressOf())));
+		IID_PPV_ARGS(m_RootSignatures["opaque"].GetAddressOf())));
+}
+
+void GameApp::BuildSSAORootSignature()
+{
+	HRESULT hReturn = E_FAIL;
+	CD3DX12_DESCRIPTOR_RANGE texTable0;
+	texTable0.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 2, 0, 0);
+	CD3DX12_DESCRIPTOR_RANGE texTable1;
+	texTable1.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 2, 0);
+
+	CD3DX12_ROOT_PARAMETER slotRootParmeter[3];
+	slotRootParmeter[0].InitAsConstantBufferView(0);
+	slotRootParmeter[1].InitAsDescriptorTable(1, &texTable0, D3D12_SHADER_VISIBILITY_PIXEL);
+	slotRootParmeter[2].InitAsDescriptorTable(1, &texTable1, D3D12_SHADER_VISIBILITY_PIXEL);
+
+	const CD3DX12_STATIC_SAMPLER_DESC linearWrap(
+		0,
+		D3D12_FILTER_MIN_MAG_MIP_LINEAR,
+		D3D12_TEXTURE_ADDRESS_MODE_WRAP,
+		D3D12_TEXTURE_ADDRESS_MODE_WRAP,
+		D3D12_TEXTURE_ADDRESS_MODE_WRAP);
+	const CD3DX12_STATIC_SAMPLER_DESC linearClamp(
+		1,
+		D3D12_FILTER_MIN_MAG_MIP_LINEAR,
+		D3D12_TEXTURE_ADDRESS_MODE_CLAMP,
+		D3D12_TEXTURE_ADDRESS_MODE_CLAMP,
+		D3D12_TEXTURE_ADDRESS_MODE_CLAMP);
+	const CD3DX12_STATIC_SAMPLER_DESC normalDepth(
+		2,
+		D3D12_FILTER_MIN_MAG_LINEAR_MIP_POINT,
+		D3D12_TEXTURE_ADDRESS_MODE_BORDER,
+		D3D12_TEXTURE_ADDRESS_MODE_BORDER,
+		D3D12_TEXTURE_ADDRESS_MODE_BORDER,
+		0.0f,
+		0,
+		D3D12_COMPARISON_FUNC_NEVER, 
+		D3D12_STATIC_BORDER_COLOR_TRANSPARENT_BLACK
+		);
+	const CD3DX12_STATIC_SAMPLER_DESC randomVec(
+		3,
+		D3D12_FILTER_MIN_MAG_LINEAR_MIP_POINT,
+		D3D12_TEXTURE_ADDRESS_MODE_WRAP,
+		D3D12_TEXTURE_ADDRESS_MODE_WRAP,
+		D3D12_TEXTURE_ADDRESS_MODE_WRAP,
+		0.0f,
+		0,
+		D3D12_COMPARISON_FUNC_NEVER,
+		D3D12_STATIC_BORDER_COLOR_TRANSPARENT_BLACK
+	);
+	const CD3DX12_STATIC_SAMPLER_DESC ssaoBlur(
+		4,
+		D3D12_FILTER_MIN_MAG_LINEAR_MIP_POINT,
+		D3D12_TEXTURE_ADDRESS_MODE_CLAMP,
+		D3D12_TEXTURE_ADDRESS_MODE_CLAMP,
+		D3D12_TEXTURE_ADDRESS_MODE_CLAMP,
+		0.0f,
+		0
+	);
+	std::array<CD3DX12_STATIC_SAMPLER_DESC, 5>staticSamplers =
+	{
+		linearWrap,linearClamp,normalDepth,randomVec,ssaoBlur
+	};
+	CD3DX12_ROOT_SIGNATURE_DESC rootSigDesc(_countof(slotRootParmeter), slotRootParmeter,
+		(UINT)staticSamplers.size(), staticSamplers.data(),
+		D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
+
+	ComPtr<ID3DBlob> serializedRootSig = nullptr;
+	ComPtr<ID3DBlob> errorBlob = nullptr;
+	hReturn = D3D12SerializeRootSignature(&rootSigDesc, D3D_ROOT_SIGNATURE_VERSION_1, 
+		serializedRootSig.GetAddressOf(), errorBlob.GetAddressOf());
+
+	if (errorBlob != nullptr) 
+	{
+		::OutputDebugStringA((char*)errorBlob->GetBufferPointer());
+	}
+	HR(hReturn);
+
+	HR(m_pd3dDevice->CreateRootSignature(
+		0, 
+		serializedRootSig->GetBufferPointer(),
+		serializedRootSig->GetBufferSize(), 
+		IID_PPV_ARGS(m_RootSignatures["ssao"].GetAddressOf())));
 }
 
 void GameApp::BuildDescriptorHeaps()
@@ -689,7 +758,7 @@ void GameApp::BuildDescriptorHeaps()
 		m_DSVDescriptorSize,
 		m_RTVDescriptorSize);
 
-	m_SkyTexHeapIndex = m_TextureManager.GetTextureIndex("grassCube");
+	m_SkyTexHeapIndex = m_TextureManager.GetTextureSrvIndex("grassCube");
 }
 
 void GameApp::BuildShadersAndInputLayout()
@@ -711,8 +780,8 @@ void GameApp::BuildShadersAndInputLayout()
 	m_Shaders["skyVS"] = d3dUtil::CompileShader(L"..\\Shader\\Chapter21\\Default.hlsl", nullptr, "Sky_VS", "vs_5_1");
 	m_Shaders["skyPS"] = d3dUtil::CompileShader(L"..\\Shader\\Chapter21\\Default.hlsl", nullptr, "Sky_PS", "ps_5_1");
 	// ssao
-	m_Shaders["aoVS"] = d3dUtil::CompileShader(L"..\\Shader\\Chapter21\\SSAO.hlsl", nullptr, "VS", "vs_5_1");
-	m_Shaders["aoPS"] = d3dUtil::CompileShader(L"..\\Shader\\Chapter21\\SSAO.hlsl", nullptr, "PS", "ps_5_1");
+	m_Shaders["aoVS"] = d3dUtil::CompileShader(L"..\\Shader\\Chapter21\\AO.hlsl", nullptr, "VS", "vs_5_1");
+	m_Shaders["aoPS"] = d3dUtil::CompileShader(L"..\\Shader\\Chapter21\\AO.hlsl", direLightDefines, "PS", "ps_5_1");
 	// shadow
 	m_Shaders["shadowVS"] = d3dUtil::CompileShader(L"..\\Shader\\Chapter21\\Shadows.hlsl", nullptr, "VS", "vs_5_1");
 	m_Shaders["shadowPS"]	= d3dUtil::CompileShader(L"..\\Shader\\Chapter21\\Shadows.hlsl", nullptr, "PS", "ps_5_1");
@@ -720,7 +789,7 @@ void GameApp::BuildShadersAndInputLayout()
 	// debug output
 	m_Shaders["fullScreenVS"] = d3dUtil::CompileShader(L"..\\Shader\\Chapter21\\FullScreenTriangle.hlsl", nullptr, "FullScreenTriangleTexcoordVS", "vs_5_1");
 	m_Shaders["shadowDebugPS"]	= d3dUtil::CompileShader(L"..\\Shader\\Chapter21\\Shadows.hlsl", nullptr, "Debug_PS", "ps_5_1");
-	m_Shaders["aoDebugPS"] = d3dUtil::CompileShader(L"..\\Shader\\Chapter21\\SSAO.hlsl", nullptr, "Debug_AO_PS", "ps_5_1");
+	m_Shaders["aoDebugPS"] = d3dUtil::CompileShader(L"..\\Shader\\Chapter21\\AO.hlsl", nullptr, "Debug_AO_PS", "ps_5_1");
 
 	m_InputLayouts["opaque"] =
 	{
@@ -783,185 +852,69 @@ void GameApp::BuildShapeGeometry()
 		sphere.Vertices.size() +
 		cylinder.Vertices.size();
 
-	//Build CPU SSAO
-	if(m_ShowMode == ShowMode::CPU_AO)
+	std::vector<Vertex> vertices(totalVertexCount);
+
+	UINT k = 0;
+	for (size_t i = 0; i < box.Vertices.size(); ++i, ++k)
 	{
-		std::vector<CPU_SSAO_Vertex> boxVertices(box.Vertices.size());
-		std::vector<CPU_SSAO_Vertex> gridVertices(grid.Vertices.size());
-		std::vector<CPU_SSAO_Vertex> sphereVertices(sphere.Vertices.size());
-		std::vector<CPU_SSAO_Vertex> cylinderVertices(cylinder.Vertices.size());
-		
-		for (size_t i = 0; i < box.Vertices.size(); ++i)
-		{
-			boxVertices[i].Pos = box.Vertices[i].Position;
-			boxVertices[i].Normal = box.Vertices[i].Normal;
-			boxVertices[i].TexC = box.Vertices[i].TexC;
-			boxVertices[i].TangentU = box.Vertices[i].TangentU;
-		}
-		for (size_t i = 0; i < grid.Vertices.size(); ++i)
-		{
-			gridVertices[i].Pos = grid.Vertices[i].Position;
-			gridVertices[i].Normal = grid.Vertices[i].Normal;
-			gridVertices[i].TexC = grid.Vertices[i].TexC;
-			gridVertices[i].TangentU = grid.Vertices[i].TangentU;
-			gridVertices[i].AmbientAccess = 0.0f;
-		}
-		for (size_t i = 0; i < sphere.Vertices.size(); ++i)
-		{
-			sphereVertices[i].Pos = sphere.Vertices[i].Position;
-			sphereVertices[i].Normal = sphere.Vertices[i].Normal;
-			sphereVertices[i].TexC = sphere.Vertices[i].TexC;
-			sphereVertices[i].TangentU = sphere.Vertices[i].TangentU;
-		}
-		for (size_t i = 0; i < cylinder.Vertices.size(); ++i)
-		{
-			cylinderVertices[i].Pos = cylinder.Vertices[i].Position;
-			cylinderVertices[i].Normal = cylinder.Vertices[i].Normal;
-			cylinderVertices[i].TexC = cylinder.Vertices[i].TexC;
-			cylinderVertices[i].TangentU = cylinder.Vertices[i].TangentU;
-		}
-		//BuildVertexAmbientOcclusion(boxVertices, box.Indices32);
-		//BuildVertexAmbientOcclusion(gridVertices, grid.Indices32);
-		//BuildVertexAmbientOcclusion(sphereVertices, sphere.Indices32);
-		//BuildVertexAmbientOcclusion(cylinderVertices, cylinder.Indices32);
-
-		UINT k = 0;
-		std::vector<CPU_SSAO_Vertex> vertices(totalVertexCount);
-		for (size_t i = 0; i < boxVertices.size(); ++i, ++k)
-		{
-			vertices[k].Pos				= boxVertices[i].Pos;
-			vertices[k].Normal			= boxVertices[i].Normal;
-			vertices[k].TexC			= boxVertices[i].TexC;
-			vertices[k].TangentU		= boxVertices[i].TangentU;
-			vertices[k].AmbientAccess	= boxVertices[i].AmbientAccess;
-		}
-		for (size_t i = 0; i < gridVertices.size(); ++i, ++k)
-		{
-			vertices[k].Pos				= gridVertices[i].Pos;
-			vertices[k].Normal			= gridVertices[i].Normal;
-			vertices[k].TexC			= gridVertices[i].TexC;
-			vertices[k].TangentU		= gridVertices[i].TangentU;
-			vertices[k].AmbientAccess	= gridVertices[i].AmbientAccess;
-		}
-		for (size_t i = 0; i < sphereVertices.size(); ++i, ++k)
-		{
-			vertices[k].Pos				= sphereVertices[i].Pos;
-			vertices[k].Normal			= sphereVertices[i].Normal;
-			vertices[k].TexC			= sphereVertices[i].TexC;
-			vertices[k].TangentU		= sphereVertices[i].TangentU;
-			vertices[k].AmbientAccess	= sphereVertices[i].AmbientAccess;
-		}
-		for (size_t i = 0; i < cylinderVertices.size(); ++i, ++k) 
-		{
-			vertices[k].Pos				= cylinderVertices[i].Pos;
-			vertices[k].Normal			= cylinderVertices[i].Normal;
-			vertices[k].TexC			= cylinderVertices[i].TexC;
-			vertices[k].TangentU		= cylinderVertices[i].TangentU;
-			vertices[k].AmbientAccess	= cylinderVertices[i].AmbientAccess;
-		}
-
-		std::vector<std::uint16_t> indices;
-		indices.insert(indices.end(), std::begin(box.GetIndices16()), std::end(box.GetIndices16()));
-		indices.insert(indices.end(), std::begin(grid.GetIndices16()), std::end(grid.GetIndices16()));
-		indices.insert(indices.end(), std::begin(sphere.GetIndices16()), std::end(sphere.GetIndices16()));
-		indices.insert(indices.end(), std::begin(cylinder.GetIndices16()), std::end(cylinder.GetIndices16()));
-
-		const UINT vbByteSize = (UINT)vertices.size() * sizeof(CPU_SSAO_Vertex);
-		const UINT ibByteSize = (UINT)indices.size() * sizeof(std::uint16_t);
-
-		auto geo = std::make_unique<MeshGeometry>();
-		geo->Name = "shapeGeo";
-
-		HR(D3DCreateBlob(vbByteSize, &geo->VertexBufferCPU));
-		CopyMemory(geo->VertexBufferCPU->GetBufferPointer(), vertices.data(), vertices.size());
-
-		HR(D3DCreateBlob(ibByteSize, &geo->IndexBufferCPU));
-		CopyMemory(geo->IndexBufferCPU->GetBufferPointer(), indices.data(), indices.size());
-
-		geo->VertexBufferGPU = d3dUtil::CreateDefaultBuffer(m_pd3dDevice.Get(),
-			m_CommandList.Get(), vertices.data(), vbByteSize, geo->VertexBufferUploader);
-
-		geo->IndexBufferGPU = d3dUtil::CreateDefaultBuffer(m_pd3dDevice.Get(),
-			m_CommandList.Get(), indices.data(), ibByteSize, geo->IndexBufferUploader);
-
-		geo->VertexByteStride = sizeof(CPU_SSAO_Vertex);
-		geo->VertexBufferByteSize = vbByteSize;
-		geo->IndexFormat = DXGI_FORMAT_R16_UINT;
-		geo->IndexBufferByteSize = ibByteSize;
-
-		geo->DrawArgs["box"] = boxSubmesh;
-		geo->DrawArgs["grid"] = gridSubmesh;
-		geo->DrawArgs["sphere"] = sphereSubmesh;
-		geo->DrawArgs["column"] = cylinderSubmesh;
-
-		m_Geometries[geo->Name] = std::move(geo);
+		vertices[k].Pos = box.Vertices[i].Position;
+		vertices[k].Normal = box.Vertices[i].Normal;
+		vertices[k].TexC = box.Vertices[i].TexC;
 	}
-	else
+	for (size_t i = 0; i < grid.Vertices.size(); ++i, ++k)
 	{
-		std::vector<Vertex> vertices(totalVertexCount);
+		vertices[k].Pos = grid.Vertices[i].Position;
+		vertices[k].Normal = grid.Vertices[i].Normal;
+		vertices[k].TexC = grid.Vertices[i].TexC;
+	}
+	for (size_t i = 0; i < sphere.Vertices.size(); ++i, ++k)
+	{
+		vertices[k].Pos = sphere.Vertices[i].Position;
+		vertices[k].Normal = sphere.Vertices[i].Normal;
+		vertices[k].TexC = sphere.Vertices[i].TexC;
+	}
+	for (size_t i = 0; i < cylinder.Vertices.size(); ++i, ++k)
+	{
+		vertices[k].Pos = cylinder.Vertices[i].Position;
+		vertices[k].Normal = cylinder.Vertices[i].Normal;
+		vertices[k].TexC = cylinder.Vertices[i].TexC;
+	}
 
-		UINT k = 0;
-		for (size_t i = 0; i < box.Vertices.size(); ++i, ++k)
-		{
-			vertices[k].Pos = box.Vertices[i].Position;
-			vertices[k].Normal = box.Vertices[i].Normal;
-			vertices[k].TexC = box.Vertices[i].TexC;
-		}
-		for (size_t i = 0; i < grid.Vertices.size(); ++i, ++k)
-		{
-			vertices[k].Pos = grid.Vertices[i].Position;
-			vertices[k].Normal = grid.Vertices[i].Normal;
-			vertices[k].TexC = grid.Vertices[i].TexC;
-		}
-		for (size_t i = 0; i < sphere.Vertices.size(); ++i, ++k)
-		{
-			vertices[k].Pos = sphere.Vertices[i].Position;
-			vertices[k].Normal = sphere.Vertices[i].Normal;
-			vertices[k].TexC = sphere.Vertices[i].TexC;
-		}
-		for (size_t i = 0; i < cylinder.Vertices.size(); ++i, ++k)
-		{
-			vertices[k].Pos = cylinder.Vertices[i].Position;
-			vertices[k].Normal = cylinder.Vertices[i].Normal;
-			vertices[k].TexC = cylinder.Vertices[i].TexC;
-		}
+	std::vector<std::uint16_t> indices;
+	indices.insert(indices.end(), std::begin(box.GetIndices16()), std::end(box.GetIndices16()));
+	indices.insert(indices.end(), std::begin(grid.GetIndices16()), std::end(grid.GetIndices16()));
+	indices.insert(indices.end(), std::begin(sphere.GetIndices16()), std::end(sphere.GetIndices16()));
+	indices.insert(indices.end(), std::begin(cylinder.GetIndices16()), std::end(cylinder.GetIndices16()));
 
-		std::vector<std::uint16_t> indices;
-		indices.insert(indices.end(), std::begin(box.GetIndices16()), std::end(box.GetIndices16()));
-		indices.insert(indices.end(), std::begin(grid.GetIndices16()), std::end(grid.GetIndices16()));
-		indices.insert(indices.end(), std::begin(sphere.GetIndices16()), std::end(sphere.GetIndices16()));
-		indices.insert(indices.end(), std::begin(cylinder.GetIndices16()), std::end(cylinder.GetIndices16()));
+	const UINT vbByteSize = (UINT)vertices.size() * sizeof(Vertex);
+	const UINT ibByteSize = (UINT)indices.size() * sizeof(std::uint16_t);
 
-		const UINT vbByteSize = (UINT)vertices.size() * sizeof(Vertex);
-		const UINT ibByteSize = (UINT)indices.size() * sizeof(std::uint16_t);
+	auto geo = std::make_unique<MeshGeometry>();
+	geo->Name = "shapeGeo";
 
-		auto geo = std::make_unique<MeshGeometry>();
-		geo->Name = "shapeGeo";
+	HR(D3DCreateBlob(vbByteSize, &geo->VertexBufferCPU));
+	CopyMemory(geo->VertexBufferCPU->GetBufferPointer(), vertices.data(), vertices.size());
 
-		HR(D3DCreateBlob(vbByteSize, &geo->VertexBufferCPU));
-		CopyMemory(geo->VertexBufferCPU->GetBufferPointer(), vertices.data(), vertices.size());
+	HR(D3DCreateBlob(ibByteSize, &geo->IndexBufferCPU));
+	CopyMemory(geo->IndexBufferCPU->GetBufferPointer(), indices.data(), indices.size());
 
-		HR(D3DCreateBlob(ibByteSize, &geo->IndexBufferCPU));
-		CopyMemory(geo->IndexBufferCPU->GetBufferPointer(), indices.data(), indices.size());
+	geo->VertexBufferGPU = d3dUtil::CreateDefaultBuffer(m_pd3dDevice.Get(),
+		m_CommandList.Get(), vertices.data(), vbByteSize, geo->VertexBufferUploader);
 
-		geo->VertexBufferGPU = d3dUtil::CreateDefaultBuffer(m_pd3dDevice.Get(),
-			m_CommandList.Get(), vertices.data(), vbByteSize, geo->VertexBufferUploader);
+	geo->IndexBufferGPU = d3dUtil::CreateDefaultBuffer(m_pd3dDevice.Get(),
+		m_CommandList.Get(), indices.data(), ibByteSize, geo->IndexBufferUploader);
 
-		geo->IndexBufferGPU = d3dUtil::CreateDefaultBuffer(m_pd3dDevice.Get(),
-			m_CommandList.Get(), indices.data(), ibByteSize, geo->IndexBufferUploader);
+	geo->VertexByteStride = sizeof(Vertex);
+	geo->VertexBufferByteSize = vbByteSize;
+	geo->IndexFormat = DXGI_FORMAT_R16_UINT;
+	geo->IndexBufferByteSize = ibByteSize;
 
-		geo->VertexByteStride = sizeof(Vertex);
-		geo->VertexBufferByteSize = vbByteSize;
-		geo->IndexFormat = DXGI_FORMAT_R16_UINT;
-		geo->IndexBufferByteSize = ibByteSize;
-
-		geo->DrawArgs["box"] = boxSubmesh;
-		geo->DrawArgs["grid"] = gridSubmesh;
-		geo->DrawArgs["sphere"] = sphereSubmesh;
-		geo->DrawArgs["column"] = cylinderSubmesh;
+	geo->DrawArgs["box"] = boxSubmesh;
+	geo->DrawArgs["grid"] = gridSubmesh;
+	geo->DrawArgs["sphere"] = sphereSubmesh;
+	geo->DrawArgs["column"] = cylinderSubmesh;
 	
-		m_Geometries[geo->Name] = std::move(geo);
-	}
+	m_Geometries[geo->Name] = std::move(geo); 
 }
 
 void GameApp::BuildSkullGeometry()
@@ -1057,7 +1010,7 @@ void GameApp::BuildPSOs()
 
 	ZeroMemory(&opaquePsoDesc, sizeof(D3D12_GRAPHICS_PIPELINE_STATE_DESC));
 	opaquePsoDesc.InputLayout = { m_InputLayouts["opaque"].data(),(UINT)m_InputLayouts["opaque"].size() };
-	opaquePsoDesc.pRootSignature = m_RootSignature.Get();
+	opaquePsoDesc.pRootSignature = m_RootSignatures["opaque"].Get();
 	opaquePsoDesc.VS =
 	{
 		reinterpret_cast<BYTE*>(m_Shaders["standardVS"]->GetBufferPointer()),
@@ -1085,7 +1038,6 @@ void GameApp::BuildPSOs()
 	D3D12_GRAPHICS_PIPELINE_STATE_DESC skyPsoDesc = opaquePsoDesc;
 	skyPsoDesc.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;
 	skyPsoDesc.DepthStencilState.DepthFunc = D3D12_COMPARISON_FUNC_LESS_EQUAL;
-	skyPsoDesc.pRootSignature = m_RootSignature.Get();
 	skyPsoDesc.VS =
 	{
 		reinterpret_cast<BYTE*>(m_Shaders["skyVS"]->GetBufferPointer()),
@@ -1103,7 +1055,6 @@ void GameApp::BuildPSOs()
 	shadowPsoDesc.RasterizerState.DepthBias = 100000;
 	shadowPsoDesc.RasterizerState.DepthBiasClamp = 0.0f;
 	shadowPsoDesc.RasterizerState.SlopeScaledDepthBias = 1.0f;
-	shadowPsoDesc.pRootSignature = m_RootSignature.Get();
 	shadowPsoDesc.VS =
 	{
 		reinterpret_cast<BYTE*>(m_Shaders["shadowVS"]->GetBufferPointer()),
@@ -1130,7 +1081,6 @@ void GameApp::BuildPSOs()
 	// shadow debug
 	D3D12_GRAPHICS_PIPELINE_STATE_DESC shadowDebugPsoDesc = opaquePsoDesc;
 	shadowDebugPsoDesc.InputLayout = {};
-	shadowDebugPsoDesc.pRootSignature = m_RootSignature.Get();
 	shadowDebugPsoDesc.VS =
 	{
 		reinterpret_cast<BYTE*>(m_Shaders["fullScreenVS"]->GetBufferPointer()),
@@ -1148,21 +1098,27 @@ void GameApp::BuildPSOs()
 	HR(m_pd3dDevice->CreateGraphicsPipelineState(&shadowDebugPsoDesc, IID_PPV_ARGS(&m_PSOs["shadow_debug"])));
 
 	// ao
-	D3D12_GRAPHICS_PIPELINE_STATE_DESC ssaoPsoDesc = opaquePsoDesc;
-	ssaoPsoDesc.InputLayout = { m_InputLayouts["CPU_AO"].data(),(UINT)m_InputLayouts["CPU_AO"].size() };
-	ssaoPsoDesc.VS =
+	D3D12_GRAPHICS_PIPELINE_STATE_DESC aoPsoDesc = opaquePsoDesc;
+	aoPsoDesc.InputLayout = { m_InputLayouts["CPU_AO"].data(),(UINT)m_InputLayouts["CPU_AO"].size() };
+	aoPsoDesc.VS =
 	{
 		reinterpret_cast<BYTE*>(m_Shaders["aoVS"]->GetBufferPointer()),
 		m_Shaders["aoVS"]->GetBufferSize()
 	};
-	ssaoPsoDesc.PS =
+	aoPsoDesc.PS =
+	{
+		reinterpret_cast<BYTE*>(m_Shaders["aoPS"]->GetBufferPointer()),
+		m_Shaders["aoPS"]->GetBufferSize()
+	};
+	HR(m_pd3dDevice->CreateGraphicsPipelineState(&aoPsoDesc, IID_PPV_ARGS(&m_PSOs["ao"])));
+	// ssao debug
+	D3D12_GRAPHICS_PIPELINE_STATE_DESC aoDebugPsoDesc = aoPsoDesc;
+	aoDebugPsoDesc.PS =
 	{
 		reinterpret_cast<BYTE*>(m_Shaders["aoDebugPS"]->GetBufferPointer()),
 		m_Shaders["aoDebugPS"]->GetBufferSize()
 	};
-	HR(m_pd3dDevice->CreateGraphicsPipelineState(&ssaoPsoDesc, IID_PPV_ARGS(&m_PSOs["ao"])));
-	// ssao debug
-
+	HR(m_pd3dDevice->CreateGraphicsPipelineState(&aoDebugPsoDesc, IID_PPV_ARGS(&m_PSOs["ao_debug"])));
 }
 
 void GameApp::BuildFrameResources()
@@ -1179,8 +1135,8 @@ void GameApp::BuildMaterials()
 	auto bricks = std::make_unique<Material>();
 	bricks->m_Name = "bricks";
 	bricks->m_MatCBIndex = 0;
-	bricks->m_DiffuseSrvHeapIndex = m_TextureManager.GetTextureIndex("bricksTex");
-	bricks->m_NormalSrvHeapIndex = m_TextureManager.GetTextureIndex("bricksNorTex");
+	bricks->m_DiffuseSrvHeapIndex = m_TextureManager.GetTextureSrvIndex("bricksTex");
+	bricks->m_NormalSrvHeapIndex = m_TextureManager.GetTextureSrvIndex("bricksNorTex");
 	bricks->m_DiffuseAlbedo = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
 	bricks->m_FresnelR0 = XMFLOAT3(0.1f, 0.1f, 0.1f);
 	bricks->m_Roughness = 0.3f;
@@ -1188,8 +1144,8 @@ void GameApp::BuildMaterials()
 	auto tile = std::make_unique<Material>();
 	tile->m_Name = "tile";
 	tile->m_MatCBIndex = 1;
-	tile->m_DiffuseSrvHeapIndex = m_TextureManager.GetTextureIndex("tileTex");
-	tile->m_NormalSrvHeapIndex = m_TextureManager.GetTextureIndex("tileNorTex");
+	tile->m_DiffuseSrvHeapIndex = m_TextureManager.GetTextureSrvIndex("tileTex");
+	tile->m_NormalSrvHeapIndex = m_TextureManager.GetTextureSrvIndex("tileNorTex");
 	tile->m_DiffuseAlbedo = XMFLOAT4(0.9f, 0.9f, 0.9f, 1.0f);
 	tile->m_FresnelR0 = XMFLOAT3(0.2f, 0.2f, 0.2f);
 	tile->m_Roughness = 0.1f;
@@ -1197,8 +1153,8 @@ void GameApp::BuildMaterials()
 	auto mirror = std::make_unique<Material>();
 	mirror->m_Name = "mirror";
 	mirror->m_MatCBIndex = 2;
-	mirror->m_DiffuseSrvHeapIndex = m_TextureManager.GetTextureIndex("whiteTex");
-	mirror->m_NormalSrvHeapIndex = m_TextureManager.GetTextureIndex("whiteNorTex");
+	mirror->m_DiffuseSrvHeapIndex = m_TextureManager.GetTextureSrvIndex("whiteTex");
+	mirror->m_NormalSrvHeapIndex = m_TextureManager.GetTextureSrvIndex("whiteNorTex");
 	mirror->m_DiffuseAlbedo = XMFLOAT4(0.0f, 0.0f, 0.1f, 1.0f);
 	mirror->m_FresnelR0 = XMFLOAT3(0.98f, 0.98f, 0.98f);
 	mirror->m_Roughness = 0.1f;
@@ -1207,8 +1163,8 @@ void GameApp::BuildMaterials()
 	auto skullMat = std::make_unique<Material>();
 	skullMat->m_Name = "skullMat";
 	skullMat->m_MatCBIndex = 3;
-	skullMat->m_DiffuseSrvHeapIndex = m_TextureManager.GetTextureIndex("whiteTex");
-	skullMat->m_NormalSrvHeapIndex = m_TextureManager.GetTextureIndex("whiteNorTex");
+	skullMat->m_DiffuseSrvHeapIndex = m_TextureManager.GetTextureSrvIndex("whiteTex");
+	skullMat->m_NormalSrvHeapIndex = m_TextureManager.GetTextureSrvIndex("whiteNorTex");
 	skullMat->m_DiffuseAlbedo = XMFLOAT4(0.8f, 0.8f, 0.8f, 1.0f);
 	skullMat->m_FresnelR0 = XMFLOAT3(0.2f, 0.2f, 0.2f);
 	skullMat->m_Roughness = 0.2f;
@@ -1217,7 +1173,7 @@ void GameApp::BuildMaterials()
 	sky->m_Name = "sky";
 	sky->m_MatCBIndex = 4;
 	sky->m_DiffuseSrvHeapIndex = m_SkyTexHeapIndex;
-	sky->m_NormalSrvHeapIndex = m_TextureManager.GetTextureIndex("whiteNorTex");
+	sky->m_NormalSrvHeapIndex = m_TextureManager.GetTextureSrvIndex("whiteNorTex");
 	sky->m_DiffuseAlbedo = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
 	sky->m_FresnelR0 = XMFLOAT3(0.2f, 0.2f, 0.2f);
 	sky->m_Roughness = 0.2f;

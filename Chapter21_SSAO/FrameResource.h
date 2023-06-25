@@ -44,6 +44,22 @@ struct PassConstants
 	LightConstants Lights[MAXLIGHTNUM];
 };
 
+struct SSAOConstants 
+{
+	DirectX::XMFLOAT4X4 ProjTex = MathHelper::Identity4x4();
+	DirectX::XMFLOAT4 FarPlanePoints[3];
+	DirectX::XMFLOAT4 OffsetVectors[14];
+	float OcclusionRadius = 0.5f;
+	float OcclusionFadeStart = 0.2f;
+	float OcclusionFadeEnd = 2.0f;
+	float OcclusionEpsilon = 0.05f;
+
+	DirectX::XMFLOAT4 BlurWeights[3];
+	DirectX::XMFLOAT2 TexelSize;
+	UINT BlurRaidus;
+	UINT Pad0;
+};
+
 struct Vertex
 {
 	DirectX::XMFLOAT3 Pos;
@@ -72,6 +88,7 @@ public:
 
 	std::unique_ptr<UploadBuffer<PassConstants>> PassCB = nullptr;
 	std::unique_ptr<UploadBuffer<ObjectConstants>> ObjectCB = nullptr;
+	std::unique_ptr<UploadBuffer<SSAOConstants>> SsaoCB = nullptr;
 	std::unique_ptr<UploadBuffer<MaterialData>> MaterialBuffer = nullptr;
 
 	UINT64 Fence = 0;

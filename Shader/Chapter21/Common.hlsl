@@ -50,6 +50,7 @@ cbuffer cbPass : register(b1)
 	float4x4 gInvViewProj;
 	float4x4 gInvSkyBoxWorld;
     float4x4 gShadowTransform;
+    float4x4 gWorldInvTransposeView;
 	float3 gEyePosW;
 	float gPad1;
 	float2 gRenderTargetSize;

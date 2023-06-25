@@ -117,12 +117,34 @@ ITexture* TextureManager::GetTexture(std::string name)
 }
 
 // when texture don't exit, return -1 
-int TextureManager::GetTextureIndex(std::string name)
+int TextureManager::GetTextureSrvIndex(std::string name)
 {
 	XID nameID = StringToID(name);
 	if (m_TexturesIndex.count(nameID))
 	{
-		return m_TexturesIndex[nameID];
+		return m_TexturesIndex[nameID][0];
+	}
+	return -1;
+}
+
+// when texture don't exit, return -1 
+int TextureManager::GetTextureDsvIndex(std::string name)
+{
+	XID nameID = StringToID(name);
+	if (m_TexturesIndex.count(nameID))
+	{
+		return m_TexturesIndex[nameID][1];
+	}
+	return -1;
+}
+
+// when texture don't exit, return -1 
+int TextureManager::GetTextureRtvIndex(std::string name)
+{
+	XID nameID = StringToID(name);
+	if (m_TexturesIndex.count(nameID))
+	{
+		return m_TexturesIndex[nameID][2];
 	}
 	return -1;
 }
@@ -132,7 +154,8 @@ void TextureManager::BuildDescriptor(
 	CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuDsv, CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuRtv,
 	UINT uiSrvDescriptorSize, UINT uiDsvDescriptorSize, UINT uiRtvDescriptorSize)
 {
-	int index = 1;
+	// dsvIndex 和 rtvIndex 从0开始使用
+	int srvIndex = 1, dsvIndex = -1, rtvIndex = -1;
 	m_hCpuSrv = hCpuSrv;
 	m_hGpuSrv = hGpuSrv;
 	m_hCpuDsv = hCpuDsv;
@@ -146,7 +169,9 @@ void TextureManager::BuildDescriptor(
 	{
 		it.second->BuildDescriptor(m_pDevice.Get(), hCpuSrv, hGpuSrv, hCpuDsv,
 			hCpuRtv, uiSrvDescriptorSize, uiDsvDescriptorSize, uiRtvDescriptorSize);
-		AddTextureIndex(it.first, index++);
+		dsvIndex = it.second->GetDSVDescriptorCount() > 0 ? dsvIndex += it.second->GetDSVDescriptorCount() : -1;
+		rtvIndex = it.second->GetRTVDescriptorCount() > 0 ? rtvIndex += it.second->GetRTVDescriptorCount() : -1;
+		AddTextureIndex(it.first, { srvIndex++,dsvIndex ,rtvIndex });
 	}
 
 	D3D12_SHADER_RESOURCE_VIEW_DESC nullDesc;
@@ -162,7 +187,7 @@ void TextureManager::BuildDescriptor(
 	m_NullTex = hGpuSrv;
 	hCpuSrv.Offset(1, uiSrvDescriptorSize);
 	hGpuSrv.Offset(1, uiSrvDescriptorSize);
-	AddTextureIndex("nullTex", index++);
+	AddTextureIndex("nullTex", { srvIndex++,-1 ,-1 });
 
 	nullDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURECUBE;
 	nullDesc.Format = DXGI_FORMAT_BC1_UNORM;
@@ -173,7 +198,7 @@ void TextureManager::BuildDescriptor(
 	m_NullCubeTex = hGpuSrv;
 	hCpuSrv.Offset(1, uiSrvDescriptorSize);
 	hGpuSrv.Offset(1, uiSrvDescriptorSize);
-	AddTextureIndex("nullCubeTex", index++);
+	AddTextureIndex("nullCubeTex", { srvIndex++,-1 ,-1 });
 
 	m_nSRVCount += 2;
 
@@ -185,38 +210,32 @@ void TextureManager::BuildDescriptor(
 	}
 }
 
-void TextureManager::ReBuildDescriptor(std::string name, UINT oldIndex)
+void TextureManager::ReBuildDescriptor(std::string name, std::shared_ptr<ITexture> texture)
 {
-	ITexture* texture = GetTexture(name);
+	ITexture* oldTexture = GetTexture(name);
+	INT srvIndex = GetTextureSrvIndex(name), dsvIndex = GetTextureDsvIndex(name), rtvIndex = GetTextureRtvIndex(name);
 	CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuSrv = m_hCpuSrv;
 	CD3DX12_GPU_DESCRIPTOR_HANDLE hGpuSrv = m_hGpuSrv;
 	CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuDsv = m_hCpuDsv;
 	CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuRtv = m_hCpuRtv;
 
-	AddTextureIndex(name, oldIndex);
-	texture->BuildDescriptor(m_pDevice.Get(), hCpuSrv.Offset(oldIndex,m_uiSrvDescriptorSize), hGpuSrv.Offset(oldIndex,m_uiSrvDescriptorSize),
-		hCpuDsv.Offset(1, m_uiDsvDescriptorSize), hCpuRtv, m_uiSrvDescriptorSize, m_uiDsvDescriptorSize, m_uiRtvDescriptorSize);
-}
-
-void TextureManager::ReBuildDescriptor(std::string name, UINT oldIndex, CD3DX12_GPU_DESCRIPTOR_HANDLE hGpuSrv, 
-	CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuDsv, CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuRtv)
-{
-	ITexture* texture = GetTexture(name);
-
-	CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuSrv = m_hCpuSrv;
-
-	AddTextureIndex(name, oldIndex);
-	texture->BuildDescriptor(m_pDevice.Get(), hCpuSrv.Offset(oldIndex, m_uiSrvDescriptorSize), hGpuSrv, hCpuDsv, hCpuRtv, 
+	texture->BuildDescriptor(m_pDevice.Get(), 
+		hCpuSrv.Offset(srvIndex, m_uiSrvDescriptorSize), hGpuSrv.Offset(srvIndex, m_uiSrvDescriptorSize),
+		hCpuDsv.Offset(dsvIndex, m_uiDsvDescriptorSize), hCpuRtv.Offset(rtvIndex, m_uiRtvDescriptorSize),
 		m_uiSrvDescriptorSize, m_uiDsvDescriptorSize, m_uiRtvDescriptorSize);
+
+	RemoveTexture(name);
+	AddTexture(name, texture);
+	AddTextureIndex(name, { srvIndex,dsvIndex ,rtvIndex });
 }
 
-bool TextureManager::AddTextureIndex(std::string name, int index)
+bool TextureManager::AddTextureIndex(std::string name, std::array<int, 3> index)
 {
 	XID nameID = StringToID(name);
 	return m_TexturesIndex.try_emplace(nameID, index).second;
 }
 
-bool TextureManager::AddTextureIndex(XID nameID, int index)
+bool TextureManager::AddTextureIndex(XID nameID, std::array<int, 3> index)
 {
 	return m_TexturesIndex.try_emplace(nameID, index).second;
 }

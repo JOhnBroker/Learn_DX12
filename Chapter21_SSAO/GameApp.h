@@ -2,23 +2,20 @@
 #define GameApp_H
 
 #include <d3dApp.h>
-#include "MathHelper.h"
 #include "UploadBuffer.h"
 #include "GeometryGenerator.h"
 #include "FrameResource.h"
-#include "Waves.h"
+#include "TextureManager.h"
 #include "Material.h"
-#include "Texture.h"
 #include "Light.h"
+#include "RenderItem.h"
 
 #include "Camera.h"
 #include "Octree.h"
 
-#include "TextureManager.h"
-
 #include "CubeRenderTarget.h"
 #include "ShadowMap.h"
-
+#include "SSAO.h"
 
 #define STATICSAMPLERCOUNT 7
 #define LIGHTCOUNT 3
@@ -27,36 +24,9 @@
 using namespace DirectX;
 using namespace DirectX::PackedVector;
 
-struct RenderItem
-{
-	RenderItem() = default;
-	RenderItem(const RenderItem& rhs) = delete;
-
-	XMFLOAT4X4 World = MathHelper::Identity4x4();
-	XMFLOAT4X4 TexTransform = MathHelper::Identity4x4();
-
-	int NumFramesDirty = g_numFrameResources;
-
-	UINT ObjCBIndex = -1;
-
-	Material* Mat = nullptr;
-	MeshGeometry* Geo = nullptr;
-
-	// Primitive topology
-	D3D12_PRIMITIVE_TOPOLOGY PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
-
-	BoundingBox Bounds;
-
-	// DrawIndexedInstanced parameters
-	UINT IndexCount = 0;
-	UINT StartIndexLocation = 0;
-	int BaseVertexLocation = 0;
-};
-
 enum class RenderLayer :int
 {
 	Opaque = 0,
-	Debug,
 	Sky,
 	Count
 };
@@ -96,6 +66,7 @@ public:
 	void UpdateShadowPassCB(const GameTimer& gt);
 
 	void BuildRootSignature();
+	void BuildSSAORootSignature();
 	void BuildDescriptorHeaps();
 	void BuildShadersAndInputLayout();
 	void BuildShapeGeometry();
@@ -123,7 +94,7 @@ private:
 	FrameResource* m_CurrFrameResource = nullptr;
 	int m_CurrFrameResourceIndex = 0;
 
-	ComPtr<ID3D12RootSignature> m_RootSignature = nullptr;
+	std::unordered_map<std::string, ComPtr<ID3D12RootSignature>> m_RootSignatures;
 	ComPtr<ID3D12Resource> m_CubeDepthStencilBuffer = nullptr;
 
 	std::unordered_map<std::string, std::unique_ptr<MeshGeometry>> m_Geometries;
@@ -157,6 +128,7 @@ private:
 
 	//Imgui
 	bool m_ShadowMapDebugEnable = false;
+	bool m_AODebugEnable = false;
 	CameraMode m_CameraMode = CameraMode::FirstPerson;
 	ShowMode m_ShowMode = ShowMode::SSAO;
 	LightMode m_LightMode = LightMode::Orthogonal;

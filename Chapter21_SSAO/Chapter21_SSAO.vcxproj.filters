@@ -58,6 +58,9 @@
     <ClCompile Include="Texture.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
+    <ClCompile Include="SSAO.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="d3dApp.h">
@@ -126,6 +129,10 @@
     <ClInclude Include="TextureManager.h">
       <Filter>头文件</Filter>
     </ClInclude>
+    <ClInclude Include="SSAO.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="RenderItem.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="imgui.ini" />

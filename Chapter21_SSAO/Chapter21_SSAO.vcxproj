@@ -169,6 +169,7 @@
     </ClCompile>
     <ClCompile Include="Octree.cpp" />
     <ClCompile Include="ShadowMap.cpp" />
+    <ClCompile Include="SSAO.cpp" />
     <ClCompile Include="Texture.cpp" />
     <ClCompile Include="TextureManager.cpp" />
     <ClCompile Include="Waves.cpp" />
@@ -190,7 +191,9 @@
     <ClInclude Include="MathHelper.h" />
     <ClInclude Include="GameApp.h" />
     <ClInclude Include="Octree.h" />
+    <ClInclude Include="RenderItem.h" />
     <ClInclude Include="ShadowMap.h" />
+    <ClInclude Include="SSAO.h" />
     <ClInclude Include="Texture.h" />
     <ClInclude Include="TextureManager.h" />
     <ClInclude Include="UploadBuffer.h" />
