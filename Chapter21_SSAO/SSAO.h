@@ -44,7 +44,7 @@ public:
 	// Pass2：绘制SSAO
 	void RenderToSSAOTexture(ID3D12GraphicsCommandList* cmdList, ID3D12PipelineState* pPso,
 		FrameResource* currFrame);
-	// Pass3：对SSAO进行滤波
+	// Pass3：对SSAO进行滤波;	blurCount: 模糊次数
 	void BlurAOMap(ID3D12GraphicsCommandList* cmdList, ID3D12PipelineState* pPso, 
 		FrameResource* currFrame, int blurCount);
 	// Render Debug AO
@@ -55,6 +55,14 @@ private:
 	void BuildRandomVectorTexture(ID3D12GraphicsCommandList* cmdList);
 	void BuildOffsetVectors();
 	void BlurAOMap(ID3D12GraphicsCommandList* cmdList, bool horzBlur);
+
+public:
+	uint32_t m_SampleCount = 14;        // 采样向量数
+	float m_OcclusionRadius = 0.5f;     // 采样半球的半径
+	float m_OcclusionFadeStart = 0.2f;  // 开始向不遮蔽过渡的起始距离值
+	float m_OcclusionFadeEnd = 2.0f;    // 完全不遮蔽的距离值
+	float m_OcclusionEpsilon = 0.05f;     // 防止自相交用的距离值
+	uint32_t m_BlurRadius = 5;
 
 private:
 	template<class T>

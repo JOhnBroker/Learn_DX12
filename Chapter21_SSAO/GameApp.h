@@ -128,6 +128,7 @@ private:
 	//Imgui
 	bool m_ShadowMapDebugEnable = false;
 	bool m_AODebugEnable = false;
+	bool m_SSAODebugEnable = false;
 	CameraMode m_CameraMode = CameraMode::FirstPerson;
 	ShowMode m_ShowMode = ShowMode::SSAO;
 	LightMode m_LightMode = LightMode::Orthogonal;
