@@ -10,6 +10,7 @@
 #define NORMALDEPTHMAP_NAME "NormalDepth"
 #define SSAOXMAP_NAME "SSAO_X"
 #define SSAOYMAP_NAME "SSAO_Y"
+#define SSAODEBUGMAP_NAME "SSAO_Debug"
 #define RANDOMVECTORCOUNT 14
 
 class SSAO
@@ -34,11 +35,12 @@ public:
 	CD3DX12_GPU_DESCRIPTOR_HANDLE GetNormalDepthSrv()const { return m_NormalDepthMap->GetShaderResource(); }
 	CD3DX12_CPU_DESCRIPTOR_HANDLE GetNormalDepthRtv()const { return m_NormalDepthMap->GetRenderTarget(); }
 	CD3DX12_GPU_DESCRIPTOR_HANDLE GetAOMapSrv()const { return m_SSAOMap0->GetShaderResource(); }
+	CD3DX12_GPU_DESCRIPTOR_HANDLE GetAOMapDebugSrv()const { return m_SSAODebugMap->GetShaderResource(); }
 
 	void OnResize(UINT newWidth, UINT newHeight);
 	// Pass1：绘制观察空间法向量和深度贴图
 	void RenderNormalDepthMap(ID3D12GraphicsCommandList* cmdList, ID3D12PipelineState* pPso, 
-		FrameResource* currFrame, std::vector<RenderItem*>& items);
+		FrameResource* currFrame, const std::vector<RenderItem*>& items);
 	// Pass2：绘制SSAO
 	void RenderToSSAOTexture(ID3D12GraphicsCommandList* cmdList, ID3D12PipelineState* pPso,
 		FrameResource* currFrame);
@@ -46,8 +48,7 @@ public:
 	void BlurAOMap(ID3D12GraphicsCommandList* cmdList, ID3D12PipelineState* pPso, 
 		FrameResource* currFrame, int blurCount);
 	// Render Debug AO
-	void RenderAOToTexture(ID3D12GraphicsCommandList* cmdList, ID3D12PipelineState* pPso,
-		FrameResource* currFrame);
+	void RenderAOToTexture(ID3D12GraphicsCommandList* cmdList, ID3D12PipelineState* pPso);
 
 private:
 	void BuildResource();
@@ -74,6 +75,7 @@ private:
 	std::shared_ptr<Texture2D> m_NormalDepthMap;
 	std::shared_ptr<Texture2D> m_SSAOMap0;
 	std::shared_ptr<Texture2D> m_SSAOMap1;
+	std::shared_ptr<Texture2D> m_SSAODebugMap;
 
 	const int m_MaxBlurRadius = 5;
 

@@ -8,7 +8,6 @@
 #include "TextureManager.h"
 #include "Material.h"
 #include "Light.h"
-#include "RenderItem.h"
 
 #include "Camera.h"
 #include "Octree.h"
@@ -64,6 +63,7 @@ public:
 	void UpdateMainPassCB(const GameTimer& gt);
 	void UpdateShadowTransform(const GameTimer& gt);
 	void UpdateShadowPassCB(const GameTimer& gt);
+	void UpdateSSAOCB(const GameTimer& gt);
 
 	void BuildRootSignature();
 	void BuildSSAORootSignature();
@@ -76,8 +76,6 @@ public:
 	void BuildMaterials();
 	void BuildRenderItems();
 	void DrawRenderItems(ID3D12GraphicsCommandList* cmdList, const std::vector<RenderItem*>& ritems);
-	void DrawSceneToShadowMap();
-	void RenderShadowMapToTexture();
 
 	// CPU AO
 	void BuildVertexAmbientOcclusion(std::vector<CPU_SSAO_Vertex>& vertices, const std::vector<std::uint32_t>& indices);
@@ -125,6 +123,7 @@ private:
 	std::array<std::shared_ptr<Light>, LIGHTCOUNT> m_Lights;
 	int m_ShadowMapSize = 0;
 	std::unique_ptr<ShadowMap> m_ShadowMap;
+	std::unique_ptr<SSAO> m_SSAO;
 
 	//Imgui
 	bool m_ShadowMapDebugEnable = false;

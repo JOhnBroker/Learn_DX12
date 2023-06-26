@@ -33,6 +33,7 @@ SamplerComparisonState gSamShadow   : register(s6);
 cbuffer cbPerObject : register(b0)
 {
     float4x4 gWorld;
+    float4x4 gInvTransposeWorld;
     float4x4 gTexTransform;
     uint gMaterialIndex;
     uint g_Pad0;
@@ -48,9 +49,7 @@ cbuffer cbPass : register(b1)
 	float4x4 gInvProj;
 	float4x4 gViewProj;
 	float4x4 gInvViewProj;
-	float4x4 gInvSkyBoxWorld;
     float4x4 gShadowTransform;
-    float4x4 gWorldInvTransposeView;
 	float3 gEyePosW;
 	float gPad1;
 	float2 gRenderTargetSize;

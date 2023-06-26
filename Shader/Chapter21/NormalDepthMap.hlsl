@@ -24,11 +24,13 @@ VertexOut VS(VertexIn vin)
     
     MaterialData matData = gMaterialData[gMaterialIndex];
     
+    float4x4 invTransposeWorldView = gInvTransposeWorld * gView;
+    
     float4 posW = mul(float4(vin.PosL, 1.0f), gWorld);
     vout.PosH = mul(posW, gViewProj);
     vout.PosV = mul(posW, gView).xyz;
     
-    vout.NormalV = mul(vin.NormalL, (float3x3) gWorldInvTransposeView);
+    vout.NormalV = mul(vin.NormalL, (float3x3) invTransposeWorldView);
     vout.TangentW = mul(vin.TangentU, (float3x3) gWorld);
     
     float4 texC = mul(float4(vin.TexC, 0.0f, 1.0f), gTexTransform);

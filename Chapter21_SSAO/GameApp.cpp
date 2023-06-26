@@ -130,6 +130,7 @@ bool GameApp::InitResource()
 	m_TextureManager.CreateFromeFile("..\\Textures\\snowcube1024.dds"	, "snowCube", true);
 	m_TextureManager.CreateFromeFile("..\\Textures\\sunset1024.dds"		, "sunsetCube", true);
 
+	m_SSAO = std::make_unique<SSAO>(m_pd3dDevice.Get(), m_ClientWidth, m_ClientHeight);
 	m_ShadowMap = std::make_unique<ShadowMap>(m_pd3dDevice.Get(),
 		pow(2, m_ShadowMapSize) * 256, pow(2, m_ShadowMapSize) * 256);
 
@@ -298,7 +299,7 @@ void GameApp::Draw(const GameTimer& timer)
 	m_CommandList->SetGraphicsRootDescriptorTable(4, m_TextureManager.GetNullTexture());
 	m_CommandList->SetGraphicsRootDescriptorTable(5, m_SRVHeap->GetGPUDescriptorHandleForHeapStart());
 
-	DrawSceneToShadowMap();
+	m_ShadowMap->DrawShadowMap(m_CommandList.Get(), m_PSOs["shadow_opaque"].Get(), m_CurrFrameResource, m_RitemLayer[(int)RenderLayer::Opaque]);
 
 	m_CommandList->RSSetViewports(1, &m_ScreenViewPort);
 	m_CommandList->RSSetScissorRects(1, &m_ScissorRect);
@@ -348,7 +349,7 @@ void GameApp::Draw(const GameTimer& timer)
 
 	if (m_ShadowMapDebugEnable) 
 	{		
-		RenderShadowMapToTexture();
+		m_ShadowMap->RenderShadowMapToTexture(m_CommandList.Get(), m_PSOs["shadow_debug"].Get());
 		m_CommandList->OMSetRenderTargets(1, &CurrentBackBufferView(), true, &DepthStencilView());
 		if (ImGui::Begin("Depth buffer", &m_ShadowMapDebugEnable)) 
 		{
@@ -455,10 +456,13 @@ void GameApp::UpdateObjectCBs(const GameTimer& gt)
 		if (obj->NumFramesDirty > 0) 
 		{
 			XMMATRIX world = XMLoadFloat4x4(&obj->World);
+			XMVECTOR dWorld = XMMatrixDeterminant(world);
+			XMMATRIX invWorld = XMMatrixInverse(&dWorld, world);
 			XMMATRIX texTransform = XMLoadFloat4x4(&obj->TexTransform);
 
 			ObjectConstants objConstant;
 			XMStoreFloat4x4(&objConstant.World, XMMatrixTranspose(world));
+			XMStoreFloat4x4(&objConstant.InvTransposeWorld, XMMatrixTranspose(XMMatrixTranspose(invWorld)));
 			XMStoreFloat4x4(&objConstant.TexTransform, XMMatrixTranspose(texTransform));
 			objConstant.MaterialIndex = obj->Mat->m_MatCBIndex;
 
@@ -499,9 +503,6 @@ void GameApp::UpdateMaterialBuffer(const GameTimer& gt)
 
 void GameApp::UpdateMainPassCB(const GameTimer& gt)
 {
-	XMMATRIX skyboxWorld = XMMatrixScaling(m_SkyBoxScale.x, m_SkyBoxScale.y, m_SkyBoxScale.z);
-	XMVECTOR dSkyboxWorld = XMMatrixDeterminant(skyboxWorld);
-	XMMATRIX invSkyboxWorld = XMMatrixInverse(&dSkyboxWorld, skyboxWorld);
 	XMMATRIX view = m_pCamera->GetViewXM();
 	XMMATRIX proj = m_pCamera->GetProjXM();
 
@@ -519,7 +520,6 @@ void GameApp::UpdateMainPassCB(const GameTimer& gt)
 	XMStoreFloat4x4(&m_MainPassCB.InvProj, XMMatrixTranspose(invProj));
 	XMStoreFloat4x4(&m_MainPassCB.ViewProj, XMMatrixTranspose(viewproj));
 	XMStoreFloat4x4(&m_MainPassCB.InvViewProj, XMMatrixTranspose(invViewproj));
-	XMStoreFloat4x4(&m_MainPassCB.InvSkyBoxWorld, XMMatrixTranspose(invSkyboxWorld));
 	XMStoreFloat4x4(&m_MainPassCB.ShadowTransform, XMMatrixTranspose(m_Lights[0]->GetTransform()));
 	m_MainPassCB.EyePosW = m_pCamera->GetPosition();
 	m_MainPassCB.RenderTargetSize = XMFLOAT2((float)m_ClientWidth, (float)m_ClientHeight);
@@ -610,6 +610,22 @@ void GameApp::UpdateShadowPassCB(const GameTimer& gt)
 
 	auto currPassCB = m_CurrFrameResource->PassCB.get();
 	currPassCB->CopyData(1, m_ShadowPassCB);
+}
+
+void GameApp::UpdateSSAOCB(const GameTimer& gt)
+{
+	SSAOConstants ssaoCB;
+	XMMATRIX Proj = m_pCamera->GetProjXM();
+	XMMATRIX Tex(
+		0.5f, 0.0f, 0.0f, 0.0f,
+		0.0f, -0.5f, 0.0f, 0.0f,
+		0.0f, 0.0f, 1.0f, 0.0f,
+		0.5f, 0.5f, 0.0f, 1.0f);
+	
+	XMStoreFloat4x4(&ssaoCB.ProjTex, XMMatrixTranspose(Proj * Tex));
+	//todo
+	m_SSAO->GetOffsetVectors(ssaoCB.OffsetVectors);
+
 }
 
 void GameApp::BuildRootSignature()
@@ -1278,51 +1294,6 @@ void GameApp::DrawRenderItems(ID3D12GraphicsCommandList* cmdList, const std::vec
 
 		cmdList->DrawIndexedInstanced(ri->IndexCount, 1, ri->StartIndexLocation, ri->BaseVertexLocation, 0);
 	}
-}
-
-void GameApp::DrawSceneToShadowMap()
-{
-	m_CommandList->RSSetViewports(1, &m_ShadowMap->GetViewport());
-	m_CommandList->RSSetScissorRects(1, &m_ShadowMap->GetScissorRect());
-
-	m_CommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_ShadowMap->GetResource(),
-		D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_DEPTH_WRITE));
-
-	UINT passCBByteSize = d3dUtil::CalcConstantBufferByteSize(sizeof(PassConstants));
-
-	m_CommandList->ClearDepthStencilView(m_ShadowMap->GetDsv(),
-		D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, 1.0f, 0, 0, nullptr);
-
-	m_CommandList->OMSetRenderTargets(0, nullptr, false, &m_ShadowMap->GetDsv());
-
-	auto passCB = m_CurrFrameResource->PassCB->Resource();
-	D3D12_GPU_VIRTUAL_ADDRESS passCBAddress = passCB->GetGPUVirtualAddress() + 1 * passCBByteSize;
-	m_CommandList->SetGraphicsRootConstantBufferView(1, passCBAddress);
-
-	m_CommandList->SetPipelineState(m_PSOs["shadow_opaque"].Get());
-	DrawRenderItems(m_CommandList.Get(), m_RitemLayer[(int)RenderLayer::Opaque]);
-
-	m_CommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_ShadowMap->GetResource(),
-		D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_GENERIC_READ));
-}
-
-void GameApp::RenderShadowMapToTexture()
-{
-	m_CommandList->RSSetViewports(1, &m_ShadowMap->GetViewport());
-	m_CommandList->RSSetScissorRects(1, &m_ShadowMap->GetScissorRect());
-
-	m_CommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_ShadowMap->GetDebugResource(),
-		D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_RENDER_TARGET));
-
-	m_CommandList->OMSetRenderTargets(1, &m_ShadowMap->GetDebugRtv(), true, nullptr);
-
-	m_CommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-
-	m_CommandList->SetPipelineState(m_PSOs["shadow_debug"].Get());
-	m_CommandList->DrawInstanced(3, 1, 0, 0);
-
-	m_CommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_ShadowMap->GetDebugResource(),
-		D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_GENERIC_READ));
 }
 
 void GameApp::BuildVertexAmbientOcclusion(std::vector<CPU_SSAO_Vertex>& vertices, const std::vector<std::uint32_t>& indices)

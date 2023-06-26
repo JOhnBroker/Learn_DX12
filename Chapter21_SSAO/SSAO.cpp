@@ -77,7 +77,7 @@ void SSAO::OnResize(UINT newWidth, UINT newHeight)
 }
 
 void SSAO::RenderNormalDepthMap(ID3D12GraphicsCommandList* cmdList, ID3D12PipelineState* pPso,
-	FrameResource* currFrame, std::vector<RenderItem*>& items)
+	FrameResource* currFrame, const std::vector<RenderItem*>& items)
 {
 	cmdList->RSSetViewports(1, &m_ViewPort);
 	cmdList->RSSetScissorRects(1, &m_ScissotRect);
@@ -160,9 +160,25 @@ void SSAO::BlurAOMap(ID3D12GraphicsCommandList* cmdList, ID3D12PipelineState* pP
 	}
 }
 
-void SSAO::RenderAOToTexture(ID3D12GraphicsCommandList* cmdList, ID3D12PipelineState* pPso,
-	FrameResource* currFrame)
+void SSAO::RenderAOToTexture(ID3D12GraphicsCommandList* cmdList, ID3D12PipelineState* pPso)
 {
+	cmdList->RSSetViewports(1, &m_ViewPort);
+	cmdList->RSSetScissorRects(1, &m_ScissotRect);
+
+	cmdList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_SSAODebugMap->GetTexture(), 
+		D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_RENDER_TARGET));
+
+	cmdList->OMSetRenderTargets(1, &m_SSAODebugMap->GetRenderTarget(), true, nullptr);
+
+	cmdList->SetPipelineState(pPso);
+
+	cmdList->IASetVertexBuffers(0, 0, nullptr);
+	cmdList->IASetIndexBuffer(nullptr);
+	cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+	cmdList->DrawInstanced(3, 1, 0, 0);
+	
+	cmdList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_SSAODebugMap->GetTexture(),
+		D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_GENERIC_READ));
 }
 
 void SSAO::BuildResource()
@@ -176,9 +192,12 @@ void SSAO::BuildResource()
 			m_RenderTargetHeight, m_AOMapFormat);
 		m_SSAOMap1 = std::make_shared<Texture2D>(m_pDevice, m_RenderTargetWidth,
 			m_RenderTargetHeight, m_AOMapFormat);
+		m_SSAODebugMap = std::make_shared<Texture2D>(m_pDevice, m_RenderTargetWidth,
+			m_RenderTargetHeight, DXGI_FORMAT_R8G8B8A8_UNORM);
 		textureManager.ReBuildDescriptor(NORMALDEPTHMAP_NAME, m_NormalDepthMap);
 		textureManager.ReBuildDescriptor(SSAOXMAP_NAME, m_SSAOMap0);
 		textureManager.ReBuildDescriptor(SSAOYMAP_NAME, m_SSAOMap1);
+		textureManager.ReBuildDescriptor(SSAODEBUGMAP_NAME, m_SSAODebugMap);
 	}
 	else 
 	{
@@ -191,10 +210,13 @@ void SSAO::BuildResource()
 			m_RenderTargetHeight, m_AOMapFormat);
 		m_SSAOMap1 = std::make_shared<Texture2D>(m_pDevice, m_RenderTargetWidth,
 			m_RenderTargetHeight, m_AOMapFormat);
+		m_SSAODebugMap = std::make_shared<Texture2D>(m_pDevice, m_RenderTargetWidth,
+			m_RenderTargetHeight, DXGI_FORMAT_R8G8B8A8_UNORM);
 		textureManager.AddTexture(NORMALDEPTHMAP_NAME, m_NormalDepthMap);
 		textureManager.AddTexture(RANDOMVECTORMAP_NAME, m_RandomVectorMap);
 		textureManager.AddTexture(SSAOXMAP_NAME, m_SSAOMap0);
 		textureManager.AddTexture(SSAOYMAP_NAME, m_SSAOMap1);
+		textureManager.AddTexture(SSAODEBUGMAP_NAME, m_SSAODebugMap);
 	}
 }
 
@@ -203,7 +225,7 @@ void SSAO::BuildRandomVectorTexture(ID3D12GraphicsCommandList* cmdList)
 	int width = 256;
 	D3D12_RESOURCE_DESC texDesc;
 	ZeroMemory(&texDesc, sizeof(D3D12_RESOURCE_DESC));
-	texDesc.DepthOrArraySize = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+	texDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
 	texDesc.Alignment = 0;
 	texDesc.Width = width;
 	texDesc.Height = width;
@@ -226,14 +248,14 @@ void SSAO::BuildRandomVectorTexture(ID3D12GraphicsCommandList* cmdList)
 	const UINT64 uploadBufferSize = GetRequiredIntermediateSize(m_RandomVectorResource.Get(), 0, num2DSubresources);
 
 	HR(m_pDevice->CreateCommittedResource(
-		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
+		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
 		D3D12_HEAP_FLAG_NONE,
 		&CD3DX12_RESOURCE_DESC::Buffer(uploadBufferSize),
 		D3D12_RESOURCE_STATE_GENERIC_READ,
 		nullptr,
 		IID_PPV_ARGS(m_RandomVectorUploadBuffer.GetAddressOf())));
 
-	XMCOLOR* initData = new XMCOLOR[256 * 256];
+	XMCOLOR initData[256 * 256];
 	for (int i = 0; i < width; ++i)
 	{
 		for (int j = 0; j < width; ++j)
@@ -255,7 +277,6 @@ void SSAO::BuildRandomVectorTexture(ID3D12GraphicsCommandList* cmdList)
 		0, 0, num2DSubresources, &subResourceData);
 	cmdList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_RandomVectorResource.Get(),
 		D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_GENERIC_READ));
-
 }
 
 void SSAO::BuildOffsetVectors()
@@ -312,5 +333,21 @@ void SSAO::BlurAOMap(ID3D12GraphicsCommandList* cmdList, bool horzBlur)
 		inputSrv = m_SSAOMap1->GetShaderResource();
 		outputRtv = m_SSAOMap0->GetRenderTarget();
 	}
-	//TODO
+	cmdList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(output,
+		D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_RENDER_TARGET));
+
+	float clearValue[] = { 1.0f,1.0f,1.0f,1.0f };
+	cmdList->ClearRenderTargetView(outputRtv, clearValue, 0, nullptr);
+	cmdList->OMSetRenderTargets(1, &outputRtv, true, nullptr);
+
+	cmdList->SetGraphicsRootDescriptorTable(1, m_NormalDepthMap->GetShaderResource());
+	cmdList->SetGraphicsRootDescriptorTable(2, inputSrv);
+
+	cmdList->IASetVertexBuffers(0, 0, nullptr);
+	cmdList->IASetIndexBuffer(nullptr);
+	cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+	cmdList->DrawInstanced(3, 1, 0, 0);
+
+	cmdList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(output,
+		D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_GENERIC_READ));
 }

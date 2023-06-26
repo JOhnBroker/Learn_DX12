@@ -132,7 +132,9 @@
     <ClInclude Include="SSAO.h">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="RenderItem.h" />
+    <ClInclude Include="RenderItem.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="imgui.ini" />
