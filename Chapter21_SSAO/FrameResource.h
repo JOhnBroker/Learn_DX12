@@ -29,6 +29,7 @@ struct PassConstants
 	DirectX::XMFLOAT4X4 ViewProj = MathHelper::Identity4x4();
 	DirectX::XMFLOAT4X4 InvViewProj = MathHelper::Identity4x4();
 	DirectX::XMFLOAT4X4 ShadowTransform = MathHelper::Identity4x4();
+	DirectX::XMFLOAT4X4 ViewProjTex = MathHelper::Identity4x4();
 	DirectX::XMFLOAT3 EyePosW = { 0.0f,0.0f,0.0f };
 	float cbPerObjectPad1 = 0.0f;
 	DirectX::XMFLOAT2 RenderTargetSize = { 0.0f,0.0f };
@@ -57,7 +58,7 @@ struct SSAOConstants
 	DirectX::XMFLOAT4 BlurWeights[3];
 	DirectX::XMFLOAT2 TexelSize;
 	UINT BlurRaidus;
-	UINT Pad0;
+	UINT Pad0 = 0;
 };
 
 struct Vertex

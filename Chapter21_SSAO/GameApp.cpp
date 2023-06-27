@@ -32,6 +32,7 @@ bool GameApp::Initialize()
 	}
 
 	BuildRootSignature();
+	BuildSSAORootSignature();
 	BuildDescriptorHeaps();
 	BuildShadersAndInputLayout();
 	BuildShapeGeometry();
@@ -142,7 +143,7 @@ bool GameApp::InitResource()
 void GameApp::CreateRTVAndDSVDescriptorHeaps()
 {
 	D3D12_DESCRIPTOR_HEAP_DESC rtvHeapDesc;
-	rtvHeapDesc.NumDescriptors = SwapChainBufferCount + 1;
+	rtvHeapDesc.NumDescriptors = SwapChainBufferCount + 1 + 5;
 	rtvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
 	rtvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
 	rtvHeapDesc.NodeMask = 0;
@@ -158,7 +159,7 @@ void GameApp::CreateRTVAndDSVDescriptorHeaps()
 		&dsvHeapDesc, IID_PPV_ARGS(m_DSVHeap.GetAddressOf())));
 
 	D3D12_DESCRIPTOR_HEAP_DESC srvHeapDesc = {};
-	srvHeapDesc.NumDescriptors = 14;
+	srvHeapDesc.NumDescriptors = 19;
 	srvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
 	srvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
 	HR(m_pd3dDevice->CreateDescriptorHeap(&srvHeapDesc, IID_PPV_ARGS(&m_SRVHeap)));
@@ -284,6 +285,7 @@ void GameApp::Update(const GameTimer& timer)
 	UpdateShadowTransform(timer);
 	UpdateMainPassCB(timer);
 	UpdateShadowPassCB(timer);
+	UpdateSSAOCB(timer);
 }
 
 void GameApp::Draw(const GameTimer& timer)
@@ -302,16 +304,17 @@ void GameApp::Draw(const GameTimer& timer)
 	m_CommandList->SetGraphicsRootShaderResourceView(2, matBuffer->GetGPUVirtualAddress());
 	m_CommandList->SetGraphicsRootDescriptorTable(3, m_TextureManager.GetNullCubeTexture());
 	m_CommandList->SetGraphicsRootDescriptorTable(4, m_TextureManager.GetNullTexture());
-	m_CommandList->SetGraphicsRootDescriptorTable(5, m_SRVHeap->GetGPUDescriptorHandleForHeapStart());
+	m_CommandList->SetGraphicsRootDescriptorTable(5, m_TextureManager.GetNullTexture());
+	m_CommandList->SetGraphicsRootDescriptorTable(6, m_SRVHeap->GetGPUDescriptorHandleForHeapStart());
 
 	m_ShadowMap->DrawShadowMap(m_CommandList.Get(), m_PSOs["shadow_opaque"].Get(), m_CurrFrameResource, m_RitemLayer[(int)RenderLayer::Opaque]);
 
 	// TODO : use ao
-	m_SSAO->RenderNormalDepthMap(m_CommandList.Get(), m_PSOs["normaldepth"].Get(), m_CurrFrameResource, m_RitemLayer[(int)RenderLayer::Opaque]);
+	m_SSAO->RenderNormalDepthMap(m_CommandList.Get(), m_PSOs["normaldepth"].Get(), DepthStencilView(),m_CurrFrameResource, m_RitemLayer[(int)RenderLayer::Opaque]);
 
 	m_CommandList->SetGraphicsRootSignature(m_RootSignatures["ssao"].Get());
 	m_SSAO->RenderToSSAOTexture(m_CommandList.Get(), m_PSOs["ssao"].Get(), m_CurrFrameResource);
-	m_SSAO->BlurAOMap(m_CommandList.Get(), m_PSOs["ssaoBlur"].Get(), m_CurrFrameResource, 5);
+	//m_SSAO->BlurAOMap(m_CommandList.Get(), m_PSOs["ssaoBlur_X"].Get(), m_PSOs["ssaoBlur_Y"].Get(), m_CurrFrameResource, 5);
 
 	m_CommandList->SetGraphicsRootSignature(m_RootSignatures["opaque"].Get());
 
@@ -333,6 +336,7 @@ void GameApp::Draw(const GameTimer& timer)
 	skyTexDescriptor.Offset(m_SkyTexHeapIndex, m_CBVSRVDescriptorSize);
 	m_CommandList->SetGraphicsRootDescriptorTable(3, skyTexDescriptor);
 	m_CommandList->SetGraphicsRootDescriptorTable(4, m_ShadowMap->GetSrv());
+	m_CommandList->SetGraphicsRootDescriptorTable(5, m_SSAO->GetAOMapSrv());
 
 	switch (m_ShowMode)
 	{
@@ -541,6 +545,14 @@ void GameApp::UpdateMainPassCB(const GameTimer& gt)
 	XMMATRIX invProj = XMMatrixInverse(&dProj, proj);
 	XMMATRIX invViewproj = XMMatrixInverse(&dViewProj, viewproj);
 
+	XMMATRIX T(
+		0.5f, 0.0f, 0.0f, 0.0f,
+		0.0f, -0.5f, 0.0f, 0.0f,
+		0.0f, 0.0f, 1.0f, 0.0f,
+		0.5f, 0.5f, 0.0f, 1.0f);
+
+	XMMATRIX viewProjTex = XMMatrixMultiply(viewproj, T);
+
 	XMStoreFloat4x4(&m_MainPassCB.View, XMMatrixTranspose(view));
 	XMStoreFloat4x4(&m_MainPassCB.Proj, XMMatrixTranspose(proj));
 	XMStoreFloat4x4(&m_MainPassCB.InvView, XMMatrixTranspose(invView));
@@ -548,6 +560,7 @@ void GameApp::UpdateMainPassCB(const GameTimer& gt)
 	XMStoreFloat4x4(&m_MainPassCB.ViewProj, XMMatrixTranspose(viewproj));
 	XMStoreFloat4x4(&m_MainPassCB.InvViewProj, XMMatrixTranspose(invViewproj));
 	XMStoreFloat4x4(&m_MainPassCB.ShadowTransform, XMMatrixTranspose(m_Lights[0]->GetTransform()));
+	XMStoreFloat4x4(&m_MainPassCB.ViewProjTex, XMMatrixTranspose(viewProjTex));
 	m_MainPassCB.EyePosW = m_pCamera->GetPosition();
 	m_MainPassCB.RenderTargetSize = XMFLOAT2((float)m_ClientWidth, (float)m_ClientHeight);
 	m_MainPassCB.InvRenderTargetSize = XMFLOAT2(1.0f / m_ClientWidth, 1.0f / m_ClientHeight);
@@ -688,7 +701,6 @@ void GameApp::UpdateSSAOCB(const GameTimer& gt)
 
 	auto currSSAOCB = m_CurrFrameResource->SsaoCB.get();
 	currSSAOCB->CopyData(0, ssaoCB);
-
 }
 
 void GameApp::BuildRootSignature()
@@ -699,9 +711,11 @@ void GameApp::BuildRootSignature()
 	CD3DX12_DESCRIPTOR_RANGE texTable1;
 	texTable1.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 1, 0);
 	CD3DX12_DESCRIPTOR_RANGE texTable2;
-	texTable2.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, m_TextureManager.GetTextureCount(), 2, 0);
+	texTable2.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 2, 0);
+	CD3DX12_DESCRIPTOR_RANGE texTable3;
+	texTable3.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, m_TextureManager.GetTextureCount(), 3, 0);
 
-	CD3DX12_ROOT_PARAMETER slotRootParameter[6];
+	CD3DX12_ROOT_PARAMETER slotRootParameter[7];
 
 	// 创建根描述符表
 	slotRootParameter[0].InitAsConstantBufferView(0);
@@ -710,6 +724,7 @@ void GameApp::BuildRootSignature()
 	slotRootParameter[3].InitAsDescriptorTable(1, &texTable0, D3D12_SHADER_VISIBILITY_PIXEL);
 	slotRootParameter[4].InitAsDescriptorTable(1, &texTable1, D3D12_SHADER_VISIBILITY_PIXEL);
 	slotRootParameter[5].InitAsDescriptorTable(1, &texTable2, D3D12_SHADER_VISIBILITY_PIXEL);
+	slotRootParameter[6].InitAsDescriptorTable(1, &texTable3, D3D12_SHADER_VISIBILITY_PIXEL);
 
 	auto staticSamplers = GetStaticSamplers();
 
@@ -741,14 +756,17 @@ void GameApp::BuildSSAORootSignature()
 {
 	HRESULT hReturn = E_FAIL;
 	CD3DX12_DESCRIPTOR_RANGE texTable0;
-	texTable0.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 2, 0, 0);
+	texTable0.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0, 0);
 	CD3DX12_DESCRIPTOR_RANGE texTable1;
-	texTable1.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 2, 0);
+	texTable1.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 1, 0);
+	CD3DX12_DESCRIPTOR_RANGE texTable2;
+	texTable2.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 2, 0);
 
-	CD3DX12_ROOT_PARAMETER slotRootParmeter[3];
+	CD3DX12_ROOT_PARAMETER slotRootParmeter[4];
 	slotRootParmeter[0].InitAsConstantBufferView(0);
 	slotRootParmeter[1].InitAsDescriptorTable(1, &texTable0, D3D12_SHADER_VISIBILITY_PIXEL);
 	slotRootParmeter[2].InitAsDescriptorTable(1, &texTable1, D3D12_SHADER_VISIBILITY_PIXEL);
+	slotRootParmeter[3].InitAsDescriptorTable(1, &texTable2, D3D12_SHADER_VISIBILITY_PIXEL);
 
 	const CD3DX12_STATIC_SAMPLER_DESC linearWrap(
 		0,
@@ -853,19 +871,26 @@ void GameApp::BuildShadersAndInputLayout()
 		"NUM_DIR_LIGHT","3",
 		NULL,NULL
 	};
+	const D3D_SHADER_MACRO BlurXDefines[] =
+	{
+		"BLUR_HORZ","1",
+		NULL,NULL
+	};
 
 	m_Shaders["standardVS"] = d3dUtil::CompileShader(L"..\\Shader\\Chapter21\\Default.hlsl", nullptr, "VS", "vs_5_1");
 	m_Shaders["opaquePS"] = d3dUtil::CompileShader(L"..\\Shader\\Chapter21\\Default.hlsl", direLightDefines, "PS", "ps_5_1");
 	m_Shaders["skyVS"] = d3dUtil::CompileShader(L"..\\Shader\\Chapter21\\Default.hlsl", nullptr, "Sky_VS", "vs_5_1");
 	m_Shaders["skyPS"] = d3dUtil::CompileShader(L"..\\Shader\\Chapter21\\Default.hlsl", nullptr, "Sky_PS", "ps_5_1");
-	// ssao
+
+	// ao
 	m_Shaders["aoVS"] = d3dUtil::CompileShader(L"..\\Shader\\Chapter21\\AO.hlsl", nullptr, "VS", "vs_5_1");
 	m_Shaders["aoPS"] = d3dUtil::CompileShader(L"..\\Shader\\Chapter21\\AO.hlsl", direLightDefines, "PS", "ps_5_1");
 	m_Shaders["normalDepthMapVS"] = d3dUtil::CompileShader(L"..\\Shader\\Chapter21\\NormalDepthMap.hlsl", nullptr, "VS", "vs_5_1");
 	m_Shaders["normalDepthMapPS"] = d3dUtil::CompileShader(L"..\\Shader\\Chapter21\\NormalDepthMap.hlsl", nullptr, "PS", "ps_5_1");
-	m_Shaders["ssaoVS"] = d3dUtil::CompileShader(L"..\\Shader\\Chapter21\\SSAO.hlsl", nullptr, "VS", "vs_5_1");
-	m_Shaders["ssaoPS"] = d3dUtil::CompileShader(L"..\\Shader\\Chapter21\\SSAO.hlsl", direLightDefines, "PS", "ps_5_1");
-	m_Shaders["ssaoBlurPS"] = d3dUtil::CompileShader(L"..\\Shader\\Chapter21\\SSAO.hlsl", direLightDefines, "BilateralPS", "ps_5_1");
+	m_Shaders["ssaoVS"] = d3dUtil::CompileShader(L"..\\Shader\\Chapter21\\SSAO.hlsl", nullptr, "SSAO_VS", "vs_5_1");
+	m_Shaders["ssaoPS"] = d3dUtil::CompileShader(L"..\\Shader\\Chapter21\\SSAO.hlsl", nullptr, "SSAO_PS", "ps_5_1");
+	m_Shaders["ssaoBlurPS_X"] = d3dUtil::CompileShader(L"..\\Shader\\Chapter21\\SSAO.hlsl", BlurXDefines, "Bilateral_PS", "ps_5_1");
+	m_Shaders["ssaoBlurPS_Y"] = d3dUtil::CompileShader(L"..\\Shader\\Chapter21\\SSAO.hlsl", nullptr, "Bilateral_PS", "ps_5_1");
 	
 	// shadow
 	m_Shaders["shadowVS"] = d3dUtil::CompileShader(L"..\\Shader\\Chapter21\\Shadows.hlsl", nullptr, "VS", "vs_5_1");
@@ -1218,12 +1243,7 @@ void GameApp::BuildPSOs()
 		reinterpret_cast<BYTE*>(m_Shaders["normalDepthMapPS"]->GetBufferPointer()),
 		m_Shaders["normalDepthMapPS"]->GetBufferSize()
 	};
-	ssaoNormalDepthPsoDesc.DepthStencilState.DepthEnable = false;
-	ssaoNormalDepthPsoDesc.DepthStencilState.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ZERO;
 	ssaoNormalDepthPsoDesc.RTVFormats[0] = DXGI_FORMAT_R16G16B16A16_FLOAT;
-	ssaoNormalDepthPsoDesc.SampleDesc.Count = 1;
-	ssaoNormalDepthPsoDesc.SampleDesc.Quality = 0;
-	ssaoNormalDepthPsoDesc.DSVFormat = DXGI_FORMAT_UNKNOWN;
 	HR(m_pd3dDevice->CreateGraphicsPipelineState(&ssaoNormalDepthPsoDesc, IID_PPV_ARGS(&m_PSOs["normaldepth"])));
 	
 	// ssao
@@ -1249,14 +1269,21 @@ void GameApp::BuildPSOs()
 	HR(m_pd3dDevice->CreateGraphicsPipelineState(&ssaoDesc, IID_PPV_ARGS(&m_PSOs["ssao"])));
 
 	// ssao blur
-	D3D12_GRAPHICS_PIPELINE_STATE_DESC ssaoBlurDesc = ssaoDesc;
-	ssaoBlurDesc.PS =
+	D3D12_GRAPHICS_PIPELINE_STATE_DESC ssaoBlurXDesc = ssaoDesc;
+	ssaoBlurXDesc.PS =
 	{
-		reinterpret_cast<BYTE*>(m_Shaders["ssaoBlurPS"]->GetBufferPointer()),
-		m_Shaders["ssaoBlurPS"]->GetBufferSize()
+		reinterpret_cast<BYTE*>(m_Shaders["ssaoBlurPS_X"]->GetBufferPointer()),
+		m_Shaders["ssaoBlurPS_X"]->GetBufferSize()
 	};
-	ssaoBlurDesc.RTVFormats[0] = DXGI_FORMAT_R16_UNORM;
-	HR(m_pd3dDevice->CreateGraphicsPipelineState(&ssaoBlurDesc, IID_PPV_ARGS(&m_PSOs["ssaoBlur"])));
+	HR(m_pd3dDevice->CreateGraphicsPipelineState(&ssaoBlurXDesc, IID_PPV_ARGS(&m_PSOs["ssaoBlur_X"])));
+
+	D3D12_GRAPHICS_PIPELINE_STATE_DESC ssaoBlurYDesc = ssaoBlurXDesc;
+	ssaoBlurYDesc.PS =
+	{
+		reinterpret_cast<BYTE*>(m_Shaders["ssaoBlurPS_Y"]->GetBufferPointer()),
+		m_Shaders["ssaoBlurPS_Y"]->GetBufferSize()
+	};
+	HR(m_pd3dDevice->CreateGraphicsPipelineState(&ssaoBlurYDesc, IID_PPV_ARGS(&m_PSOs["ssaoBlur_Y"])));
 
 	// ssao debug map
 	D3D12_GRAPHICS_PIPELINE_STATE_DESC ssaoDebugDesc = ssaoDesc;

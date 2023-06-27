@@ -18,9 +18,9 @@ SSAO::SSAO(ID3D12Device* device, ID3D12GraphicsCommandList* cmdList, UINT width,
 
 	m_ScissotRect = { 0,0,(int)m_RenderTargetWidth,(int)m_RenderTargetHeight };
 
-	BuildResource();
 	BuildOffsetVectors();
 	BuildRandomVectorTexture(cmdList);
+	BuildResource();
 }
 
 void SSAO::GetOffsetVectors(DirectX::XMFLOAT4 offsets[14])
@@ -77,7 +77,7 @@ void SSAO::OnResize(UINT newWidth, UINT newHeight)
 }
 
 void SSAO::RenderNormalDepthMap(ID3D12GraphicsCommandList* cmdList, ID3D12PipelineState* pPso,
-	FrameResource* currFrame, const std::vector<RenderItem*>& items)
+	D3D12_CPU_DESCRIPTOR_HANDLE hDssv, FrameResource* currFrame, const std::vector<RenderItem*>& items)
 {
 	cmdList->RSSetViewports(1, &m_ViewPort);
 	cmdList->RSSetScissorRects(1, &m_ScissotRect);
@@ -87,7 +87,8 @@ void SSAO::RenderNormalDepthMap(ID3D12GraphicsCommandList* cmdList, ID3D12Pipeli
 
 	float clearValue[] = { 0.0f,0.0f,0.0f,1.0f };
 	cmdList->ClearRenderTargetView(m_NormalDepthMap->GetRenderTarget(), clearValue, 0, nullptr);
-	cmdList->OMSetRenderTargets(1, &m_NormalDepthMap->GetRenderTarget(), true, nullptr);
+	cmdList->ClearDepthStencilView(hDssv, D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, 1.0f, 0, 0, nullptr);
+	cmdList->OMSetRenderTargets(1, &m_NormalDepthMap->GetRenderTarget(), true, &hDssv);
 
 	auto passCB = currFrame->PassCB->Resource();
 	auto objectCB = currFrame->ObjectCB->Resource();
@@ -132,7 +133,8 @@ void SSAO::RenderToSSAOTexture(ID3D12GraphicsCommandList* cmdList, ID3D12Pipelin
 	cmdList->SetGraphicsRootConstantBufferView(0, ssaoCBAddress);
 
 	cmdList->SetGraphicsRootDescriptorTable(1, m_NormalDepthMap->GetShaderResource());
-	cmdList->SetGraphicsRootDescriptorTable(2, m_SSAOMap0->GetShaderResource());
+	cmdList->SetGraphicsRootDescriptorTable(2, m_RandomVectorMap->GetShaderResource());
+	cmdList->SetGraphicsRootDescriptorTable(3, m_SSAOMap0->GetShaderResource());
 	
 	cmdList->SetPipelineState(pPso);
 
@@ -145,17 +147,20 @@ void SSAO::RenderToSSAOTexture(ID3D12GraphicsCommandList* cmdList, ID3D12Pipelin
 		D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_GENERIC_READ));
 }
 
-void SSAO::BlurAOMap(ID3D12GraphicsCommandList* cmdList, ID3D12PipelineState* pPso,
+void SSAO::BlurAOMap(ID3D12GraphicsCommandList* cmdList, ID3D12PipelineState* pPsoX, ID3D12PipelineState* pPsoY,
 	FrameResource* currFrame, int blurCount)
 {
-	cmdList->SetPipelineState(pPso);
-
 	auto ssaoCBAddress = currFrame->SsaoCB->Resource()->GetGPUVirtualAddress();
 	cmdList->SetGraphicsRootConstantBufferView(0, ssaoCBAddress);
 
+	cmdList->SetPipelineState(pPsoX);
 	for (int i = 0; i < blurCount; ++i) 
 	{
 		BlurAOMap(cmdList, true);
+	}
+	cmdList->SetPipelineState(pPsoY);
+	for (int i = 0; i < blurCount; ++i) 
+	{
 		BlurAOMap(cmdList, false);
 	}
 }
@@ -244,7 +249,7 @@ void SSAO::BuildRandomVectorTexture(ID3D12GraphicsCommandList* cmdList)
 		nullptr,
 		IID_PPV_ARGS(&m_RandomVectorResource)));
 
-	const UINT num2DSubresources = texDesc.MipLevels * texDesc.DepthOrArraySize;
+    const UINT num2DSubresources = texDesc.DepthOrArraySize * texDesc.MipLevels;
 	const UINT64 uploadBufferSize = GetRequiredIntermediateSize(m_RandomVectorResource.Get(), 0, num2DSubresources);
 
 	HR(m_pDevice->CreateCommittedResource(
@@ -341,7 +346,8 @@ void SSAO::BlurAOMap(ID3D12GraphicsCommandList* cmdList, bool horzBlur)
 	cmdList->OMSetRenderTargets(1, &outputRtv, true, nullptr);
 
 	cmdList->SetGraphicsRootDescriptorTable(1, m_NormalDepthMap->GetShaderResource());
-	cmdList->SetGraphicsRootDescriptorTable(2, inputSrv);
+	cmdList->SetGraphicsRootDescriptorTable(2, m_RandomVectorMap->GetShaderResource());
+	cmdList->SetGraphicsRootDescriptorTable(3, inputSrv);
 
 	cmdList->IASetVertexBuffers(0, 0, nullptr);
 	cmdList->IASetIndexBuffer(nullptr);

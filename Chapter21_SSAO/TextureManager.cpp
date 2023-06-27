@@ -169,8 +169,8 @@ void TextureManager::BuildDescriptor(
 	{
 		it.second->BuildDescriptor(m_pDevice.Get(), hCpuSrv, hGpuSrv, hCpuDsv,
 			hCpuRtv, uiSrvDescriptorSize, uiDsvDescriptorSize, uiRtvDescriptorSize);
-		dsvIndex = it.second->GetDSVDescriptorCount() > 0 ? dsvIndex += it.second->GetDSVDescriptorCount() : -1;
-		rtvIndex = it.second->GetRTVDescriptorCount() > 0 ? rtvIndex += it.second->GetRTVDescriptorCount() : -1;
+		int curDsvIndex = it.second->GetDSVDescriptorCount() > 0 ? dsvIndex += it.second->GetDSVDescriptorCount(), curDsvIndex = dsvIndex : -1;
+		int curRtvIndex = it.second->GetRTVDescriptorCount() > 0 ? rtvIndex += it.second->GetRTVDescriptorCount(), curRtvIndex = rtvIndex : -1;
 		AddTextureIndex(it.first, { srvIndex++,dsvIndex ,rtvIndex });
 	}
 

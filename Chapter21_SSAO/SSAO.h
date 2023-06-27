@@ -40,12 +40,12 @@ public:
 	void OnResize(UINT newWidth, UINT newHeight);
 	// Pass1：绘制观察空间法向量和深度贴图
 	void RenderNormalDepthMap(ID3D12GraphicsCommandList* cmdList, ID3D12PipelineState* pPso, 
-		FrameResource* currFrame, const std::vector<RenderItem*>& items);
+		D3D12_CPU_DESCRIPTOR_HANDLE hDssv, FrameResource* currFrame, const std::vector<RenderItem*>& items);
 	// Pass2：绘制SSAO
 	void RenderToSSAOTexture(ID3D12GraphicsCommandList* cmdList, ID3D12PipelineState* pPso,
 		FrameResource* currFrame);
 	// Pass3：对SSAO进行滤波;	blurCount: 模糊次数
-	void BlurAOMap(ID3D12GraphicsCommandList* cmdList, ID3D12PipelineState* pPso, 
+	void BlurAOMap(ID3D12GraphicsCommandList* cmdList, ID3D12PipelineState* pPsoX, ID3D12PipelineState* pPsoY, 
 		FrameResource* currFrame, int blurCount);
 	// Render Debug AO
 	void RenderAOToTexture(ID3D12GraphicsCommandList* cmdList, ID3D12PipelineState* pPso);

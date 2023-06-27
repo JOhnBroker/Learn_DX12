@@ -4,7 +4,8 @@
 
 cbuffer cbSsao : register(b0)
 {
-    float4x4 gProjTex; // View to Texture Space
+    // View to Texture Space
+    float4x4 gProjTex; 
     // 远平面三角形（覆盖四个角点）
     float4 gFarPlanePoints[3];
     
@@ -19,13 +20,9 @@ cbuffer cbSsao : register(b0)
     
     // SSAO_Blur
     float4 gBlurWeights[3];
-    
-    static float sBlurWeights[12] = (float[12]) gBlurWeights;
-    
     float2 gTexelSize; // (1.0f / W, 1.0f / H)
     int gBlurRadius;
     float g_Pad;
-    
 };
 
 Texture2D gNormalDepthMap : register(t0);
@@ -37,6 +34,10 @@ SamplerState gSamLinearClamp : register(s1);
 SamplerState gSamNormalDepth : register(s2);
 SamplerState gSamRandomVec : register(s3);
 SamplerState gSamBlur : register(s4);
+
+static const int gSampleCount = 14;
+static float sBlurWeights[12] = (float[12]) gBlurWeights;
+
 
 // 计算AO
 
@@ -61,45 +62,49 @@ float OcclusionFunction(float distZ)
     if (distZ > gOcclusionEpsilon)
     {
         float fadeLength = gOcclusionFadeEnd - gOcclusionFadeStart;
-        occlusion = saturate((gOcclusionEpsilon - distZ) / fadeLength);
+        occlusion = saturate((gOcclusionFadeEnd - distZ) / fadeLength);
     }
     return occlusion;
 }
 
-void VS(uint vertexID : SV_VertexID,
-        out float4 posH : SV_Position,
-        out float3 farPlanePoint : POSITION,
-        out float2 texcoord : TEXCOORD)
+struct VertexOut
 {
+    float4 posH : SV_Position;
+    float3 farPlanePoint : POSITION;
+    float2 texC : TEXCOORD;
+};
+
+VertexOut SSAO_VS(uint vertexID : SV_VertexID)
+{
+    VertexOut vout;
     float2 grid = float2((vertexID << 1) & 2, vertexID & 2);
     float2 xy = grid * float2(2.0f, -2.0f) + float2(-1.0f, 1.0f);
     
-    texcoord = grid * float2(1.0f, 1.0f);
-    posH = float4(xy, 1.0f, 1.0f);
-    farPlanePoint = gFarPlanePoints[vertexID].xyz;
+    vout.posH = float4(xy, 1.0f, 1.0f);
+    vout.farPlanePoint = gFarPlanePoints[vertexID].xyz;
+    vout.texC = grid * float2(1.0f, 1.0f);
+    
+    return vout;
 }
 
-float4 PS(float4 posH : SV_Position,
-        float3 farPlanePoint : POSITION,
-        float2 texcoord : TEXCOORD,
-        uniform int sampleCount) : SV_Target
+float4 SSAO_PS(VertexOut pin) : SV_Target
 {
     // 1. 获取法向量和深度
-    float4 normalDepth = gNormalDepthMap.SampleLevel(gSamNormalDepth, texcoord, 0.0f);
+    float4 normalDepth = gNormalDepthMap.SampleLevel(gSamNormalDepth, pin.texC, 0.0f);
     float3 n = normalDepth.xyz;
     float depth = normalDepth.w;
     
     // 2. 重建观察空间坐标
     // p : 计算的环境光遮蔽目标点
-    float3 p = (depth / farPlanePoint.z) * farPlanePoint;
+    float3 p = (depth / pin.farPlanePoint.z) * pin.farPlanePoint;
     
     // 3. 获取随机向量并从[0, 1]^3映射到[-1, 1]^3
-    float3 randVec = gRandomVecMap.SampleLevel(gSamRandomVec, 4.0f * texcoord, 0.0f).xyz;
+    float3 randVec = gRandomVecMap.SampleLevel(gSamRandomVec, 4.0f * pin.texC, 0.0f).xyz;
     randVec = 2.0f * randVec - 1.0f;
     
     float occlusionSum = 0.0f;
     
-    for (int i = 0; i < sampleCount; ++i)
+    for (int i = 0; i < gSampleCount; ++i)
     {
         float3 offset = reflect(gOffsetVectors[i].xyz, randVec);
         
@@ -123,28 +128,27 @@ float4 PS(float4 posH : SV_Position,
         
         occlusionSum += occlusion;
     }
-    occlusionSum /= sampleCount;
+    occlusionSum /= gSampleCount;
     
     float access = 1.0f - occlusionSum;
     
-    return saturate(pow(access, 6.0f));
+    return saturate(pow(access, 4.0f));
 }
 
 // 模糊AO
 // 双边滤波
 
-float4 BilateralPS(float4 posH : SV_Position,
-                    float2 texcoord) : SV_Target
+float4 Bilateral_PS(VertexOut pin) : SV_Target
 {
     // 把中心值加进去计算
-    float4 color = sBlurWeights[gBlurRadius] * gInputImage.SampleLevel(gSamBlur, texcoord, 0.0f);
+    float4 color = sBlurWeights[gBlurRadius] * gInputImage.SampleLevel(gSamBlur, pin.texC, 0.0f);
     float totalWeight = sBlurWeights[gBlurRadius];
     
-    float4 centerNormalDepth = gNormalDepthMap.SampleLevel(gSamBlur, texcoord, 0.0f);
+    float4 centerNormalDepth = gNormalDepthMap.SampleLevel(gSamBlur, pin.texC, 0.0f);
     float3 centerNormal = centerNormalDepth.xyz;
     float centerDepth = centerNormalDepth.w;
     
-    for (int i = -gBlurRadius; i < gBlurRadius; ++i)
+    for (int i = -gBlurRadius; i <= gBlurRadius; ++i)
     {
         if (i == 0)
             continue;
@@ -153,7 +157,7 @@ float4 BilateralPS(float4 posH : SV_Position,
 #else
         float2 offset = float2(0.0f, gTexelSize.y * i);
 #endif
-        float4 neighborNormalDepth = gNormalDepthMap.SampleLevel(gSamBlur, texcoord + offset, 0.0f);
+        float4 neighborNormalDepth = gNormalDepthMap.SampleLevel(gSamBlur, pin.texC + offset, 0.0f);
         float3 neighborNormal = neighborNormalDepth.xyz;
         float neighborDepth = neighborNormalDepth.w;
         
@@ -165,7 +169,7 @@ float4 BilateralPS(float4 posH : SV_Position,
         {
             float weight = sBlurWeights[i + gBlurRadius];
             // 将相邻像素加入进行模糊
-            color += weight * gInputImage.SampleLevel(gSamBlur, texcoord + offset, 0.0f);
+            color += weight * gInputImage.SampleLevel(gSamBlur, pin.texC + offset, 0.0f);
             totalWeight += weight;
         }
         
@@ -173,10 +177,9 @@ float4 BilateralPS(float4 posH : SV_Position,
     return color / totalWeight;
 }
 
-float4 DebugAO_PS(float4 posH : SV_Position,
-                float2 texcoord : TEXCOORD) : SV_Target
+float4 DebugAO_PS(VertexOut pin) : SV_Target
 {
-    float depth = gInputImage.Sample(gSamLinearWrap, texcoord).r;
+    float depth = gInputImage.Sample(gSamLinearWrap, pin.texC).r;
     return float4(depth.rrr, 1.0f);
 }
 

@@ -16,7 +16,8 @@ struct MaterialData
 
 TextureCube gCubeMap : register(t0);
 Texture2D gShadowMap : register(t1);
-Texture2D gDiffuseMap[10] : register(t2);
+Texture2D gSSAOMap : register(t2);
+Texture2D gDiffuseMap[10] : register(t3);
 
 StructuredBuffer<MaterialData> gMaterialData : register(t0, space1);
 
@@ -50,6 +51,7 @@ cbuffer cbPass : register(b1)
 	float4x4 gViewProj;
 	float4x4 gInvViewProj;
     float4x4 gShadowTransform;
+    float4x4 gViewProjTex;
 	float3 gEyePosW;
 	float gPad1;
 	float2 gRenderTargetSize;

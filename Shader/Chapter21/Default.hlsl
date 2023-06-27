@@ -24,7 +24,8 @@ struct VertexOut
 {
 	float4 PosH 	    :	SV_POSITION;
     float4 ShadowPosH   :   POSITION0;
-	float3 PosW		    :	POSITION1;
+    float4 SsaoPosH     :   POSITION1;
+	float3 PosW		    :	POSITION2;
 	float3 NormalW	    :	NORMAL;
     float2 TexC		    :	TEXCOORD;
     float3 TangentW     :   TANGENT;
@@ -49,11 +50,11 @@ VertexOut VS(VertexIn vin)
     vout.TangentW = mul(vin.TangentU, (float3x3) gWorld);
     
     vout.PosH = mul(posW, gViewProj);
+    vout.SsaoPosH = mul(posW, gViewProjTex);
+    vout.ShadowPosH = mul(posW, gShadowTransform);
 	
     float4 texC = mul(float4(vin.TexC, 0.0f, 1.0f), gTexTransform);
     vout.TexC = mul(texC, matData.MatTransform).xy;
-    
-    vout.ShadowPosH = mul(posW, gShadowTransform);
     
 	return vout;
 }
@@ -78,7 +79,11 @@ float4 PS (VertexOut pin) : SV_Target
     float3 bumpedNormalW = NormalSampleToWorldSpace(normalMapSample.xyz, pin.NormalW, pin.TangentW);
     
     float3 toEyeW = normalize(gEyePosW - pin.PosW);
-    float4 ambient = gAmbientLight * diffuseAlbedo;
+
+    pin.SsaoPosH /= pin.SsaoPosH.w;
+    float ao = gSSAOMap.Sample(gSamLinearClamp, pin.SsaoPosH.xy, 0.0f).r;
+    
+    float4 ambient = ao * gAmbientLight * diffuseAlbedo;
     float3 shadowFactor = float3(1.0f, 1.0f, 1.0f);
     shadowFactor[0] = CalcShadowFactor(pin.ShadowPosH);
 
