@@ -25,7 +25,7 @@ SSAO::SSAO(ID3D12Device* device, ID3D12GraphicsCommandList* cmdList, UINT width,
 
 void SSAO::GetOffsetVectors(DirectX::XMFLOAT4 offsets[14])
 {
-	memcpy_s(&offsets, sizeof(XMFLOAT4) * RANDOMVECTORCOUNT, &m_Offsets, sizeof(XMFLOAT4) * RANDOMVECTORCOUNT);
+	std::copy(&m_Offsets[0], &m_Offsets[14], &offsets[0]);
 }
 
 std::vector<float> SSAO::CalcGaussWeights(float sigma)

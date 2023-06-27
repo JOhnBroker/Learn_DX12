@@ -126,6 +126,8 @@ private:
 	std::unique_ptr<SSAO> m_SSAO;
 
 	//Imgui
+	bool m_ShadowEnable = true;
+	bool m_SSAOEnable = true;
 	bool m_ShadowMapDebugEnable = false;
 	bool m_AODebugEnable = false;
 	bool m_SSAODebugEnable = false;

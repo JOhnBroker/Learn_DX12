@@ -199,8 +199,10 @@ void GameApp::Update(const GameTimer& timer)
 	ImGuiIO& io = ImGui::GetIO();
 	
 	const float dt = timer.DeltaTime();
-	if (ImGui::Begin("NormalMap demo"))
+	if (ImGui::Begin("SSAO demo"))
 	{
+		ImGui::Checkbox("Enable Shadow", &m_ShadowEnable);
+		ImGui::Checkbox("Enable SSAO", &m_SSAOEnable);
 		static int curr_showmode = static_cast<int>(m_ShowMode) - 1;
 		static const char* showMode[] = {
 				"GPU_SSAO",
@@ -314,7 +316,7 @@ void GameApp::Draw(const GameTimer& timer)
 
 	m_CommandList->SetGraphicsRootSignature(m_RootSignatures["ssao"].Get());
 	m_SSAO->RenderToSSAOTexture(m_CommandList.Get(), m_PSOs["ssao"].Get(), m_CurrFrameResource);
-	//m_SSAO->BlurAOMap(m_CommandList.Get(), m_PSOs["ssaoBlur_X"].Get(), m_PSOs["ssaoBlur_Y"].Get(), m_CurrFrameResource, 5);
+	m_SSAO->BlurAOMap(m_CommandList.Get(), m_PSOs["ssaoBlur_X"].Get(), m_PSOs["ssaoBlur_Y"].Get(), m_CurrFrameResource, 5);
 
 	m_CommandList->SetGraphicsRootSignature(m_RootSignatures["opaque"].Get());
 
@@ -335,8 +337,22 @@ void GameApp::Draw(const GameTimer& timer)
 	CD3DX12_GPU_DESCRIPTOR_HANDLE skyTexDescriptor(m_SRVHeap->GetGPUDescriptorHandleForHeapStart());
 	skyTexDescriptor.Offset(m_SkyTexHeapIndex, m_CBVSRVDescriptorSize);
 	m_CommandList->SetGraphicsRootDescriptorTable(3, skyTexDescriptor);
-	m_CommandList->SetGraphicsRootDescriptorTable(4, m_ShadowMap->GetSrv());
-	m_CommandList->SetGraphicsRootDescriptorTable(5, m_SSAO->GetAOMapSrv());
+	if (m_ShadowEnable) 
+	{
+		m_CommandList->SetGraphicsRootDescriptorTable(4, m_ShadowMap->GetSrv());
+	}
+	else 
+	{
+		m_CommandList->SetGraphicsRootDescriptorTable(4, m_TextureManager.GetNullTexture());
+	}
+	if (m_SSAOEnable)
+	{
+		m_CommandList->SetGraphicsRootDescriptorTable(5, m_SSAO->GetAOMapSrv());
+	}
+	else 
+	{
+		m_CommandList->SetGraphicsRootDescriptorTable(5, m_TextureManager.GetNullTexture());
+	}
 
 	switch (m_ShowMode)
 	{
