@@ -68,7 +68,7 @@ float4 PS (VertexOut pin) : SV_Target
     uint diffuseTexIndex = matData.DiffuseMapIndex;
     uint normalIndex = matData.NormalMapIndex;
 	
-    diffuseAlbedo *= gDiffuseMap[diffuseTexIndex].Sample(gSamLinearWrap, pin.TexC);
+    diffuseAlbedo *= gDiffuseMap[diffuseTexIndex].Sample(gSamAnisotropicWrap, pin.TexC);
 	
 #ifdef ALPHA_TEST
     clip(diffuseAlbedo.a - 0.1f);
@@ -80,12 +80,18 @@ float4 PS (VertexOut pin) : SV_Target
     
     float3 toEyeW = normalize(gEyePosW - pin.PosW);
 
+    float ao = 1.0f;
+#ifdef SSAO_ENABLE
     pin.SsaoPosH /= pin.SsaoPosH.w;
-    float ao = gSSAOMap.Sample(gSamLinearClamp, pin.SsaoPosH.xy, 0.0f).r;
-    
+    ao = gSSAOMap.Sample(gSamLinearClamp, pin.SsaoPosH.xy, 0.0f).r;
+#endif
+
     float4 ambient = ao * gAmbientLight * diffuseAlbedo;
     float3 shadowFactor = float3(1.0f, 1.0f, 1.0f);
+    
+#ifdef SHADOW_ENABLE
     shadowFactor[0] = CalcShadowFactor(pin.ShadowPosH);
+#endif
 
     const float shininess = (1.0f - roughness) * normalMapSample.a;
     Material mat = { diffuseAlbedo, fresnelR0, shininess };
@@ -98,7 +104,7 @@ float4 PS (VertexOut pin) : SV_Target
     //float3 rayDir = reflect(-toEyeW, pin.NormalW);
     //float3 r = BoxCubeMapLookup(rayOrigin.xyz, normalize(rayDir));
     float3 r = reflect(-toEyeW, bumpedNormalW);
-    float4 reflectionColor = gCubeMap.Sample(gSamLinearClamp, r);
+    float4 reflectionColor = gCubeMap.Sample(gSamLinearWrap, r);
     float3 fresnelFactor = SchlickFresnel(fresnelR0, bumpedNormalW, r);
     litColor.rgb += shininess * fresnelFactor * reflectionColor.rgb;
 

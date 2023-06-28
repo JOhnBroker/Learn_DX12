@@ -13,7 +13,7 @@ struct VertexOut
 {
     float4 PosH     : SV_Position;
     float3 PosV     : POSITION;
-    float3 NormalV  : NORMAL;
+    float3 NormalW  : NORMAL;
     float3 TangentW : TANGENT;
     float2 TexC     : TEXCOORD;
 };
@@ -30,7 +30,7 @@ VertexOut VS(VertexIn vin)
     vout.PosH = mul(posW, gViewProj);
     vout.PosV = mul(posW, gView).xyz;
     
-    vout.NormalV = mul(vin.NormalL, (float3x3) invTransposeWorldView);
+    vout.NormalW = mul(vin.NormalL, (float3x3) gWorld);
     vout.TangentW = mul(vin.TangentU, (float3x3) gWorld);
     
     float4 texC = mul(float4(vin.TexC, 0.0f, 1.0f), gTexTransform);
@@ -51,7 +51,9 @@ float4 PS(VertexOut pin) : SV_Target
     clip(diffuseAlbedo.a - 0.1f);
 #endif
 
-    pin.NormalV = normalize(pin.NormalV);
-        
-    return float4(pin.NormalV, pin.PosV.z);
+    pin.NormalW = normalize(pin.NormalW);
+    
+    float3 normalV = mul(pin.NormalW, (float3x3) gView);
+    
+    return float4(normalV, pin.PosV.z);
 }

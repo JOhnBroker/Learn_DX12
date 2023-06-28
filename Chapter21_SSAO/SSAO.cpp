@@ -153,14 +153,11 @@ void SSAO::BlurAOMap(ID3D12GraphicsCommandList* cmdList, ID3D12PipelineState* pP
 	auto ssaoCBAddress = currFrame->SsaoCB->Resource()->GetGPUVirtualAddress();
 	cmdList->SetGraphicsRootConstantBufferView(0, ssaoCBAddress);
 
-	cmdList->SetPipelineState(pPsoX);
 	for (int i = 0; i < blurCount; ++i) 
 	{
+		cmdList->SetPipelineState(pPsoX);
 		BlurAOMap(cmdList, true);
-	}
-	cmdList->SetPipelineState(pPsoY);
-	for (int i = 0; i < blurCount; ++i) 
-	{
+		cmdList->SetPipelineState(pPsoY);
 		BlurAOMap(cmdList, false);
 	}
 }

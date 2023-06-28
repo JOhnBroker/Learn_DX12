@@ -174,10 +174,11 @@ void GameApp::OnResize()
 		m_pCamera->SetFrustum(0.25f * MathHelper::Pi, AspectRatio(), 1.0f, 1000.0f);
 		m_pCamera->SetViewPort(0.0f, 0.0f, (float)m_ClientWidth, (float)m_ClientHeight);
 	}
-	if (m_SSAO != nullptr) 
-	{
-		m_SSAO->OnResize(m_ClientWidth, m_ClientHeight);
-	}
+	// Todo : 
+	//if (m_SSAO != nullptr) 
+	//{
+	//	m_SSAO->OnResize(m_ClientWidth, m_ClientHeight);
+	//}
 }
 
 void GameApp::Update(const GameTimer& timer)
@@ -337,22 +338,9 @@ void GameApp::Draw(const GameTimer& timer)
 	CD3DX12_GPU_DESCRIPTOR_HANDLE skyTexDescriptor(m_SRVHeap->GetGPUDescriptorHandleForHeapStart());
 	skyTexDescriptor.Offset(m_SkyTexHeapIndex, m_CBVSRVDescriptorSize);
 	m_CommandList->SetGraphicsRootDescriptorTable(3, skyTexDescriptor);
-	if (m_ShadowEnable) 
-	{
-		m_CommandList->SetGraphicsRootDescriptorTable(4, m_ShadowMap->GetSrv());
-	}
-	else 
-	{
-		m_CommandList->SetGraphicsRootDescriptorTable(4, m_TextureManager.GetNullTexture());
-	}
-	if (m_SSAOEnable)
-	{
-		m_CommandList->SetGraphicsRootDescriptorTable(5, m_SSAO->GetAOMapSrv());
-	}
-	else 
-	{
-		m_CommandList->SetGraphicsRootDescriptorTable(5, m_TextureManager.GetNullTexture());
-	}
+	m_CommandList->SetGraphicsRootDescriptorTable(4, m_ShadowMap->GetSrv());
+	m_CommandList->SetGraphicsRootDescriptorTable(5, m_SSAO->GetAOMapSrv());
+	
 
 	switch (m_ShowMode)
 	{
@@ -367,7 +355,22 @@ void GameApp::Draw(const GameTimer& timer)
 		}
 		break;
 	case GameApp::ShowMode::SSAO:
-		m_CommandList->SetPipelineState(m_PSOs["opaque"].Get());
+		if (m_ShadowEnable && m_SSAOEnable) 
+		{
+			m_CommandList->SetPipelineState(m_PSOs["opaque"].Get());
+		}
+		else if(m_ShadowEnable)
+		{
+			m_CommandList->SetPipelineState(m_PSOs["opaque_shadow"].Get());
+		}
+		else if (m_SSAOEnable) 
+		{
+			m_CommandList->SetPipelineState(m_PSOs["opaque_ssao"].Get());
+		}
+		else 
+		{
+			m_CommandList->SetPipelineState(m_PSOs["opaque_no_shadow"].Get());
+		}
 		break;
 	case GameApp::ShowMode::SSAO_SelfInter:
 		break;
@@ -396,7 +399,9 @@ void GameApp::Draw(const GameTimer& timer)
 	}
 	if (m_SSAODebugEnable) 
 	{
+		m_CommandList->SetGraphicsRootSignature(m_RootSignatures["ssao"].Get());
 		m_SSAO->RenderAOToTexture(m_CommandList.Get(), m_PSOs["ssao_debug"].Get());
+		m_CommandList->SetGraphicsRootSignature(m_RootSignatures["opaque"].Get());
 		m_CommandList->OMSetRenderTargets(1, &CurrentBackBufferView(), true, &DepthStencilView());
 		if (ImGui::Begin("AO buffer", &m_SSAODebugEnable))
 		{
@@ -504,12 +509,12 @@ void GameApp::UpdateObjectCBs(const GameTimer& gt)
 		{
 			XMMATRIX world = XMLoadFloat4x4(&obj->World);
 			XMVECTOR dWorld = XMMatrixDeterminant(world);
-			XMMATRIX invWorld = XMMatrixInverse(&dWorld, world);
+			XMMATRIX invTransWorld = XMMatrixTranspose(XMMatrixInverse(&dWorld, world));
 			XMMATRIX texTransform = XMLoadFloat4x4(&obj->TexTransform);
 
 			ObjectConstants objConstant;
 			XMStoreFloat4x4(&objConstant.World, XMMatrixTranspose(world));
-			XMStoreFloat4x4(&objConstant.InvTransposeWorld, XMMatrixTranspose(XMMatrixTranspose(invWorld)));
+			XMStoreFloat4x4(&objConstant.InvTransposeWorld, XMMatrixTranspose(invTransWorld));
 			XMStoreFloat4x4(&objConstant.TexTransform, XMMatrixTranspose(texTransform));
 			objConstant.MaterialIndex = obj->Mat->m_MatCBIndex;
 
@@ -879,6 +884,8 @@ void GameApp::BuildShadersAndInputLayout()
 	const D3D_SHADER_MACRO alphaTestDefines[] =
 	{
 		"NUM_DIR_LIGHT","3",
+		"SSAO_ENABLE","1",
+		"SHADOW_ENABLE","1",
 		"ALPHA_TEST", "1",
 		NULL, NULL
 	};
@@ -887,20 +894,44 @@ void GameApp::BuildShadersAndInputLayout()
 		"NUM_DIR_LIGHT","3",
 		NULL,NULL
 	};
+	const D3D_SHADER_MACRO opaqueDefines[] =
+	{
+		"NUM_DIR_LIGHT","3",
+		"SSAO_ENABLE","1",
+		"SHADOW_ENABLE","1",
+		NULL,NULL
+	};
 	const D3D_SHADER_MACRO BlurXDefines[] =
 	{
 		"BLUR_HORZ","1",
 		NULL,NULL
 	};
 
+	const D3D_SHADER_MACRO EnableSSAODefines[] =
+	{
+		"NUM_DIR_LIGHT","3",
+		"SSAO_ENABLE","1",
+		NULL,NULL
+	};
+
+	const D3D_SHADER_MACRO EnableShadowDefines[] =
+	{
+		"NUM_DIR_LIGHT","3",
+		"SHADOW_ENABLE","1",
+		NULL,NULL
+	};
+
 	m_Shaders["standardVS"] = d3dUtil::CompileShader(L"..\\Shader\\Chapter21\\Default.hlsl", nullptr, "VS", "vs_5_1");
-	m_Shaders["opaquePS"] = d3dUtil::CompileShader(L"..\\Shader\\Chapter21\\Default.hlsl", direLightDefines, "PS", "ps_5_1");
+	m_Shaders["opaquePS"] = d3dUtil::CompileShader(L"..\\Shader\\Chapter21\\Default.hlsl", opaqueDefines, "PS", "ps_5_1");
+	m_Shaders["enableShadowPS"] = d3dUtil::CompileShader(L"..\\Shader\\Chapter21\\Default.hlsl", EnableShadowDefines, "PS", "ps_5_1");
+	m_Shaders["enableSSAOPS"] = d3dUtil::CompileShader(L"..\\Shader\\Chapter21\\Default.hlsl", EnableSSAODefines, "PS", "ps_5_1");
+	m_Shaders["unableAllShadowPS"] = d3dUtil::CompileShader(L"..\\Shader\\Chapter21\\Default.hlsl", direLightDefines, "PS", "ps_5_1");
 	m_Shaders["skyVS"] = d3dUtil::CompileShader(L"..\\Shader\\Chapter21\\Default.hlsl", nullptr, "Sky_VS", "vs_5_1");
 	m_Shaders["skyPS"] = d3dUtil::CompileShader(L"..\\Shader\\Chapter21\\Default.hlsl", nullptr, "Sky_PS", "ps_5_1");
 
 	// ao
 	m_Shaders["aoVS"] = d3dUtil::CompileShader(L"..\\Shader\\Chapter21\\AO.hlsl", nullptr, "VS", "vs_5_1");
-	m_Shaders["aoPS"] = d3dUtil::CompileShader(L"..\\Shader\\Chapter21\\AO.hlsl", direLightDefines, "PS", "ps_5_1");
+	m_Shaders["aoPS"] = d3dUtil::CompileShader(L"..\\Shader\\Chapter21\\AO.hlsl", opaqueDefines, "PS", "ps_5_1");
 	m_Shaders["normalDepthMapVS"] = d3dUtil::CompileShader(L"..\\Shader\\Chapter21\\NormalDepthMap.hlsl", nullptr, "VS", "vs_5_1");
 	m_Shaders["normalDepthMapPS"] = d3dUtil::CompileShader(L"..\\Shader\\Chapter21\\NormalDepthMap.hlsl", nullptr, "PS", "ps_5_1");
 	m_Shaders["ssaoVS"] = d3dUtil::CompileShader(L"..\\Shader\\Chapter21\\SSAO.hlsl", nullptr, "SSAO_VS", "vs_5_1");
@@ -1160,6 +1191,33 @@ void GameApp::BuildPSOs()
 	opaquePsoDesc.SampleDesc.Quality = m_4xMsaaState ? (m_4xMsaaQuality - 1) : 0;
 	opaquePsoDesc.DSVFormat = m_DepthStencilFormat;
 	HR(m_pd3dDevice->CreateGraphicsPipelineState(&opaquePsoDesc, IID_PPV_ARGS(&m_PSOs["opaque"])));
+
+	// only shadow
+	D3D12_GRAPHICS_PIPELINE_STATE_DESC onlyShadowPsoDesc = opaquePsoDesc;
+	onlyShadowPsoDesc.PS =
+	{
+		reinterpret_cast<BYTE*>(m_Shaders["enableShadowPS"]->GetBufferPointer()),
+		m_Shaders["enableShadowPS"]->GetBufferSize()
+	};
+	HR(m_pd3dDevice->CreateGraphicsPipelineState(&onlyShadowPsoDesc, IID_PPV_ARGS(&m_PSOs["opaque_shadow"])));
+
+	// only ssao
+	D3D12_GRAPHICS_PIPELINE_STATE_DESC onlySSAOPsoDesc = opaquePsoDesc;
+	onlySSAOPsoDesc.PS =
+	{
+		reinterpret_cast<BYTE*>(m_Shaders["enableSSAOPS"]->GetBufferPointer()),
+		m_Shaders["enableSSAOPS"]->GetBufferSize()
+	};
+	HR(m_pd3dDevice->CreateGraphicsPipelineState(&onlySSAOPsoDesc, IID_PPV_ARGS(&m_PSOs["opaque_ssao"])));
+
+	// without shadow
+	D3D12_GRAPHICS_PIPELINE_STATE_DESC withoutShadowPsoDesc = opaquePsoDesc;
+	withoutShadowPsoDesc.PS =
+	{
+		reinterpret_cast<BYTE*>(m_Shaders["unableAllShadowPS"]->GetBufferPointer()),
+		m_Shaders["unableAllShadowPS"]->GetBufferSize()
+	};
+	HR(m_pd3dDevice->CreateGraphicsPipelineState(&withoutShadowPsoDesc, IID_PPV_ARGS(&m_PSOs["opaque_no_shadow"])));
 
 	// sky
 	D3D12_GRAPHICS_PIPELINE_STATE_DESC skyPsoDesc = opaquePsoDesc;
