@@ -95,58 +95,99 @@ ITexture* TextureManager::CreateFromeMemory(std::string name, void* data, size_t
 
 bool TextureManager::AddTexture(std::string name, std::shared_ptr<ITexture> texture)
 {
+#ifdef _DEBUG
+	return m_Textures.try_emplace(name, texture).second;
+#else
 	XID nameID = StringToID(name);
 	return m_Textures.try_emplace(nameID, texture).second;
+#endif // _DEBUG
 }
 
 void TextureManager::RemoveTexture(std::string name)
 {
+#ifdef _DEBUG
+	RemoveTextureIndex(name);
+	m_Textures.erase(name);
+#else
 	XID nameID = StringToID(name);
 	RemoveTextureIndex(name);
 	m_Textures.erase(nameID);
+#endif // _DEBUG
 }
 
 ITexture* TextureManager::GetTexture(std::string name)
 {
+#ifdef _DEBUG
+	if (m_Textures.count(name))
+	{
+		return m_Textures[name].get();
+	}
+	return nullptr;
+#else
 	XID nameID = StringToID(name);
 	if (m_Textures.count(nameID)) 
 	{
 		return m_Textures[nameID].get();
 	}
 	return nullptr;	
+#endif // _DEBUG
 }
 
 // when texture don't exit, return -1 
 int TextureManager::GetTextureSrvIndex(std::string name)
 {
+#ifdef _DEBUG
+	if (m_TexturesIndex.count(name))
+	{
+		return m_TexturesIndex[name][0];
+	}
+	return -1;
+#else
 	XID nameID = StringToID(name);
 	if (m_TexturesIndex.count(nameID))
 	{
 		return m_TexturesIndex[nameID][0];
 	}
 	return -1;
+#endif // _DEBUG
 }
 
 // when texture don't exit, return -1 
 int TextureManager::GetTextureDsvIndex(std::string name)
 {
+#ifdef _DEBUG
+	if (m_TexturesIndex.count(name))
+	{
+		return m_TexturesIndex[name][1];
+	}
+	return -1;
+#else
 	XID nameID = StringToID(name);
 	if (m_TexturesIndex.count(nameID))
 	{
 		return m_TexturesIndex[nameID][1];
 	}
 	return -1;
+#endif // _DEBUG
 }
 
 // when texture don't exit, return -1 
 int TextureManager::GetTextureRtvIndex(std::string name)
 {
+#ifdef _DEBUG
+	if (m_TexturesIndex.count(name))
+	{
+		return m_TexturesIndex[name][2];
+	}
+	return -1;
+#else
 	XID nameID = StringToID(name);
 	if (m_TexturesIndex.count(nameID))
 	{
 		return m_TexturesIndex[nameID][2];
 	}
 	return -1;
+#endif // _DEBUG
 }
 
 void TextureManager::BuildDescriptor(
@@ -231,17 +272,31 @@ void TextureManager::ReBuildDescriptor(std::string name, std::shared_ptr<ITextur
 
 bool TextureManager::AddTextureIndex(std::string name, std::array<int, 3> index)
 {
+#ifdef _DEBUG
+	return m_TexturesIndex.try_emplace(name, index).second;
+#else
 	XID nameID = StringToID(name);
 	return m_TexturesIndex.try_emplace(nameID, index).second;
+#endif // _DEBUG
+
 }
 
 bool TextureManager::AddTextureIndex(XID nameID, std::array<int, 3> index)
 {
+#ifdef _DEBUG
+	return false;
+	//return m_TexturesIndex.try_emplace(nameID, index).second;
+#else
 	return m_TexturesIndex.try_emplace(nameID, index).second;
+#endif // _DEBUG
 }
 
 void TextureManager::RemoveTextureIndex(std::string name)
 {
+#ifdef _DEBUG
+	m_TexturesIndex.erase(name);
+#else
 	XID nameID = StringToID(name);
 	m_TexturesIndex.erase(nameID);
+#endif // _DEBUG
 }

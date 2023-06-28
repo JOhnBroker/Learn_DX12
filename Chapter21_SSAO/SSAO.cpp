@@ -73,6 +73,7 @@ void SSAO::OnResize(UINT newWidth, UINT newHeight)
 
 		bIsResize = true;
 		BuildResource();
+		bIsResize = false;
 	}
 }
 
@@ -214,8 +215,8 @@ void SSAO::BuildResource()
 			m_RenderTargetHeight, m_AOMapFormat);
 		m_SSAODebugMap = std::make_shared<Texture2D>(m_pDevice, m_RenderTargetWidth,
 			m_RenderTargetHeight, DXGI_FORMAT_R8G8B8A8_UNORM);
-		textureManager.AddTexture(NORMALDEPTHMAP_NAME, m_NormalDepthMap);
 		textureManager.AddTexture(RANDOMVECTORMAP_NAME, m_RandomVectorMap);
+		textureManager.AddTexture(NORMALDEPTHMAP_NAME, m_NormalDepthMap);
 		textureManager.AddTexture(SSAOXMAP_NAME, m_SSAOMap0);
 		textureManager.AddTexture(SSAOYMAP_NAME, m_SSAOMap1);
 		textureManager.AddTexture(SSAODEBUGMAP_NAME, m_SSAODebugMap);

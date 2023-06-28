@@ -80,6 +80,8 @@ void ShadowMap::OnResize(UINT newWidth, UINT newHeight)
 		bIsResize = true;
 
 		BuildResource();
+
+		bIsResize = false;
 	}
 }
 

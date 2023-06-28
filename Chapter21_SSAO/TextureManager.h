@@ -49,8 +49,15 @@ private:
 private:
 	ComPtr<ID3D12Device> m_pDevice;
 	ComPtr<ID3D12GraphicsCommandList> m_pCommandList;
+
+#ifdef _DEBUG
+	std::unordered_map<std::string, std::shared_ptr<ITexture>> m_Textures;
+	std::unordered_map<std::string, std::array<int, 3>> m_TexturesIndex;
+#else
 	std::unordered_map<XID, std::shared_ptr<ITexture>> m_Textures;
 	std::unordered_map<XID, std::array<int, 3>> m_TexturesIndex;
+#endif // _DEBUG
+
 
 	UINT m_uiSrvDescriptorSize = 0;
 	UINT m_uiDsvDescriptorSize = 0;

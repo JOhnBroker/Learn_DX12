@@ -169,16 +169,21 @@ void GameApp::OnResize()
 {
 	D3DApp::OnResize();
 
-	if (m_pCamera != nullptr) 
+	if (m_pCamera != nullptr)
 	{
 		m_pCamera->SetFrustum(0.25f * MathHelper::Pi, AspectRatio(), 1.0f, 1000.0f);
 		m_pCamera->SetViewPort(0.0f, 0.0f, (float)m_ClientWidth, (float)m_ClientHeight);
 	}
-	// Todo : 
-	//if (m_SSAO != nullptr) 
-	//{
-	//	m_SSAO->OnResize(m_ClientWidth, m_ClientHeight);
-	//}
+	if (m_SSAO != nullptr)
+	{
+		FlushCommandQueue();
+		m_SSAO->OnResize(m_ClientWidth, m_ClientHeight);
+	}
+	if (m_ShadowMap != nullptr)
+	{
+		m_ShadowMap->OnResize(pow(2, m_ShadowMapSize + 1) * 256, pow(2, m_ShadowMapSize + 1) * 256);
+		m_ShadowMap->OnResize(pow(2, m_ShadowMapSize) * 256, pow(2, m_ShadowMapSize) * 256);
+	}
 }
 
 void GameApp::Update(const GameTimer& timer)
