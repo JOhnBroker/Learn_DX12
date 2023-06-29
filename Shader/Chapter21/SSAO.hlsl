@@ -108,6 +108,7 @@ float4 SSAO_PS(VertexOut pin) : SV_Target
     {
         float3 offset = reflect(gOffsetVectors[i].xyz, randVec);
         
+        // 只对正半球进行采样
         float flip = sign(dot(offset, n));
         
         // 对p点除遮蔽半径的半球范围进行采样
@@ -123,7 +124,10 @@ float4 SSAO_PS(VertexOut pin) : SV_Target
         
         // 判断是否遮蔽p点
         float distZ = p.z - r.z;
-        float dp = max(dot(n, normalize(r - p)), 0.0f);
+        float dp = 1.0f;
+#ifndef SELF_INTERSECTION
+        dp = max(dot(n, normalize(r - p)), 0.0f);
+#endif
         float occlusion = dp * OcclusionFunction(distZ);
         
         occlusionSum += occlusion;

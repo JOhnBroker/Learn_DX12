@@ -321,8 +321,22 @@ void GameApp::Draw(const GameTimer& timer)
 	m_SSAO->RenderNormalDepthMap(m_CommandList.Get(), m_PSOs["normaldepth"].Get(), DepthStencilView(),m_CurrFrameResource, m_RitemLayer[(int)RenderLayer::Opaque]);
 
 	m_CommandList->SetGraphicsRootSignature(m_RootSignatures["ssao"].Get());
-	m_SSAO->RenderToSSAOTexture(m_CommandList.Get(), m_PSOs["ssao"].Get(), m_CurrFrameResource);
-	m_SSAO->BlurAOMap(m_CommandList.Get(), m_PSOs["ssaoBlur_X"].Get(), m_PSOs["ssaoBlur_Y"].Get(), m_CurrFrameResource, 5);
+	if (m_ShowMode == ShowMode::SSAO_SelfInter) 
+	{
+		m_SSAO->RenderToSSAOTexture(m_CommandList.Get(), m_PSOs["ssao_self"].Get(), m_CurrFrameResource);	
+	}
+	else 
+	{
+		m_SSAO->RenderToSSAOTexture(m_CommandList.Get(), m_PSOs["ssao"].Get(), m_CurrFrameResource);
+	}
+	if (m_ShowMode == ShowMode::SSAO_Gaussian) 
+	{
+		//TODO
+	}
+	else 
+	{
+		m_SSAO->BlurAOMap(m_CommandList.Get(), m_PSOs["ssaoBlur_X"].Get(), m_PSOs["ssaoBlur_Y"].Get(), m_CurrFrameResource, 5);
+	}
 
 	m_CommandList->SetGraphicsRootSignature(m_RootSignatures["opaque"].Get());
 
@@ -346,10 +360,8 @@ void GameApp::Draw(const GameTimer& timer)
 	m_CommandList->SetGraphicsRootDescriptorTable(4, m_ShadowMap->GetSrv());
 	m_CommandList->SetGraphicsRootDescriptorTable(5, m_SSAO->GetAOMapSrv());
 	
-
-	switch (m_ShowMode)
+	if (m_ShowMode == ShowMode::CPU_AO)
 	{
-	case GameApp::ShowMode::CPU_AO:
 		if (m_AODebugEnable) 
 		{
 			m_CommandList->SetPipelineState(m_PSOs["ao_debug"].Get());
@@ -358,31 +370,22 @@ void GameApp::Draw(const GameTimer& timer)
 		{
 			m_CommandList->SetPipelineState(m_PSOs["ao"].Get());
 		}
-		break;
-	case GameApp::ShowMode::SSAO:
-		if (m_ShadowEnable && m_SSAOEnable) 
-		{
-			m_CommandList->SetPipelineState(m_PSOs["opaque"].Get());
-		}
-		else if(m_ShadowEnable)
-		{
-			m_CommandList->SetPipelineState(m_PSOs["opaque_shadow"].Get());
-		}
-		else if (m_SSAOEnable) 
-		{
-			m_CommandList->SetPipelineState(m_PSOs["opaque_ssao"].Get());
-		}
-		else 
-		{
-			m_CommandList->SetPipelineState(m_PSOs["opaque_no_shadow"].Get());
-		}
-		break;
-	case GameApp::ShowMode::SSAO_SelfInter:
-		break;
-	case GameApp::ShowMode::SSAO_Gaussian:
-		break;
-	default:
-		break;
+	}
+	if (m_ShadowEnable && m_SSAOEnable) 
+	{
+		m_CommandList->SetPipelineState(m_PSOs["opaque"].Get());
+	}
+	else if(m_ShadowEnable)
+	{
+		m_CommandList->SetPipelineState(m_PSOs["opaque_shadow"].Get());
+	}
+	else if (m_SSAOEnable) 
+	{
+		m_CommandList->SetPipelineState(m_PSOs["opaque_ssao"].Get());
+	}
+	else 
+	{
+		m_CommandList->SetPipelineState(m_PSOs["opaque_no_shadow"].Get());
 	}
 	DrawRenderItems(m_CommandList.Get(), m_RitemLayer[(int)RenderLayer::Opaque]);
 	
@@ -926,6 +929,12 @@ void GameApp::BuildShadersAndInputLayout()
 		NULL,NULL
 	};
 
+	const D3D_SHADER_MACRO EnableSelfIntersecDefines[] =
+	{
+		"SELF_INTERSECTION","1",
+		NULL,NULL
+	};
+
 	m_Shaders["standardVS"] = d3dUtil::CompileShader(L"..\\Shader\\Chapter21\\Default.hlsl", nullptr, "VS", "vs_5_1");
 	m_Shaders["opaquePS"] = d3dUtil::CompileShader(L"..\\Shader\\Chapter21\\Default.hlsl", opaqueDefines, "PS", "ps_5_1");
 	m_Shaders["enableShadowPS"] = d3dUtil::CompileShader(L"..\\Shader\\Chapter21\\Default.hlsl", EnableShadowDefines, "PS", "ps_5_1");
@@ -941,6 +950,7 @@ void GameApp::BuildShadersAndInputLayout()
 	m_Shaders["normalDepthMapPS"] = d3dUtil::CompileShader(L"..\\Shader\\Chapter21\\NormalDepthMap.hlsl", nullptr, "PS", "ps_5_1");
 	m_Shaders["ssaoVS"] = d3dUtil::CompileShader(L"..\\Shader\\Chapter21\\SSAO.hlsl", nullptr, "SSAO_VS", "vs_5_1");
 	m_Shaders["ssaoPS"] = d3dUtil::CompileShader(L"..\\Shader\\Chapter21\\SSAO.hlsl", nullptr, "SSAO_PS", "ps_5_1");
+	m_Shaders["ssaoPS_selfinter"] = d3dUtil::CompileShader(L"..\\Shader\\Chapter21\\SSAO.hlsl", EnableSelfIntersecDefines, "SSAO_PS", "ps_5_1");
 	m_Shaders["ssaoBlurPS_X"] = d3dUtil::CompileShader(L"..\\Shader\\Chapter21\\SSAO.hlsl", BlurXDefines, "Bilateral_PS", "ps_5_1");
 	m_Shaders["ssaoBlurPS_Y"] = d3dUtil::CompileShader(L"..\\Shader\\Chapter21\\SSAO.hlsl", nullptr, "Bilateral_PS", "ps_5_1");
 	
@@ -1346,6 +1356,15 @@ void GameApp::BuildPSOs()
 	ssaoDesc.SampleDesc.Quality = 0;
 	ssaoDesc.DSVFormat = DXGI_FORMAT_UNKNOWN;
 	HR(m_pd3dDevice->CreateGraphicsPipelineState(&ssaoDesc, IID_PPV_ARGS(&m_PSOs["ssao"])));
+
+	// 自交
+	D3D12_GRAPHICS_PIPELINE_STATE_DESC ssaoSelfInterDesc = ssaoDesc;
+	ssaoSelfInterDesc.PS =
+	{
+		reinterpret_cast<BYTE*>(m_Shaders["ssaoPS_selfinter"]->GetBufferPointer()),
+		m_Shaders["ssaoPS_selfinter"]->GetBufferSize()
+	};
+	HR(m_pd3dDevice->CreateGraphicsPipelineState(&ssaoSelfInterDesc, IID_PPV_ARGS(&m_PSOs["ssao_self"])));
 
 	// ssao blur
 	D3D12_GRAPHICS_PIPELINE_STATE_DESC ssaoBlurXDesc = ssaoDesc;
