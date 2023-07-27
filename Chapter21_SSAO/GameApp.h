@@ -9,6 +9,7 @@
 #include "Material.h"
 #include "Light.h"
 
+#include "CameraController.h"
 #include "Camera.h"
 #include "Octree.h"
 
@@ -57,7 +58,6 @@ public:
 	virtual void OnMouseDown(WPARAM btnState, int x, int y) override;
 
 	void AnimateMaterials(const GameTimer& gt);
-	void UpdateCamera(const GameTimer& gt);
 	void UpdateObjectCBs(const GameTimer& gt);
 	void UpdateMaterialBuffer(const GameTimer& gt);
 	void UpdateMainPassCB(const GameTimer& gt);
@@ -111,6 +111,7 @@ private:
 	// other
 	DirectX::BoundingSphere m_SceneBounds;
 	std::shared_ptr<Camera> m_pCamera = nullptr;
+	std::shared_ptr<CameraController> m_pCameraController = nullptr;
 	RenderItem* m_SkullRitem = nullptr;
 	
 	// static SkyBox

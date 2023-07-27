@@ -64,6 +64,7 @@ bool GameApp::InitResource()
 	if (m_CameraMode == CameraMode::FirstPerson)
 	{
 		auto camera = std::make_shared<FirstPersonCamera>();
+		auto cameraController = std::make_shared<FirstPersonCameraController>();
 		m_pCamera = camera;
 		camera->SetFrustum(0.25f * MathHelper::Pi, AspectRatio(), 1.0f, 1000.0f);
 		camera->SetViewPort(0.0f, 0.0f, (float)m_ClientWidth, (float)m_ClientHeight);
@@ -71,16 +72,24 @@ bool GameApp::InitResource()
 			XMFLOAT3(0.0f, 4.0f, -5.0f),
 			XMFLOAT3(0.0f, 1.0f, 0.0f),
 			XMFLOAT3(0.0f, 1.0f, 0.0f));
+
+		cameraController->InitCamera(camera);
+		m_pCameraController = cameraController;
+		
 	}
 	else if (m_CameraMode == CameraMode::ThirdPerson)
 	{
 		auto camera = std::make_shared<ThirdPersonCamera>();
+		auto cameraController = std::make_shared<ThirdPersonCameraController>();
 		m_pCamera = camera;
 		camera->SetFrustum(0.25f * MathHelper::Pi, AspectRatio(), 1.0f, 1000.0f);
 		camera->SetViewPort(0.0f, 0.0f, (float)m_ClientWidth, (float)m_ClientHeight);
 		camera->SetTarget(XMFLOAT3(0.0f, 0.0f, 1.0f));
 		camera->SetDistance(10.0f);
 		camera->SetDistanceMinMax(3.0f, 20.0f);
+
+		cameraController->InitCamera(camera);
+		m_pCameraController = cameraController;
 	}
 
 	// Initialize light resource
@@ -190,7 +199,7 @@ void GameApp::Update(const GameTimer& timer)
 {
 	auto cam3rd = std::dynamic_pointer_cast<ThirdPersonCamera>(m_pCamera);
 	auto cam1st = std::dynamic_pointer_cast<FirstPersonCamera>(m_pCamera);
-	UpdateCamera(timer);
+	m_pCameraController->Update(timer.DeltaTime());
 
 	// animate skull
 
@@ -467,44 +476,6 @@ void GameApp::OnMouseDown(WPARAM btnState, int x, int y)
 
 void GameApp::AnimateMaterials(const GameTimer& gt)
 {
-}
-
-void GameApp::UpdateCamera(const GameTimer& gt)
-{
-	auto cam3rd = std::dynamic_pointer_cast<ThirdPersonCamera>(m_pCamera);
-	auto cam1st = std::dynamic_pointer_cast<FirstPersonCamera>(m_pCamera);
-
-	ImGuiIO& io = ImGui::GetIO();
-	if (m_CameraMode == CameraMode::FirstPerson) 
-	{
-		float d1 = 0.0f, d2 = 0.0f;
-		if (ImGui::IsKeyDown(ImGuiKey_W))
-			d1 += gt.DeltaTime();
-		if (ImGui::IsKeyDown(ImGuiKey_S))
-			d1 -= gt.DeltaTime();
-		if (ImGui::IsKeyDown(ImGuiKey_A))
-			d2 -= gt.DeltaTime();
-		if (ImGui::IsKeyDown(ImGuiKey_D))
-			d2 += gt.DeltaTime();
-
-		cam1st->Walk(d1 * 6.0f);
-		cam1st->Strafe(d2 * 6.0f);
-
-		if (ImGui::IsMouseDragging(ImGuiMouseButton_Right))
-		{
-			cam1st->Pitch(io.MouseDelta.y * 0.01f);
-			cam1st->RotateY(io.MouseDelta.x * 0.01f);
-		}
-	}
-	else if (m_CameraMode == CameraMode::ThirdPerson) 
-	{
-		if (ImGui::IsMouseDragging(ImGuiMouseButton_Right))
-		{
-			cam3rd->RotateX(io.MouseDelta.y * 0.01f);
-			cam3rd->RotateY(io.MouseDelta.x * 0.01f);
-		}
-		cam3rd->Approach(-io.MouseWheel * 1.0f);
-	}
 }
 
 void GameApp::UpdateObjectCBs(const GameTimer& gt)

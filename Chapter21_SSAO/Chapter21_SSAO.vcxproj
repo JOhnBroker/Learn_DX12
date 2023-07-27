@@ -122,13 +122,13 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>Default</ConformanceMode>
-      <AdditionalIncludeDirectories>../ImGui;./;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>../Common;../ImGui;./;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>../ImGui/lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>ImGuid.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>../Lib/Debug;../ImGui/lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>ImGuid.lib;CommonX64D.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -139,69 +139,29 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>Default</ConformanceMode>
-      <AdditionalIncludeDirectories>../ImGui;./;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>../Common;../ImGui;./;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>../ImGui/lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>ImGui.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>../Lib/Release;../ImGui/lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>ImGui.lib;CommonX64.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="Camera.cpp" />
     <ClCompile Include="CubeRenderTarget.cpp" />
-    <ClCompile Include="d3dApp.cpp" />
-    <ClCompile Include="d3dUtil.cpp" />
-    <ClCompile Include="DDSTextureLoader.cpp" />
-    <ClCompile Include="DXTrace.cpp" />
-    <ClCompile Include="FrameResource.cpp" />
-    <ClCompile Include="GameTimer.cpp" />
-    <ClCompile Include="GeometryGenerator.cpp" />
-    <ClCompile Include="ImguiManager.cpp" />
-    <ClCompile Include="Light.cpp" />
+    <ClCompile Include="GameApp.cpp" />
     <ClCompile Include="Main.cpp" />
-    <ClCompile Include="MathHelper.cpp" />
-    <ClCompile Include="GameApp.cpp">
-      <ConformanceMode Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ConformanceMode>
-    </ClCompile>
-    <ClCompile Include="Octree.cpp" />
-    <ClCompile Include="Quaternion.cpp" />
     <ClCompile Include="ShadowMap.cpp" />
     <ClCompile Include="SSAO.cpp" />
-    <ClCompile Include="Texture.cpp" />
-    <ClCompile Include="TextureManager.cpp" />
-    <ClCompile Include="Waves.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Camera.h" />
     <ClInclude Include="CubeRenderTarget.h" />
-    <ClInclude Include="d3dApp.h" />
-    <ClInclude Include="d3dUtil.h" />
-    <ClInclude Include="d3dx12.h" />
-    <ClInclude Include="DDSTextureLoader.h" />
-    <ClInclude Include="DXTrace.h" />
-    <ClInclude Include="FrameResource.h" />
-    <ClInclude Include="GameTimer.h" />
-    <ClInclude Include="GeometryGenerator.h" />
-    <ClInclude Include="ImguiManager.h" />
-    <ClInclude Include="Light.h" />
-    <ClInclude Include="Material.h" />
-    <ClInclude Include="MathHelper.h" />
     <ClInclude Include="GameApp.h" />
-    <ClInclude Include="Octree.h" />
-    <ClInclude Include="Quaternion.h" />
-    <ClInclude Include="RenderItem.h" />
     <ClInclude Include="ShadowMap.h" />
     <ClInclude Include="SSAO.h" />
-    <ClInclude Include="Texture.h" />
-    <ClInclude Include="TextureManager.h" />
-    <ClInclude Include="Transform.h" />
-    <ClInclude Include="UploadBuffer.h" />
-    <ClInclude Include="Waves.h" />
-    <ClInclude Include="WinMin.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="imgui.ini" />
