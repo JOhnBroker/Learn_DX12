@@ -168,6 +168,7 @@
       <ConformanceMode Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ConformanceMode>
     </ClCompile>
     <ClCompile Include="Octree.cpp" />
+    <ClCompile Include="Quaternion.cpp" />
     <ClCompile Include="ShadowMap.cpp" />
     <ClCompile Include="SSAO.cpp" />
     <ClCompile Include="Texture.cpp" />
@@ -191,11 +192,13 @@
     <ClInclude Include="MathHelper.h" />
     <ClInclude Include="GameApp.h" />
     <ClInclude Include="Octree.h" />
+    <ClInclude Include="Quaternion.h" />
     <ClInclude Include="RenderItem.h" />
     <ClInclude Include="ShadowMap.h" />
     <ClInclude Include="SSAO.h" />
     <ClInclude Include="Texture.h" />
     <ClInclude Include="TextureManager.h" />
+    <ClInclude Include="Transform.h" />
     <ClInclude Include="UploadBuffer.h" />
     <ClInclude Include="Waves.h" />
     <ClInclude Include="WinMin.h" />

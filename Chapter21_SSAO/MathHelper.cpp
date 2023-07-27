@@ -5,6 +5,8 @@ using namespace DirectX;
 
 const float MathHelper::Infinity = FLT_MAX;
 const float MathHelper::Pi = 3.1415926535f;
+const float MathHelper::Deg2Rad = MathHelper::Pi / 180.0f;
+const float MathHelper::Rad2Deg = 1.0f / MathHelper::Deg2Rad;
 
 float MathHelper::AngleFromXY(float x, float y)
 {
@@ -46,4 +48,17 @@ DirectX::XMVECTOR MathHelper::RandHemisphereUnitVec3(XMVECTOR n)
 
 		return XMVector3Normalize(v);
 	}
+}
+
+float Math::Repeat(float t, float length)
+{
+	return Clamp(t - Math::Floor(t / length) * length, 0.0f, length);
+}
+
+float Math::LerpAngle(float a, float b, float t)
+{
+	float delta = Repeat((b - a), 360);
+	if (delta > 180)
+		delta -= 360;
+	return a + delta * Clamp01(t);
 }

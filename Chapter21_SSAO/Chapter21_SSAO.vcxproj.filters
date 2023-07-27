@@ -61,6 +61,9 @@
     <ClCompile Include="SSAO.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
+    <ClCompile Include="Quaternion.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="d3dApp.h">
@@ -133,6 +136,12 @@
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="RenderItem.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Transform.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Quaternion.h">
       <Filter>头文件</Filter>
     </ClInclude>
   </ItemGroup>

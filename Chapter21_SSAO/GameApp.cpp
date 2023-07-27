@@ -505,7 +505,6 @@ void GameApp::UpdateCamera(const GameTimer& gt)
 		}
 		cam3rd->Approach(-io.MouseWheel * 1.0f);
 	}
-	m_pCamera->UpdateViewMatrix();
 }
 
 void GameApp::UpdateObjectCBs(const GameTimer& gt)
@@ -563,8 +562,8 @@ void GameApp::UpdateMaterialBuffer(const GameTimer& gt)
 
 void GameApp::UpdateMainPassCB(const GameTimer& gt)
 {
-	XMMATRIX view = m_pCamera->GetViewXM();
-	XMMATRIX proj = m_pCamera->GetProjXM();
+	XMMATRIX view = m_pCamera->GetViewMatrixXM();
+	XMMATRIX proj = m_pCamera->GetProjMatrixXM();
 
 	XMMATRIX viewproj = XMMatrixMultiply(view, proj);
 	XMVECTOR dView = XMMatrixDeterminant(view);
@@ -684,7 +683,7 @@ void GameApp::UpdateShadowPassCB(const GameTimer& gt)
 void GameApp::UpdateSSAOCB(const GameTimer& gt)
 {
 	SSAOConstants ssaoCB;
-	XMMATRIX Proj = m_pCamera->GetProjXM();
+	XMMATRIX Proj = m_pCamera->GetProjMatrixXM();
 	XMMATRIX Tex(
 		0.5f, 0.0f, 0.0f, 0.0f,
 		0.0f, -0.5f, 0.0f, 0.0f,

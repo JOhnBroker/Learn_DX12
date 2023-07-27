@@ -5,6 +5,7 @@
 
 #include <windows.h>
 #include <DirectXMath.h>
+#include <cmath>
 #include <cstdint>
 
 class MathHelper
@@ -89,9 +90,96 @@ public:
 
 	static const float Infinity;
 	static const float Pi;
-
-
-
+	static const float Deg2Rad;
+	static const float Rad2Deg;
 };
+
+namespace Math 
+{
+	//indexes for pre-multiplied quaternion values
+	enum QuatIndexes:int
+	{
+		xx,
+		xy,
+		xz,
+		xw,
+		yy,
+		yz,
+		yw,
+		zz,
+		zw,
+		ww,
+		QuatIndexesCount
+	};
+
+	//Indexes for values used to calculate euler angles
+	enum Indexes:int
+	{
+		X1,		// sin / cos
+		X2,		
+		Y1,		
+		Y2,		
+		Z1,		
+		Z2,		
+		singularity_test,
+		IndexesCount
+	};
+
+	const float Epsilon = 1.e-6f;
+
+	static float Floor(float f) { return (float)floorf(f); }
+	static float Clamp(float value, float min, float max) 
+	{
+		if (value < min)
+			value = min;
+		else if (value > max)
+			value = max;
+		return value;
+	}
+	static int Clamp(int value, int min, int max)
+	{
+		if (value < min)
+			value = min;
+		else if (value > max)
+			value = max;
+		return value;
+	}
+	static float Clamp01(float value)
+	{
+		if (value < 0.0f)
+			return 0.0f;
+		else if (value > 1.0f)
+			return 1.0f;
+		else
+			return value;
+	}
+	static float Repeat(float t, float length);
+	static float Sqrt(float f) { return (float)sqrt(f); }
+	static float InvSqrt(float p) { return 1.0F / sqrt(p); }
+	static float Acos(float f) { return (float)acos(f); }
+	static float Abs(float f) { return (float)abs(f); }
+	static float Min(float a, float b) { return a < b ? a : b; }
+	static float Max(float a, float b) { return a > b ? a : b; }
+	static bool FloatEqual(float a, float b) { return Abs(a - b) < Epsilon; }
+	static bool FloatNotEqual(float a, float b) { return !FloatEqual(a, b); }
+	static float LerpAngle(float a, float b, float t);
+	static float Sign(float f) { return (f >= 0.0f) ? 1.0f : (-1.0f); }
+
+	inline bool CompareApproximately(float f0, float f1, float epsilon = 0.000001F)
+	{
+		float dist = (f0 - f1);
+		dist = Abs(dist);
+		return dist <= epsilon;
+	}
+
+	inline float Deg2Rad(float deg)
+	{
+		// TODO : should be deg * kDeg2Rad, but can't be changed,
+		// because it changes the order of operations and that affects a replay in some RegressionTests
+		return deg / 360.0f * 2.0f * MathHelper::Pi;
+	}
+
+}
+
 
 #endif
