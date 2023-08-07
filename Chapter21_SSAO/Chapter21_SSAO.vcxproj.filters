@@ -22,6 +22,12 @@
     <ClCompile Include="Shader.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
+    <ClCompile Include="..\Common\PassManager.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="IPass.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="CubeRenderTarget.h">
@@ -40,6 +46,12 @@
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="Shader.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Common\PassManager.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="IPass.h">
       <Filter>头文件</Filter>
     </ClInclude>
   </ItemGroup>

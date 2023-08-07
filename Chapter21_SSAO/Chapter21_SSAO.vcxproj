@@ -151,8 +151,10 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="..\Common\PassManager.cpp" />
     <ClCompile Include="CubeRenderTarget.cpp" />
     <ClCompile Include="GameApp.cpp" />
+    <ClCompile Include="IPass.cpp" />
     <ClCompile Include="Main.cpp" />
     <ClCompile Include="PipelineStateObject.cpp" />
     <ClCompile Include="Shader.cpp" />
@@ -160,8 +162,10 @@
     <ClCompile Include="SSAO.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\Common\PassManager.h" />
     <ClInclude Include="CubeRenderTarget.h" />
     <ClInclude Include="GameApp.h" />
+    <ClInclude Include="IPass.h" />
     <ClInclude Include="PipelineStateObject.h" />
     <ClInclude Include="Shader.h" />
     <ClInclude Include="ShadowMap.h" />
