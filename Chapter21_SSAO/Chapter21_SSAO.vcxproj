@@ -89,6 +89,7 @@
       <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <AdditionalIncludeDirectories>../ImGui;./;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -106,6 +107,7 @@
       <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <AdditionalIncludeDirectories>../ImGui;./;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -123,6 +125,7 @@
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>Default</ConformanceMode>
       <AdditionalIncludeDirectories>../Common;../ImGui;./;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -140,6 +143,7 @@
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>Default</ConformanceMode>
       <AdditionalIncludeDirectories>../Common;../ImGui;./;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -151,25 +155,28 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="..\Common\PassManager.cpp" />
     <ClCompile Include="CubeRenderTarget.cpp" />
     <ClCompile Include="GameApp.cpp" />
     <ClCompile Include="IPass.cpp" />
     <ClCompile Include="Main.cpp" />
+    <ClCompile Include="PassManager.cpp" />
     <ClCompile Include="PipelineStateObject.cpp" />
+    <ClCompile Include="RenderStates.cpp" />
     <ClCompile Include="Shader.cpp" />
     <ClCompile Include="ShadowMap.cpp" />
     <ClCompile Include="SSAO.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\Common\PassManager.h" />
     <ClInclude Include="CubeRenderTarget.h" />
     <ClInclude Include="GameApp.h" />
     <ClInclude Include="IPass.h" />
+    <ClInclude Include="PassManager.h" />
     <ClInclude Include="PipelineStateObject.h" />
+    <ClInclude Include="Property.h" />
     <ClInclude Include="Shader.h" />
     <ClInclude Include="ShadowMap.h" />
     <ClInclude Include="SSAO.h" />
+    <ClInclude Include="RenderStates.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="imgui.ini" />

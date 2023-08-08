@@ -68,7 +68,7 @@ private:
 class UploadConstantBuffer
 {
 public:
-	UploadConstantBuffer(ID3D12Device* device, UINT elementByteSize, UINT elementCount)
+	UploadConstantBuffer(ID3D12Device* device, UINT elementByteSize)
 		:m_ElementByteSize(elementByteSize) 
 	{
 		// Constant buffer elements need to be multiples of 256 bytes.
@@ -81,7 +81,7 @@ public:
 		m_ElementByteSize = d3dUtil::CalcConstantBufferByteSize(m_ElementByteSize);
 
 		CD3DX12_HEAP_PROPERTIES uploadHeapProperties(D3D12_HEAP_TYPE_UPLOAD);
-		CD3DX12_RESOURCE_DESC uploadResourceDesc = CD3DX12_RESOURCE_DESC::Buffer(m_ElementByteSize * elementCount);
+		CD3DX12_RESOURCE_DESC uploadResourceDesc = CD3DX12_RESOURCE_DESC::Buffer(m_ElementByteSize);
 		HR(device->CreateCommittedResource(
 			&uploadHeapProperties,
 			D3D12_HEAP_FLAG_NONE,
@@ -105,7 +105,7 @@ public:
 		m_MappedData = nullptr;
 	}
 
-	HRESULT CreateBuffer(ID3D12Device* device, UINT elementByteSize, UINT elementCount)
+	HRESULT CreateBuffer(ID3D12Device* device, UINT elementByteSize)
 	{
 		HRESULT hResult = S_OK;
 		if (m_UploadBuffer != nullptr) return hResult;
@@ -121,7 +121,7 @@ public:
 		m_ElementByteSize = d3dUtil::CalcConstantBufferByteSize(m_ElementByteSize);
 
 		CD3DX12_HEAP_PROPERTIES uploadHeapProperties(D3D12_HEAP_TYPE_UPLOAD);
-		CD3DX12_RESOURCE_DESC uploadResourceDesc = CD3DX12_RESOURCE_DESC::Buffer(m_ElementByteSize * elementCount);
+		CD3DX12_RESOURCE_DESC uploadResourceDesc = CD3DX12_RESOURCE_DESC::Buffer(m_ElementByteSize);
 		HR(hResult = device->CreateCommittedResource(
 			&uploadHeapProperties,
 			D3D12_HEAP_FLAG_NONE,
@@ -140,9 +140,9 @@ public:
 		return m_UploadBuffer.Get();
 	}
 
-	void CopyData(int elementIndex, void* data)
+	void CopyData(void* data)
 	{
-		memcpy_s(&m_MappedData[elementIndex * m_ElementByteSize], m_ElementByteSize, &data, m_ElementByteSize);
+		memcpy_s(&m_MappedData[m_ElementByteSize], m_ElementByteSize, &data, m_ElementByteSize);
 	}
 
 private:
