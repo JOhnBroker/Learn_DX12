@@ -26,10 +26,10 @@ bool GameApp::Initialize()
 
 	HR(m_CommandList->Reset(m_DirectCmdListAlloc.Get(), nullptr));
 
-	if (!InitResource()) 
-	{
-		return false;
-	}
+	//if (!InitResource()) 
+	//{
+	//	return false;
+	//}
 
 	BuildRootSignature();
 	BuildSSAORootSignature();
@@ -54,6 +54,8 @@ bool GameApp::Initialize()
 
 bool GameApp::InitResource()
 {
+	HR(m_CommandList->Reset(m_DirectCmdListAlloc.Get(), nullptr));
+
 	bool bResult = false;
 	
 	// Initialize scene aabb
@@ -144,6 +146,14 @@ bool GameApp::InitResource()
 	m_ShadowMap = std::make_unique<ShadowMap>(m_pd3dDevice.Get(),
 		pow(2, m_ShadowMapSize) * 256, pow(2, m_ShadowMapSize) * 256);
 
+	m_TextureManager.UpdateDescriptorCount();
+
+	// execute initialization commands
+	HR(m_CommandList->Close());
+	ID3D12CommandList* cmdsLists[] = { m_CommandList.Get() };
+	m_CommandQueue->ExecuteCommandLists(_countof(cmdsLists), cmdsLists);
+
+	FlushCommandQueue();
 	bResult = true;
 
 	return bResult;
@@ -152,7 +162,7 @@ bool GameApp::InitResource()
 void GameApp::CreateRTVAndDSVDescriptorHeaps()
 {
 	D3D12_DESCRIPTOR_HEAP_DESC rtvHeapDesc;
-	rtvHeapDesc.NumDescriptors = SwapChainBufferCount + 1 + 5;
+	rtvHeapDesc.NumDescriptors = SwapChainBufferCount + m_TextureManager.GetRTVDescriptorCount() + 1;
 	rtvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
 	rtvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
 	rtvHeapDesc.NodeMask = 0;
@@ -160,7 +170,7 @@ void GameApp::CreateRTVAndDSVDescriptorHeaps()
 		&rtvHeapDesc, IID_PPV_ARGS(m_RTVHeap.GetAddressOf())));
 
 	D3D12_DESCRIPTOR_HEAP_DESC dsvHeapDesc;
-	dsvHeapDesc.NumDescriptors = 2;
+	dsvHeapDesc.NumDescriptors = m_TextureManager.GetDSVDescriptorCount() + 1;
 	dsvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_DSV;
 	dsvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
 	dsvHeapDesc.NodeMask = 0;
@@ -168,7 +178,7 @@ void GameApp::CreateRTVAndDSVDescriptorHeaps()
 		&dsvHeapDesc, IID_PPV_ARGS(m_DSVHeap.GetAddressOf())));
 
 	D3D12_DESCRIPTOR_HEAP_DESC srvHeapDesc = {};
-	srvHeapDesc.NumDescriptors = 19;
+	srvHeapDesc.NumDescriptors = m_TextureManager.GetSRVDescriptorCount() + 1;
 	srvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
 	srvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
 	HR(m_pd3dDevice->CreateDescriptorHeap(&srvHeapDesc, IID_PPV_ARGS(&m_SRVHeap)));
@@ -854,6 +864,7 @@ void GameApp::BuildDescriptorHeaps()
 		m_DSVDescriptorSize,
 		m_RTVDescriptorSize);
 
+	m_ShadowMap->SetBuildDescriptorState(true);
 	m_SkyTexHeapIndex = m_TextureManager.GetTextureSrvIndex("grassCube");
 }
 

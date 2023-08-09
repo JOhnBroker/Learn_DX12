@@ -483,8 +483,15 @@ bool D3DApp::InitDirect3D()
 
 	CreateCommandObjects();
 	CreateSwapChain();
+	if (!InitResource())
+		return false;
 	CreateRTVAndDSVDescriptorHeaps();
 
+	return true;
+}
+
+bool D3DApp::InitResource()
+{
 	return true;
 }
 

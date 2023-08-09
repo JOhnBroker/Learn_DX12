@@ -55,6 +55,7 @@ protected:
 protected:
 	bool InitMainWindow();
 	bool InitDirect3D();
+	virtual bool InitResource();
 	bool InitImGui();
 	void CreateCommandObjects();										// 创建命令队列、命令列表分配器和命令列表
 	void CreateSwapChain();												// 创建交换链

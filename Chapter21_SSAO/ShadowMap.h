@@ -20,6 +20,7 @@ public:
 	ShadowMap& operator=(const ShadowMap& rhs)=delete;
 	~ShadowMap()=default;
 
+	void SetBuildDescriptorState(bool option);
     UINT GetWidth()const;
     UINT GetHeight()const;
 	ID3D12Resource* GetResource();
@@ -52,6 +53,7 @@ private:
 	UINT m_Height = 0;
 
 	bool bIsResize = false;
+	bool bIsBuildDescriptor = false;
 	std::shared_ptr<Depth2D> m_ShadowMap;
 	std::shared_ptr<Texture2D> m_ShadowMap_Debug;
 };

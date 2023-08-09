@@ -37,6 +37,7 @@ struct ShaderInfo
 	SHADER_TYPE eType;
 };
 
+// 常量缓冲区
 struct ConstantBufferData 
 {
 	bool isDirty = false;
@@ -81,6 +82,7 @@ struct ConstantBufferData
 
 };
 
+// 常量缓冲区中每个参数
 struct ConstantBufferVariable 
 {
 	std::string m_ValueName;						// 参数名
@@ -220,6 +222,25 @@ struct ConstantBufferVariable
 	}
 };
 
+struct ShaderParameter
+{
+	std::string name;
+	SHADER_TYPE shaderType;
+	UINT bindPoint;
+	UINT registerSpace;
+};
+
+struct ShaderSRVParameter : ShaderParameter
+{
+	CD3DX12_GPU_DESCRIPTOR_HANDLE srv;
+};
+
+struct ShaderUAVParameter :ShaderParameter 
+{
+	CD3DX12_GPU_DESCRIPTOR_HANDLE uav;
+};
+
+struct ShaderSamplerParameter :ShaderParameter {};
 
 class Shader
 {
@@ -236,10 +257,10 @@ public:
 
 	void BindParameters();
 
-
 private:
+	HRESULT AddShader(std::string name, ID3DBlob** ppShaderByteCode);
 	HRESULT CreateShaderFromFile(std::string fileName, const std::vector<ShaderInfo>& shaderInfo);
-	HRESULT CompileShaderFromFile();
+	HRESULT CompileShaderFromFile(std::string fileName, const std::vector<ShaderInfo>& shaderInfo);
 
 	D3D12_SHADER_VISIBILITY GetShaderVisibility(SHADER_TYPE type);
 	std::vector<CD3DX12_STATIC_SAMPLER_DESC> CreateStaticSamplers();
@@ -256,18 +277,18 @@ public:
 	template<class T>
 	using ComPtr = Microsoft::WRL::ComPtr<T>;
 
-	std::unordered_map<size_t, ComPtr<ID3DBlob>> m_VertexShader;
+	std::unordered_map<size_t, ComPtr<ID3DBlob>> m_VertexShader;		
 	std::unordered_map<size_t, ComPtr<ID3DBlob>> m_HullShader;
 	std::unordered_map<size_t, ComPtr<ID3DBlob>> m_DomainShader;
 	std::unordered_map<size_t, ComPtr<ID3DBlob>> m_GeometryShader;
 	std::unordered_map<size_t, ComPtr<ID3DBlob>> m_PixelShader;
 	std::unordered_map<size_t, ComPtr<ID3DBlob>> m_ComputerShader;
 
-	std::unordered_map<size_t, std::shared_ptr<ConstantBufferVariable>> m_ConstantBufferVariables;	// 常量缓冲区的变量
-	std::vector<ConstantBufferData> m_CBVParams;
-	std::vector<CD3DX12_GPU_DESCRIPTOR_HANDLE> m_SRVParams;
-	std::vector<CD3DX12_GPU_DESCRIPTOR_HANDLE> m_UAVParams;
-	std::vector<int> m_SamplerParams;
+	std::unordered_map<size_t, std::shared_ptr<ConstantBufferVariable>> m_ConstantBufferVariables;	// 常量缓冲区的变量		// name转hash,作为ID
+	std::unordered_map<size_t, std::shared_ptr<ConstantBufferData>> m_CBVParams;					// 绑定槽位作为ID
+	std::unordered_map<size_t, std::shared_ptr<ShaderSRVParameter>> m_SRVParams;					// 绑定槽位作为ID
+	std::unordered_map<size_t, std::shared_ptr<ShaderUAVParameter>> m_UAVParams;					// 绑定槽位作为ID
+	std::unordered_map<size_t, std::shared_ptr<ShaderSamplerParameter>> m_SamplerParams;			// 绑定槽位作为ID	
 
 	int m_CBVSignatureBaseBindSlot = -1;
 	int m_SRVSignatureBindSlot = -1;

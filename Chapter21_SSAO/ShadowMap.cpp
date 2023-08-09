@@ -17,6 +17,11 @@ ShadowMap::ShadowMap(ID3D12Device* device, UINT width, UINT height)
 	BuildResource();
 }
 
+void ShadowMap::SetBuildDescriptorState(bool option)
+{
+	bIsBuildDescriptor = option;
+}
+
 UINT ShadowMap::GetWidth()const
 {
     return m_Width;
@@ -151,8 +156,10 @@ void ShadowMap::BuildResource()
 {
 	TextureManager& textureManager = TextureManager::Get();
 
-	if (bIsResize) 
+	if (bIsResize)
 	{
+		if (!bIsBuildDescriptor)
+			return;
 		m_ShadowMap = std::make_shared<Depth2D>(m_pd3dDevice, m_Width, m_Height);
 		textureManager.ReBuildDescriptor(SHADOWMAP_NAME, m_ShadowMap);
 

@@ -35,6 +35,9 @@ bool RenderStates::IsInit()
 
 void RenderStates::InitAll()
 {
+	if (IsInit)
+		return;
+
 	bIsInit = true;
 
 	RSNormal = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
@@ -70,7 +73,7 @@ void RenderStates::InitAll()
 	SSLinearClamp = SSPointClamp;
 	SSLinearClamp.Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
 
-	SSLinearWrap = SSLinearWrap;
+	SSLinearWrap = SSPointWrap;
 	SSLinearWrap.Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
 
 	SSAnisotropicClamp8x = SSPointClamp;
@@ -91,12 +94,12 @@ void RenderStates::InitAll()
 
 	// Alpha-To-Coverage模式
 	BSAlphaToCoverage = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
-	BSAlphaToCoverage.AlphaToCoverageEnable = true;
+	BSAlphaToCoverage.AlphaToCoverageEnable = TRUE;
 
 	// Color = SrcAlpha * SrcColor + (1 - SrcAlpha) * DestColor 
 	// Alpha = SrcAlpha
 	BSTransparent = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
-	BSTransparent.RenderTarget[0].BlendEnable = true;
+	BSTransparent.RenderTarget[0].BlendEnable = TRUE;
 	BSTransparent.RenderTarget[0].SrcBlend = D3D12_BLEND_SRC_ALPHA;
 	BSTransparent.RenderTarget[0].DestBlend = D3D12_BLEND_INV_SRC_ALPHA;
 	BSTransparent.RenderTarget[0].BlendOp = D3D12_BLEND_OP_ADD;
@@ -107,18 +110,18 @@ void RenderStates::InitAll()
 	// Color = SrcColor + DestColor
 	// Alpha = SrcAlpha + DestAlpha
 	BSAdditive = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
-	BSAdditive.RenderTarget[0].BlendEnable = true;
+	BSAdditive.RenderTarget[0].BlendEnable = TRUE;
 	BSAdditive.RenderTarget[0].SrcBlend = D3D12_BLEND_ONE;
 	BSAdditive.RenderTarget[0].DestBlend = D3D12_BLEND_ONE;
 	BSAdditive.RenderTarget[0].BlendOp = D3D12_BLEND_OP_ADD;
 	BSAdditive.RenderTarget[0].SrcBlendAlpha = D3D12_BLEND_ONE;
-	BSAdditive.RenderTarget[0].DestBlendAlpha = D3D12_BLEND_ZERO;
+	BSAdditive.RenderTarget[0].DestBlendAlpha = D3D12_BLEND_ONE;
 	BSAdditive.RenderTarget[0].BlendOpAlpha = D3D12_BLEND_OP_ADD;
 
 	// Color = SrcAlpha * SrcColor + DestColor
 	// Alpha = SrcAlpha
 	BSAlphaWeightedAdditive = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
-	BSAlphaWeightedAdditive.RenderTarget[0].BlendEnable = true;
+	BSAlphaWeightedAdditive.RenderTarget[0].BlendEnable = TRUE;
 	BSAlphaWeightedAdditive.RenderTarget[0].SrcBlend = D3D12_BLEND_SRC_ALPHA;
 	BSAlphaWeightedAdditive.RenderTarget[0].DestBlend = D3D12_BLEND_ONE;
 	BSAlphaWeightedAdditive.RenderTarget[0].BlendOp = D3D12_BLEND_OP_ADD;
@@ -161,11 +164,10 @@ void RenderStates::InitAll()
 	DSSWriteStencil.FrontFace.StencilFunc = D3D12_COMPARISON_FUNC_EQUAL;
 	DSSWriteStencil.BackFace.StencilFunc = D3D12_COMPARISON_FUNC_EQUAL;
 
-
 	// 无深度测试，仅模板写入
 	DSSEqualStencil = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
-	DSSEqualStencil.DepthEnable = false;
-	DSSEqualStencil.StencilEnable = true;
+	DSSEqualStencil.DepthEnable = FALSE;
+	DSSEqualStencil.StencilEnable = TRUE;
 	DSSEqualStencil.StencilReadMask = 0xff;
 	DSSEqualStencil.StencilWriteMask = 0xff;
 	DSSEqualStencil.FrontFace.StencilFailOp = D3D12_STENCIL_OP_REPLACE;

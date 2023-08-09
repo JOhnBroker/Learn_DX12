@@ -20,6 +20,7 @@ public:
 
 	static TextureManager& Get();
 	void Init(ID3D12Device* device, ID3D12GraphicsCommandList* cmdList);
+	void UpdateDescriptorCount();
 	ITexture* CreateFromeFile(std::string filename, std::string name, bool isCube = false, bool forceSRGB = false);
 	ITexture* CreateFromeMemory(std::string name, void* data, size_t byteWidth, bool isCube = false, bool forceSRGB = false);
 	bool AddTexture(std::string name, std::shared_ptr<ITexture> texture);

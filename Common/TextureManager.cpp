@@ -35,6 +35,22 @@ void TextureManager::Init(ID3D12Device* device, ID3D12GraphicsCommandList* cmdLi
 	m_pCommandList = cmdList;
 }
 
+void TextureManager::UpdateDescriptorCount()
+{
+	m_nSRVCount	= 0;
+	m_nDSVCount	= 0;
+	m_nRTVCount	= 0;
+
+	m_nSRVCount += 2;
+
+	for (auto& it : m_Textures)
+	{
+		m_nSRVCount += it.second->GetSRVDescriptorCount();
+		m_nDSVCount += it.second->GetDSVDescriptorCount();
+		m_nRTVCount += it.second->GetRTVDescriptorCount();
+	}
+}
+
 ITexture* TextureManager::CreateFromeFile(std::string filename, std::string name, bool isCube, bool forceSRGB) 
 {
 	uint32_t width = 0, height = 0, mipLevels = 1;

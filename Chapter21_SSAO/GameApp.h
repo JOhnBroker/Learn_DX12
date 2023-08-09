@@ -45,7 +45,7 @@ public:
 	~GameApp();
 
 	virtual bool Initialize()override;
-	bool InitResource();
+	virtual bool InitResource() override;
 
 public:
 	virtual void CreateRTVAndDSVDescriptorHeaps() override;
