@@ -39,3 +39,8 @@ void ShaderDefines::SetDefine(const std::string& name, const std::string& defini
 {
     definesMap.insert_or_assign(name, definition);
 }
+
+Shader::Shader(ID3D12Device* device, std::string filename)
+    : m_pDevice(device), m_FileName(filename)
+{
+}

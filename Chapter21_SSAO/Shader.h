@@ -246,8 +246,16 @@ class Shader
 {
 public:
 
-	Shader(ID3D12Device* device);
+	Shader(ID3D12Device* device, std::string filename);
 	~Shader() = default;
+
+	// 编译着色器 或 读取着色器字节码，按下述顺序：
+   // 1. 如果开启着色器字节码文件缓存路径 且 关闭强制覆盖，则优先尝试读取${cacheDir}/${shaderName}.cso并添加
+   // 2. 否则读取filename。若为着色器字节码，直接添加
+   // 3. 若filename为hlsl源码，则进行编译和添加。开启着色器字节码文件缓存会保存着色器字节码到${cacheDir}/${shaderName}.cso
+	HRESULT CreateShaderFromFile(std::string fileName, const std::vector<ShaderInfo>& shaderInfo);
+	// 仅编译着色器
+	HRESULT CompileShaderFromFile(std::string fileName, const std::vector<ShaderInfo>& shaderInfo);
 
 	void SetConstantBuffer(std::string name);
 	void SetShaderResource(std::string name, CD3DX12_GPU_DESCRIPTOR_HANDLE SRV);
@@ -258,9 +266,9 @@ public:
 	void BindParameters();
 
 private:
+	// 添加编译好的着色器二进制信息并为其设置标识名
+	// 该函数不会保存着色器二进制编码到文件
 	HRESULT AddShader(std::string name, ID3DBlob** ppShaderByteCode);
-	HRESULT CreateShaderFromFile(std::string fileName, const std::vector<ShaderInfo>& shaderInfo);
-	HRESULT CompileShaderFromFile(std::string fileName, const std::vector<ShaderInfo>& shaderInfo);
 
 	D3D12_SHADER_VISIBILITY GetShaderVisibility(SHADER_TYPE type);
 	std::vector<CD3DX12_STATIC_SAMPLER_DESC> CreateStaticSamplers();
@@ -268,7 +276,6 @@ private:
 
 	// 更新收集着色器反射信息
 	HRESULT UpdateShaderReflection(std::string name, ID3D12ShaderReflection* pShaderReflection, uint32_t shaderFlags);
-	void GetShaderParameters();
 	// 清空所有资源与反射信息
 	void Clear();
 
@@ -299,6 +306,7 @@ public:
 	ComPtr<ID3D12RootSignature> m_RootSignature;
 
 private:
+	std::string m_FileName;
 	ID3D12Device* m_pDevice;
 
 };

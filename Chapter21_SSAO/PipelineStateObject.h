@@ -55,5 +55,14 @@ private:
 
 };
 
+//-------------------------------------------------------------------------//
+// ComputePSO
+//-------------------------------------------------------------------------//
+
+
+struct ComputePSODescriptor;
+
+class ComputePSOManager;
+
 
 #endif // !PIPELINESTATEOBJECT_H
