@@ -3,7 +3,7 @@
 
 #include "hittable.h"
 
-class sphere :public hittale 
+class sphere :public hittable
 {
 public:
 	sphere() {}
@@ -12,8 +12,8 @@ public:
 	virtual bool hit(const ray& r, double t_min, double t_max, hit_record& rec)const override;
 
 public:
-	point3 center;
-	double radius;
+    point3 center = point3(0, 0, 0);
+    double radius = 0.0f;
 };
 
 
@@ -40,8 +40,7 @@ bool sphere::hit(const ray& r, double t_min, double t_max, hit_record& rec) cons
 
     rec.t = root;
     rec.pos = r.At(root);
-    rec.normal = (rec.pos - center) / radius;
-
+    rec.set_face_normal(r, (rec.pos - center) / radius);
     res = true;
 Exit0:
     return res;

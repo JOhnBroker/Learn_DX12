@@ -46,7 +46,7 @@ public:
 
 
 public:
-	double e[3];
+	double e[3] = { 0.0,0.0,0.0 };
 };
 
 using point3 = vec3;
