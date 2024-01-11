@@ -142,6 +142,7 @@
     <ClCompile Include="Extra_RayTracing.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="camera.h" />
     <ClInclude Include="color.h" />
     <ClInclude Include="common.h" />
     <ClInclude Include="hittable.h" />
