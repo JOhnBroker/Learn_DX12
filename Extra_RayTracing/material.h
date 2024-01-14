@@ -33,6 +33,19 @@ private:
 	double fuzz;
 };
 
+class Dielectric :public Material 
+{
+public:
+	Dielectric(double index_of_refraction) : ref_idx(index_of_refraction) {}
+	virtual bool Scatter(const ray& r_in, const hit_record& rec, color& attenuation, ray& scattered) const override;
+
+private:
+	static double reflectance(double cos, double ref_idx);
+
+private:
+	double ref_idx;
+};
+
 bool Lambertian::Scatter(const ray& r_in, const hit_record& rec, color& attenuation, ray& scattered) const
 {
 	// diffuse
@@ -50,10 +63,37 @@ bool Metal::Scatter(const ray& r_in, const hit_record& rec, color& attenuation, 
 {
 	// specular
 	auto refected = reflect(unit_vector(r_in.GetDirection()), rec.normal);
-	// Ã«²£Á§Ð§¹û
+	// æ¯›çŽ»ç’ƒæ•ˆæžœ
 	scattered = ray(rec.pos, refected + fuzz * random_in_uint_sphere());
 	attenuation = albedo;
 	return (dot(scattered.GetDirection(), rec.normal) > 0);
+}
+
+bool Dielectric::Scatter(const ray & r_in, const hit_record & rec, color & attenuation, ray & scattered) const
+{
+	attenuation = color(1.0, 1.0, 1.0);
+	double refraction_ratio = rec.front_face ? (1.0 / ref_idx) : ref_idx;
+	vec3 uint_direction = unit_vector(r_in.GetDirection());
+
+	double cos_theta = fmin(dot(-uint_direction, rec.normal), 1.0);
+	double sin_theta = sqrt(1 - cos_theta * cos_theta);
+	bool isReflect = refraction_ratio * sin_theta > 1.0;
+	vec3 direction;
+
+	if (isReflect || reflectance(cos_theta, ref_idx) > random_double()) 
+		direction = reflect(uint_direction, rec.normal);
+	else
+		direction = refract(uint_direction, rec.normal, refraction_ratio);
+
+	scattered = ray(rec.pos, direction);
+	return true;
+}
+
+inline double Dielectric::reflectance(double cos, double refIdx)
+{
+	auto r0 = (1 - refIdx) / (1 + refIdx);
+	r0 *= r0;
+	return r0 + (1 - r0) * pow((1 - cos), 5);
 }
 
 #endif // !MATERIAL_H
