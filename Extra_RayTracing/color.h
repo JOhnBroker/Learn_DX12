@@ -3,6 +3,13 @@
 
 #include "vec3.h"
 
+using color = vec3;
+
+inline double linear_to_gamma(double linear_component)
+{
+	return sqrt(linear_component);
+}
+
 void write_color(std::ostream& out, color pixel_color, int samples_per_pixel) 
 {
 	auto r = pixel_color.x();
@@ -11,13 +18,18 @@ void write_color(std::ostream& out, color pixel_color, int samples_per_pixel)
 
 	// gamma Ð£Õý
 	auto scale = 1.0 / samples_per_pixel;
-	r = sqrt(r * scale);
-	g = sqrt(g * scale);
-	b = sqrt(b * scale);
+	r = r * scale;
+	g = g * scale;
+	b = b * scale;
 
-	out << static_cast<int>(256 * clame(r,0.0,0.999)) << ' '
-		<< static_cast<int>(256 * clame(g,0.0,0.999)) << ' '
-		<< static_cast<int>(256 * clame(b,0.0,0.999)) << '\n';
+	r = linear_to_gamma(r);
+	g = linear_to_gamma(g);
+	b = linear_to_gamma(b);
+		
+	static const interval intensity(0.000, 0.999);
+	out << static_cast<int>(256 * intensity.clamp(r)) << ' '
+		<< static_cast<int>(256 * intensity.clamp(g)) << ' '
+		<< static_cast<int>(256 * intensity.clamp(b)) << '\n';
 }
 
 #endif // !COLOR_H

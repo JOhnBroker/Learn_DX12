@@ -2,6 +2,7 @@
 #define MATERIAL_H
 
 #include "common.h"
+#include "color.h"
 #include "hittable_list.h"
 
 struct hit_record;
@@ -9,6 +10,7 @@ struct hit_record;
 class Material 
 {
 public:
+	virtual ~Material() = default;
 	virtual bool Scatter(const ray& r_in, const hit_record& rec, color& attenuation, ray& scattered) const = 0;
 };
 
@@ -53,7 +55,7 @@ bool Lambertian::Scatter(const ray& r_in, const hit_record& rec, color& attenuat
 
 	if (scatter_direct.near_zero())
 		scatter_direct = rec.normal;
-	scattered = ray(rec.pos, scatter_direct);
+	scattered = ray(rec.pos, scatter_direct, r_in.GetTime());
 	attenuation = albedo;
 
 	return true;
@@ -64,7 +66,7 @@ bool Metal::Scatter(const ray& r_in, const hit_record& rec, color& attenuation, 
 	// specular
 	auto refected = reflect(unit_vector(r_in.GetDirection()), rec.normal);
 	// 毛玻璃效果
-	scattered = ray(rec.pos, refected + fuzz * random_in_uint_sphere());
+	scattered = ray(rec.pos, refected + fuzz * random_in_uint_sphere(), r_in.GetTime());
 	attenuation = albedo;
 	return (dot(scattered.GetDirection(), rec.normal) > 0);
 }
@@ -76,7 +78,7 @@ bool Dielectric::Scatter(const ray & r_in, const hit_record & rec, color & atten
 	vec3 uint_direction = unit_vector(r_in.GetDirection());
 
 	double cos_theta = fmin(dot(-uint_direction, rec.normal), 1.0);
-	double sin_theta = sqrt(1 - cos_theta * cos_theta);
+	double sin_theta = sqrt(1.0 - cos_theta * cos_theta);
 	bool isReflect = refraction_ratio * sin_theta > 1.0;
 	vec3 direction;
 
@@ -85,7 +87,7 @@ bool Dielectric::Scatter(const ray & r_in, const hit_record & rec, color & atten
 	else
 		direction = refract(uint_direction, rec.normal, refraction_ratio);
 
-	scattered = ray(rec.pos, direction);
+	scattered = ray(rec.pos, direction, r_in.GetTime());
 	return true;
 }
 

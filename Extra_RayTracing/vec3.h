@@ -5,6 +5,7 @@
 #include <iostream>
 
 using std::sqrt;
+using std::fabs;
 
 class vec3 
 {
@@ -55,7 +56,6 @@ public:
 };
 
 using point3 = vec3;
-using color = vec3;
 
 
 inline std::ostream& operator<<(std::ostream& out, const vec3& v) 
