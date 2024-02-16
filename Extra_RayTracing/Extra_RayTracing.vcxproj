@@ -140,11 +140,18 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="camera.cpp" />
+    <ClCompile Include="color.cpp" />
     <ClCompile Include="Extra_RayTracing.cpp" />
+    <ClCompile Include="hittable_list.cpp" />
+    <ClCompile Include="interval.cpp" />
+    <ClCompile Include="material.cpp" />
+    <ClCompile Include="sphere.cpp" />
+    <ClCompile Include="vec3.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="camera.h" />
     <ClInclude Include="color.h" />
+    <ClInclude Include="util.h" />
     <ClInclude Include="common.h" />
     <ClInclude Include="hittable.h" />
     <ClInclude Include="hittable_list.h" />

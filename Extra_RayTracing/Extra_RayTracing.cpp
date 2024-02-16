@@ -1,6 +1,9 @@
 #include "common.h"
+
 #include "camera.h"
+#include "color.h"
 #include "hittable_list.h"
+#include "material.h"
 #include "sphere.h"
 
 
@@ -27,19 +30,22 @@ hittable_list random_scene()
                     //diffuse
                     auto albedo = color::random() * color::random();
                     material = make_shared<Lambertian>(albedo);
+                    //auto cen2 = center + vec3(0, random_double(0, 0.5f), 0);
+                    world.add(make_shared<sphere>(center, r, material));
                 }
                 else if (choose_mat < 0.95) 
                 {
                     auto albedo = color::random() * color::random();
                     auto fuzz = random_double(0, 0.5);
                     material = make_shared<Metal>(albedo, fuzz);
+                    world.add(make_shared<sphere>(center, r, material));
                 }
                 else 
                 {
                     // glass
                     material = make_shared<Dielectric>(1.5);
+                    world.add(make_shared<sphere>(center, r, material));
                 }
-                world.add(make_shared<sphere>(center, r, material));
             }
         }
     }
@@ -72,11 +78,11 @@ int main()
     camera.max_depth = 20;
 
     camera.vfov = 20;
-    camera.lookfrome= point3(13, 2, 3);
+    camera.lookfrom = point3(13, 2, 3);
     camera.lookat = point3(0, 0, 0);
     camera.vup = vec3(0, 1, 0);
 
-    camera.defocus_angle = 0.6;
+    camera.defocus_angle = 0.02;
     camera.focus_dist = 10.0;
 
     // Render

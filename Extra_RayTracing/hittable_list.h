@@ -1,42 +1,29 @@
 #ifndef HITTABLE_LIST_H
 #define HITTABLE_LIST_H
 
+#include "common.h"
+
 #include "hittable.h"
+
+#include <memory>
 #include <vector>
 
-class hittable_list :public hittable 
-{
-public:
-	hittable_list() {}
-	hittable_list(shared_ptr<hittable> object) {}
 
-	void clear() { objects.clear(); objects.shrink_to_fit(); }
-	void add(shared_ptr<hittable> obj) { objects.push_back(obj); }
+class hittable_list : public hittable {
+  public:
+    std::vector<shared_ptr<hittable>> objects;
 
-	virtual bool hit(const ray& r, interval ray_t, hit_record& rec)const override;
+    hittable_list() {}
+    hittable_list(shared_ptr<hittable> object) { add(object); }
 
-public: 
-	std::vector<shared_ptr<hittable>> objects;
+    void clear() { objects.clear(); }
+
+    void add(shared_ptr<hittable> object) {
+        objects.push_back(object);
+    }
+
+    bool hit(const Ray& r, interval ray_t, hit_record& rec) const override;
 };
 
-bool hittable_list::hit(const ray& r, interval ray_t, hit_record& rec)const 
-{
-	hit_record tem_rec;
-	bool hit_anything = false;
-	double closest_far = ray_t.max;
 
-	for (const auto& obj : objects) 
-	{
-		// closest_far 作为 t_max进行射线检测，所以能保证rec存的是离相机距离最近
-		if (obj->hit(r, interval(ray_t.min, closest_far), tem_rec))
-		{
-			hit_anything = true;
-			closest_far = tem_rec.t;
-			rec = tem_rec;
-		}
-	}
-	return hit_anything;
-}
-
-
-#endif // !HITTABLE_LIST_H
+#endif
