@@ -64,10 +64,11 @@ Ray Camera::GetRay(int i, int j) const
 	auto pixel_center = pixel00_loc + (i * pixel_delta_u) + (j * pixel_delta_v);
 	auto pixel_sample = pixel_center + PixelSampleSquare();
 
-	auto Ray_origin = (defocus_angle <= 0) ? center : DefocusDiskSample();
-	auto Ray_direction = pixel_sample - Ray_origin;
+	auto ray_origin = (defocus_angle <= 0) ? center : DefocusDiskSample();
+	auto ray_direction = pixel_sample - ray_origin;
+	auto ray_time = random_double();
 
-	return Ray(Ray_origin, Ray_direction);
+	return Ray(ray_origin, ray_direction, ray_time);
 }
 
 vec3 Camera::PixelSampleSquare() const

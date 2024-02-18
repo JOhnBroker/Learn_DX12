@@ -8,9 +8,8 @@ bool Lambertian::Scatter(const Ray& r_in, const hit_record& rec, color& attenuat
 	if (scatter_direct.near_zero())
 		scatter_direct = rec.normal;
 
-	//scattered = Ray(rec.p, scatter_direct, r_in.GetTime());
-	scattered = Ray(rec.p, scatter_direct);
-	attenuation = albedo;
+	scattered = Ray(rec.p, scatter_direct, r_in.GetTime());
+	attenuation = albedo->Value(rec.u, rec.v, rec.p);
 
 	return true;
 }
@@ -20,8 +19,7 @@ bool Metal::Scatter(const Ray& r_in, const hit_record& rec, color& attenuation, 
 	// specular
 	vec3 reflected = reflect(unit_vector(r_in.GetDirection()), rec.normal);
 	// 毛玻璃效果
-	//scattered = Ray(rec.p, refected + fuzz * random_in_unit_sphere(), r_in.GetTime());
-	scattered = Ray(rec.p, reflected + fuzz * random_in_unit_sphere());
+	scattered = Ray(rec.p, reflected + fuzz * random_in_unit_sphere(), r_in.GetTime());
 	attenuation = albedo;
 	return (dot(scattered.GetDirection(), rec.normal) > 0);
 }
@@ -42,8 +40,7 @@ bool Dielectric::Scatter(const Ray& r_in, const hit_record& rec, color& attenuat
 	else
 		direction = refract(unit_direction, rec.normal, refraction_ratio);
 
-	//scattered = Ray(rec.p, direction, r_in.GetTime());
-	scattered = Ray(rec.p, direction);
+	scattered = Ray(rec.p, direction, r_in.GetTime());
 	return true;
 }
 

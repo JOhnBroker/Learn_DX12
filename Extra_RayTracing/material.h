@@ -3,6 +3,7 @@
 
 #include "common.h"
 #include "color.h"
+#include "Texture.h"
 
 #include "hittable_list.h"
 
@@ -19,30 +20,31 @@ class Material {
 
 class Lambertian : public Material {
   public:
-    Lambertian(const color& a) : albedo(a) {}
+    Lambertian(const color& a) : albedo(make_shared<SolidColor>(a)) {}
+    Lambertian(shared_ptr<Texture> a) : albedo(a) {}
     bool Scatter(const Ray& r_in, const hit_record& rec, color& attenuation, Ray& scattered) const override;
 
   private:
-    color albedo;
+    shared_ptr<Texture> albedo;
 };
 
 
 class Metal : public Material {
-  public:
+public:
     Metal(const color& a, double f) : albedo(a), fuzz(f < 1 ? f : 1) {}
     bool Scatter(const Ray& r_in, const hit_record& rec, color& attenuation, Ray& scattered) const override;
 
-  private:
+private:
     color albedo;
     double fuzz;
 };
 
 
 class Dielectric : public Material {
-  public:
+public:
     Dielectric(double index_of_refraction) : ir(index_of_refraction) {}
     bool Scatter(const Ray& r_in, const hit_record& rec, color& attenuation, Ray& scattered)const override;
-  private:
+private:
     double ir; // Index of Refraction
 
     static double Reflectance(double cosine, double ref_idx);

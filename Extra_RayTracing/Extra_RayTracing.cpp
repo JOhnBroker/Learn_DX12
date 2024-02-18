@@ -3,16 +3,19 @@
 #include "camera.h"
 #include "color.h"
 #include "hittable_list.h"
+#include "BVH.h"
 #include "material.h"
 #include "sphere.h"
+#include "Texture.h"
 
 
-hittable_list random_scene() 
+void RandomSpheresScene() 
 {
     hittable_list world;
 
     auto ground_maerial = make_shared<Lambertian>(color(0.5, 0.5, 0.5));
-    world.add(make_shared<sphere>(point3(0, -1000, 0), 1000, ground_maerial));
+    auto checker = make_shared<CheckerTexture>(0.32, color(0.2, 0.3, 0.1), color(0.9, 0.9, 0.9));
+    world.add(make_shared<sphere>(point3(0, -1000, 0), 1000, make_shared<Lambertian>(checker)));
 
     double r = 0.2;
     for (int i = -11; i < 11; ++i) 
@@ -30,8 +33,8 @@ hittable_list random_scene()
                     //diffuse
                     auto albedo = color::random() * color::random();
                     material = make_shared<Lambertian>(albedo);
-                    //auto cen2 = center + vec3(0, random_double(0, 0.5f), 0);
-                    world.add(make_shared<sphere>(center, r, material));
+                    auto cen2 = center + vec3(0, random_double(0, 0.5f), 0);
+                    world.add(make_shared<sphere>(center, cen2, r, material));
                 }
                 else if (choose_mat < 0.95) 
                 {
@@ -59,23 +62,16 @@ hittable_list random_scene()
     auto material3 = make_shared<Metal>(color(0.7, 0.6, 0.5), 0.0);
     world.add(make_shared<sphere>(point3(4, 1, 0), 1.0, material3));
 
-    return world;
-}
-
-
-int main()
-{
-    // World
-    hittable_list world = random_scene();
+    world = hittable_list(make_shared<BVHNode>(world));
 
     // Camera
     Camera camera;
 
     // Image
     camera.aspect_ratio = 16.0 / 9.0;
-    camera.image_width = 1200;
-    camera.samples_per_pixel = 10;
-    camera.max_depth = 20;
+    camera.image_width = 400;
+    camera.samples_per_pixel = 100;
+    camera.max_depth = 50;
 
     camera.vfov = 20;
     camera.lookfrom = point3(13, 2, 3);
@@ -87,6 +83,43 @@ int main()
 
     // Render
     camera.Render(world);
+}
+
+void TwoSpheresScene()
+{
+    hittable_list world;
+
+    auto checker = make_shared<CheckerTexture>(0.8, color(0.2, 0.3, 0.1), color(0.9, 0.9, 0.9));
+
+    world.add(make_shared<sphere>(point3(0, -10, 0), 10, make_shared<Lambertian>(checker)));
+    world.add(make_shared<sphere>(point3(0, 10, 0), 10, make_shared<Lambertian>(checker)));
+
+    // Camera
+    Camera camera;
+
+    // Image
+    camera.aspect_ratio = 16.0 / 9.0;
+    camera.image_width = 400;
+    camera.samples_per_pixel = 100;
+    camera.max_depth = 50;
+
+    camera.vfov = 20;
+    camera.lookfrom = point3(13, 2, 3);
+    camera.lookat = point3(0, 0, 0);
+    camera.vup = vec3(0, 1, 0);
+
+    camera.defocus_angle = 0;
+
+    // Render
+    camera.Render(world);
+}
+
+
+int main()
+{
+    // World
+    //RandomSpheresScene();
+    TwoSpheresScene();
 
     return 0;
 }
