@@ -1,9 +1,9 @@
 #ifndef CAMERA_H
 #define CAMERA_H
 
-#include "common.h"
+#include "Common/common.h"
 
-#include "color.h"
+#include "Common/color.h"
 #include "hittable.h"
 #include "material.h"
 

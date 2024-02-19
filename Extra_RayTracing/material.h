@@ -1,9 +1,9 @@
 #ifndef Material_H
 #define Material_H
 
-#include "common.h"
-#include "color.h"
-#include "Texture.h"
+#include "Common/common.h"
+#include "Common/color.h"
+#include "Common/Texture.h"
 
 #include "hittable_list.h"
 

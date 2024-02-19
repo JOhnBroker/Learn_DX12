@@ -1,12 +1,11 @@
-#include "common.h"
+#include "Common/common.h"
 
 #include "camera.h"
-#include "color.h"
 #include "hittable_list.h"
 #include "BVH.h"
 #include "material.h"
 #include "sphere.h"
-#include "Texture.h"
+#include "Common/Texture.h"
 
 
 void RandomSpheresScene() 
@@ -114,12 +113,41 @@ void TwoSpheresScene()
     camera.Render(world);
 }
 
+void EarthScene() 
+{
+    auto earthTexture = make_shared<ImageTexture>("earthmap.jpg");
+    auto earthSurface = make_shared<Lambertian>(earthTexture);
+    auto earth = make_shared<sphere>(point3(0, 0, 0), 2, earthSurface);
+
+    // Camera
+    Camera camera;
+
+    // Image
+    camera.aspect_ratio = 16.0 / 9.0;
+    camera.image_width = 400;
+    camera.samples_per_pixel = 100;
+    camera.max_depth = 50;
+
+    camera.vfov = 20;
+    camera.lookfrom = point3(12, 0, 0);
+    camera.lookat = point3(0, 0, 0);
+    camera.vup = vec3(0, 1, 0);
+
+    camera.defocus_angle = 0;
+
+    // Render
+    camera.Render(hittable_list(earth));
+
+}
+
 
 int main()
 {
     // World
     //RandomSpheresScene();
-    TwoSpheresScene();
+    //TwoSpheresScene();
+    EarthScene();
 
     return 0;
 }
+

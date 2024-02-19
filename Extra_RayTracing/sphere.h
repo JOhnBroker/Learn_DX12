@@ -1,7 +1,7 @@
 #ifndef SPHERE_H
 #define SPHERE_H
 
-#include "common.h"
+#include "Common/common.h"
 #include "hittable.h"
 
 

@@ -13,18 +13,12 @@
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
+    <Filter Include="Common">
+      <UniqueIdentifier>{64bbd81f-4096-4dc4-9efc-02729ca287a7}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Extra_RayTracing.cpp">
-      <Filter>源文件</Filter>
-    </ClCompile>
-    <ClCompile Include="camera.cpp">
-      <Filter>源文件</Filter>
-    </ClCompile>
-    <ClCompile Include="color.cpp">
-      <Filter>源文件</Filter>
-    </ClCompile>
-    <ClCompile Include="interval.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
     <ClCompile Include="hittable_list.cpp">
@@ -36,30 +30,33 @@
     <ClCompile Include="sphere.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="vec3.cpp">
-      <Filter>源文件</Filter>
-    </ClCompile>
-    <ClCompile Include="AABB.cpp">
-      <Filter>源文件</Filter>
-    </ClCompile>
     <ClCompile Include="BVH.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="Texture.cpp">
+    <ClCompile Include="Common\AABB.cpp">
+      <Filter>Common</Filter>
+    </ClCompile>
+    <ClCompile Include="Common\color.cpp">
+      <Filter>Common</Filter>
+    </ClCompile>
+    <ClCompile Include="Common\Texture.cpp">
+      <Filter>Common</Filter>
+    </ClCompile>
+    <ClCompile Include="Common\vec3.cpp">
+      <Filter>Common</Filter>
+    </ClCompile>
+    <ClCompile Include="camera.cpp">
       <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Common\interval.cpp">
+      <Filter>Common</Filter>
+    </ClCompile>
+    <ClCompile Include="Common\RTStbImage.cpp">
+      <Filter>Common</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="hittable.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="ray.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="vec3.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="color.h">
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="sphere.h">
@@ -68,29 +65,41 @@
     <ClInclude Include="hittable_list.h">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="util.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="camera.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
     <ClInclude Include="material.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="interval.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="common.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="AABB.h">
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="BVH.h">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="Texture.h">
+    <ClInclude Include="Common\AABB.h">
+      <Filter>Common</Filter>
+    </ClInclude>
+    <ClInclude Include="Common\color.h">
+      <Filter>Common</Filter>
+    </ClInclude>
+    <ClInclude Include="Common\common.h">
+      <Filter>Common</Filter>
+    </ClInclude>
+    <ClInclude Include="Common\ray.h">
+      <Filter>Common</Filter>
+    </ClInclude>
+    <ClInclude Include="Common\Texture.h">
+      <Filter>Common</Filter>
+    </ClInclude>
+    <ClInclude Include="Common\util.h">
+      <Filter>Common</Filter>
+    </ClInclude>
+    <ClInclude Include="Common\vec3.h">
+      <Filter>Common</Filter>
+    </ClInclude>
+    <ClInclude Include="camera.h">
       <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Common\interval.h">
+      <Filter>Common</Filter>
+    </ClInclude>
+    <ClInclude Include="Common\RTStbImage.h">
+      <Filter>Common</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

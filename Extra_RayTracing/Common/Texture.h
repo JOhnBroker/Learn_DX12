@@ -3,6 +3,7 @@
 
 #include "common.h"
 #include "color.h"
+#include "RTStbImage.h"
 
 
 class Texture
@@ -41,6 +42,16 @@ private:
 	double invScale;
 	shared_ptr<Texture> even;
 	shared_ptr<Texture> odd;
+};
+
+class ImageTexture :public Texture 
+{
+public:
+	ImageTexture(const char* szFileName) :image(szFileName) {}
+	color Value(double u, double v, const point3& p)const override;
+
+private:
+	RTStbImage image;
 };
 
 

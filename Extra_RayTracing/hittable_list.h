@@ -1,7 +1,7 @@
 #ifndef HITTABLE_LIST_H
 #define HITTABLE_LIST_H
 
-#include "common.h"
+#include "Common/common.h"
 
 #include "hittable.h"
 

@@ -139,33 +139,35 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="AABB.cpp" />
     <ClCompile Include="BVH.cpp" />
     <ClCompile Include="camera.cpp" />
-    <ClCompile Include="color.cpp" />
+    <ClCompile Include="Common\AABB.cpp" />
+    <ClCompile Include="Common\color.cpp" />
+    <ClCompile Include="Common\interval.cpp" />
+    <ClCompile Include="Common\RTStbImage.cpp" />
+    <ClCompile Include="Common\Texture.cpp" />
+    <ClCompile Include="Common\vec3.cpp" />
     <ClCompile Include="Extra_RayTracing.cpp" />
     <ClCompile Include="hittable_list.cpp" />
-    <ClCompile Include="interval.cpp" />
     <ClCompile Include="material.cpp" />
     <ClCompile Include="sphere.cpp" />
-    <ClCompile Include="Texture.cpp" />
-    <ClCompile Include="vec3.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="AABB.h" />
     <ClInclude Include="BVH.h" />
     <ClInclude Include="camera.h" />
-    <ClInclude Include="color.h" />
-    <ClInclude Include="Texture.h" />
-    <ClInclude Include="util.h" />
-    <ClInclude Include="common.h" />
+    <ClInclude Include="Common\AABB.h" />
+    <ClInclude Include="Common\color.h" />
+    <ClInclude Include="Common\common.h" />
+    <ClInclude Include="Common\interval.h" />
+    <ClInclude Include="Common\ray.h" />
+    <ClInclude Include="Common\RTStbImage.h" />
+    <ClInclude Include="Common\Texture.h" />
+    <ClInclude Include="Common\util.h" />
+    <ClInclude Include="Common\vec3.h" />
     <ClInclude Include="hittable.h" />
     <ClInclude Include="hittable_list.h" />
-    <ClInclude Include="interval.h" />
     <ClInclude Include="material.h" />
-    <ClInclude Include="ray.h" />
     <ClInclude Include="sphere.h" />
-    <ClInclude Include="vec3.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

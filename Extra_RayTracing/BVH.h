@@ -1,7 +1,7 @@
 #ifndef BVH_H
 #define BVH_H
 
-#include "common.h"
+#include "Common/common.h"
 
 #include "hittable_list.h"
 
