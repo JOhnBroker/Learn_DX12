@@ -25,3 +25,9 @@ color ImageTexture::Value(double u, double v, const point3& p) const
 	auto colorScale = 1.0 / 255.0;
 	return color(colorScale * pixel[0], colorScale * pixel[1], colorScale * pixel[2]);
 }
+
+color NoiseTexture::Value(double u, double v, const point3& p) const
+{
+	point3 s = mScale * p;
+	return color(1, 1, 1) * 0.5 * (1.0 + sin(s.z() + 10 * mNoise.Turb(s)));
+}

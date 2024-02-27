@@ -4,6 +4,7 @@
 #include "common.h"
 #include "color.h"
 #include "RTStbImage.h"
+#include "Perlin.h"
 
 
 class Texture
@@ -54,5 +55,17 @@ private:
 	RTStbImage image;
 };
 
+// 噪声图
+class NoiseTexture :public Texture 
+{
+public:
+	NoiseTexture() = default;
+	NoiseTexture(double scale) :mScale(scale) {}
+
+	color Value(double u, double v, const point3& p)const;
+private:
+	Perlin mNoise;
+	double mScale = 1.0;
+};
 
 #endif // !TEXTURE_H

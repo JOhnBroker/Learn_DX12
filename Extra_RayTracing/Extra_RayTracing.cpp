@@ -88,10 +88,13 @@ void TwoSpheresScene()
 {
     hittable_list world;
 
-    auto checker = make_shared<CheckerTexture>(0.8, color(0.2, 0.3, 0.1), color(0.9, 0.9, 0.9));
+    //auto checker = make_shared<CheckerTexture>(0.8, color(0.2, 0.3, 0.1), color(0.9, 0.9, 0.9));
+    //world.add(make_shared<sphere>(point3(0, -10, 0), 10, make_shared<Lambertian>(checker)));
+    //world.add(make_shared<sphere>(point3(0, 10, 0), 10, make_shared<Lambertian>(checker)));
 
-    world.add(make_shared<sphere>(point3(0, -10, 0), 10, make_shared<Lambertian>(checker)));
-    world.add(make_shared<sphere>(point3(0, 10, 0), 10, make_shared<Lambertian>(checker)));
+    auto noise = make_shared<NoiseTexture>(2);
+    world.add(make_shared<sphere>(point3(0, -1000, 0), 1000, make_shared<Lambertian>(noise)));
+    world.add(make_shared<sphere>(point3(0, 2, 0), 2, make_shared<Lambertian>(noise)));
 
     // Camera
     Camera camera;
@@ -144,9 +147,18 @@ void EarthScene()
 int main()
 {
     // World
-    //RandomSpheresScene();
-    //TwoSpheresScene();
-    EarthScene();
+    switch (2)
+    {
+    case 1:
+        RandomSpheresScene();
+        break;
+    case 2:
+        TwoSpheresScene();
+        break;
+    case 3:
+        EarthScene();
+        break;
+    }
 
     return 0;
 }

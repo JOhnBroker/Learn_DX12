@@ -144,6 +144,7 @@
     <ClCompile Include="Common\AABB.cpp" />
     <ClCompile Include="Common\color.cpp" />
     <ClCompile Include="Common\interval.cpp" />
+    <ClCompile Include="Common\Perlin.cpp" />
     <ClCompile Include="Common\RTStbImage.cpp" />
     <ClCompile Include="Common\Texture.cpp" />
     <ClCompile Include="Common\vec3.cpp" />
@@ -159,6 +160,7 @@
     <ClInclude Include="Common\color.h" />
     <ClInclude Include="Common\common.h" />
     <ClInclude Include="Common\interval.h" />
+    <ClInclude Include="Common\Perlin.h" />
     <ClInclude Include="Common\ray.h" />
     <ClInclude Include="Common\RTStbImage.h" />
     <ClInclude Include="Common\Texture.h" />
