@@ -1,4 +1,8 @@
+#ifdef _MSC_VER
 #include <Windows.h>
+#else
+#include <unistd.h>
+#endif
 #include "RTStbImage.h"
 #define STB_IMAGE_IMPLEMENTATION
 #define STBI_FAILURE_USERMSG
@@ -10,6 +14,7 @@ std::string GetCurrentPath()
 {
     std::string ret;
     char buf[MAX_PATH_LEN];
+#ifdef _MSC_VER
     GetCurrentDirectoryA(MAX_PATH_LEN, buf);
 
     char* p = strrchr(buf, '\\');
@@ -21,6 +26,18 @@ std::string GetCurrentPath()
     {
         ret = std::string(buf) + "\\..\\Textures\\";
     }
+#else
+    getcwd(buf, MAX_PATH_LEN);
+     char* p = strrchr(buf, '/');
+    if (strncmp(p, "/Release", strlen(p)) == 0 || strncmp(p, "/Debug", strlen(p)) == 0)
+    {
+        ret = std::string(buf) + "/../../../Textures/";
+    }
+    else
+    {
+        ret = std::string(buf) + "/../../Textures/";
+    }
+#endif
     return ret;
 }
 
