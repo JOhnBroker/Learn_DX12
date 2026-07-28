@@ -1,24 +1,24 @@
 #include "sphere.h"
 
-bool sphere::hit(const Ray& r, interval ray_t, hit_record& rec) const
+bool sphere::Hit(const Ray& r, interval ray_t, HitRecord& rec) const
 {
     bool res = false;
-    point3 cen = is_moving ? GetCenter(r.GetTime()) : center;
+    point3 cen = center.At(r.GetTime());
     vec3 oc = r.GetOrigin() - cen;
     // 射线与球体是否相交 可以 转化为射线到球心之间的距离
     // (P(t)-C)·P(t)-C = r^2 ; P(t) = Ori + t*Dir
     // 展开公式可得
     // t^2 * Dir·Dir + 2t * Dir·(Ori - C) + (Ori - C)·(Ori - C) - r^2 = 0
     auto a = r.GetDirection().length_squared();
-    auto half_b = dot(oc, r.GetDirection());
+    auto half_b = dot(r.GetDirection(), oc);
     auto c = oc.length_squared() - radius * radius;
     auto discriminant = half_b * half_b - a * c;
-    auto root = (-half_b - sqrt(discriminant)) / a;
+    auto root = (half_b - sqrt(discriminant)) / a;
     if (discriminant < 0) goto Exit0;
 
     if (!ray_t.surrounds(root))
     {
-        root = (-half_b + sqrt(discriminant)) / a;
+        root = (half_b + sqrt(discriminant)) / a;
         if (!ray_t.surrounds(root)) goto Exit0;
     }
 
@@ -30,6 +30,26 @@ bool sphere::hit(const Ray& r, interval ray_t, hit_record& rec) const
     res = true;
 Exit0:
     return res;
+}
+
+double sphere::PDFValue(const point3& origin, const vec3& direction) const
+{
+    HitRecord rec;
+    if (!this->Hit(Ray(origin, direction, 0), interval(0.001, infinity), rec))
+        return 0;
+    auto distSquard = (center.At(0) - origin).length_squared();
+    auto cosThetaMax = std::sqrt(1 - radius * radius / distSquard);
+    auto solidAngle = 2 * pi * (1 - cosThetaMax);
+
+    return 1 / solidAngle;
+}
+
+vec3 sphere::Random(const point3& origin) const
+{
+    vec3 direction = center.At(0) - origin;
+    auto distanceSquared = direction.length_squared();
+    ONB uvw(direction);
+    return uvw.transform(RandomToSphere(radius, distanceSquared));
 }
 
 void sphere::GetSphereUV(const point3& p, double& u, double& v)
@@ -46,4 +66,17 @@ void sphere::GetSphereUV(const point3& p, double& u, double& v)
 
     u = phi / (2 * pi);
     v = theta / pi;
+}
+
+vec3 sphere::RandomToSphere(double radius, double distanceSquared)
+{
+    auto r1 = random_double();
+    auto r2 = random_double();
+    auto z = 1 + r2 * (std::sqrt(1 - radius * radius / distanceSquared) - 1);
+
+    auto phi = 2 * pi * r1;
+    auto x = std::cos(phi) * std::sqrt(1 - z * z);
+    auto y = std::sin(phi) * std::sqrt(1 - z * z);
+
+    return vec3(x, y, z);
 }

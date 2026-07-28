@@ -28,3 +28,18 @@ bool AABB::hit(const Ray& r, interval ray_t) const
 	}
 	return true;
 }
+
+void AABB::padToMinimums() {
+	double delta = 0.0001;
+	if (x.size() < delta) x = x.expand(delta);
+	if (y.size() < delta) y = y.expand(delta);
+	if (z.size() < delta) z = z.expand(delta);
+}
+
+AABB operator+(const AABB& bbox, const vec3& offset) {
+	return AABB(bbox.x + offset.x(), bbox.y + offset.y(), bbox.z + offset.z());
+}
+
+AABB operator+(const vec3& offset, const AABB& bbox) {
+	return bbox + offset;
+}

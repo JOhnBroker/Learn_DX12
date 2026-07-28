@@ -123,6 +123,9 @@ vec3 random_in_unit_sphere();
 // 单位球体内选随机点
 vec3 random_unit_vector();
 
+// 随机余弦方向点
+vec3 random_cosine_direction();
+
 // 半球上随机点
 vec3 random_on_hemisphere(const vec3& normal);
 

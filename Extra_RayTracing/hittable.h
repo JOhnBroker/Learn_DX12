@@ -6,7 +6,7 @@
 
 class Material;
 
-class hit_record {
+class HitRecord {
   public:
     point3 p;
     vec3 normal;
@@ -25,12 +25,45 @@ class hit_record {
 };
 
 
-class hittable {
+class Hittable {
   public:
-    virtual ~hittable() = default;
+    virtual ~Hittable() = default;
 
-    virtual bool hit(const Ray& r, interval ray_t, hit_record& rec) const = 0;
+    virtual bool Hit(const Ray& r, interval ray_t, HitRecord& rec) const = 0;
     virtual AABB BoundingBox() const = 0;
+    virtual double PDFValue(const point3& origin, const vec3& direction) const {
+        return 0.0;
+    }
+    virtual vec3 Random(const point3& origin) const {
+        return vec3(1, 0, 0);
+    }
+};
+
+class Translate : public Hittable {
+public:
+    Translate(shared_ptr<Hittable> object, const vec3& offset) :mObject(object), mOffset(offset) 
+    {
+        mBbox = mObject->BoundingBox() + offset;
+    }
+    bool Hit(const Ray& r, interval ray_t, HitRecord& rec) const override;
+    AABB BoundingBox() const override { return  mBbox; }
+private:
+    shared_ptr<Hittable> mObject;
+    vec3 mOffset;
+    AABB mBbox;
+};
+
+class RotateY : public Hittable {
+public:
+    RotateY(shared_ptr<Hittable> object, double angle);
+    bool Hit(const Ray& r, interval ray_t, HitRecord& rec) const override;
+    AABB BoundingBox() const override { return mBbox; }
+
+private:
+    shared_ptr<Hittable> mObject;
+    double mSinTheta;
+    double mCosTheta;
+    AABB mBbox;
 };
 
 

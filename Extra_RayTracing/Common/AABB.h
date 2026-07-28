@@ -8,7 +8,10 @@ class AABB
 public:
 	AABB() {}
 	AABB(const interval in_x, const interval in_y, const interval in_z) 
-		:x(in_x), y(in_y), z(in_z) {}
+		:x(in_x), y(in_y), z(in_z) 
+	{
+		padToMinimums();
+	}
 	AABB(const point3& a, const point3& b) 
 	{
 		x = interval(fmin(a[0], b[0]), fmax(a[0], b[0]));
@@ -20,12 +23,20 @@ public:
 		x = interval(box0.x, box1.x);
 		y = interval(box0.y, box1.y);
 		z = interval(box0.z, box1.z);
+		padToMinimums();
 	}
 	const interval& axis(int n)const;
 	bool hit(const Ray& r, interval ray_t)const;
 
+private:
+	void padToMinimums();
+
 public:
 	interval x, y, z;
 };
+
+AABB operator+(const AABB& bbox, const vec3& offset);
+
+AABB operator+(const vec3& offset, const AABB& bbox);
 
 #endif // !AABB_H

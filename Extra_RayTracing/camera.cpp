@@ -1,6 +1,7 @@
 #include "camera.h"
+#include "PDF.h"
 
-void Camera::Render(const hittable& world)
+void Camera::Render(const Hittable& world, const Hittable& lights)
 {
 	Initialize();
 
@@ -10,11 +11,13 @@ void Camera::Render(const hittable& world)
 		std::clog << "\rScanlines remaining: " << (image_height - j) << ' ' << std::flush;
 		for (int i = 0; i < image_width; ++i) {
 			color pixel_color(0, 0, 0);
-			for (int sample = 0; sample < samples_per_pixel; ++sample) {
-				Ray r = GetRay(i, j);
-				pixel_color += RayColor(r, max_depth, world);
+			for (int s_j = 0; s_j < sqrt_spp; ++s_j) {
+				for (int s_i = 0; s_i < sqrt_spp; ++s_i) {
+					Ray r = GetRay(i, j, s_i, s_j);
+					pixel_color += RayColor(r, max_depth, world, lights);
+				}
 			}
-			write_color(std::cout, pixel_color, samples_per_pixel);
+			write_color(std::cout, pixel_samples_scale * pixel_color);
 		}
 	}
 
@@ -24,6 +27,10 @@ void Camera::Initialize()
 {
 	image_height = static_cast<int>(image_width / aspect_ratio);
 	image_height = (image_height < 1) ? 1 : image_height;
+
+	sqrt_spp = int(std::sqrt(samples_per_pixel));
+	pixel_samples_scale = 1.0 / (sqrt_spp * sqrt_spp);
+	recip_sqrt_spp = 1.0 / sqrt_spp;
 
 	center = lookfrom;
 
@@ -56,12 +63,15 @@ void Camera::Initialize()
 	defocus_disk_v = v * defocus_radius;
 }
 
-Ray Camera::GetRay(int i, int j) const
+Ray Camera::GetRay(int i, int j, int s_i, int s_j) const
 {
 	// Get a randomly-sampled camera Ray for the pixel at location i,j, originating from
-		// the camera defocus disk.
+	// the camera defocus disk.
 
-	auto pixel_center = pixel00_loc + (i * pixel_delta_u) + (j * pixel_delta_v);
+	auto offset = SampleSquareStratified(s_i, s_j);
+	auto pixel_center = pixel00_loc
+		+ ((i + offset.x()) * pixel_delta_u)
+		+ ((j + offset.y()) * pixel_delta_v);
 	auto pixel_sample = pixel_center + PixelSampleSquare();
 
 	auto ray_origin = (defocus_angle <= 0) ? center : DefocusDiskSample();
@@ -93,23 +103,51 @@ point3 Camera::DefocusDiskSample() const
 	return center + (p[0] * defocus_disk_u) + (p[1] * defocus_disk_v);
 }
 
-color Camera::RayColor(const Ray& r, int depth, const hittable& world) const
+color Camera::RayColor(const Ray& r, int depth, const Hittable& world, const Hittable& lights) const
 {
 	// If we've exceeded the Ray bounce limit, no more light is gathered.
 	if (depth <= 0)
 		return color(0, 0, 0);
 
-	hit_record rec;
+	HitRecord rec;
 
-	if (world.hit(r, interval(0.001, infinity), rec)) {
-		Ray scattered;
-		color attenuation;
-		if (rec.mat->Scatter(r, rec, attenuation, scattered))
-			return attenuation * RayColor(scattered, depth - 1, world);
-		return color(0, 0, 0);
+	// If the ray hits nothing, return the background color.
+	if (!world.Hit(r, interval(0.001, infinity), rec)) {
+		return background;
+	}
+	ScatterRecord srec;
+	color colorFromEmission = rec.mat->Emitted(r, rec, rec.u, rec.v, rec.p);
+
+	if (!rec.mat->Scatter(r, rec, srec))
+		return colorFromEmission;
+	
+	if (srec.skipPDF) {
+		return srec.attenuation * RayColor(srec.skipPDFRay, depth - 1, world, lights);
 	}
 
-	vec3 unit_direction = unit_vector(r.GetDirection());
-	auto a = 0.5 * (unit_direction.y() + 1.0);
-	return (1.0 - a) * color(1.0, 1.0, 1.0) + a * color(0.5, 0.7, 1.0);
+	auto lightPtr = make_shared<HittablePDF>(lights, rec.p);
+	MixturePDF mixedPDF(lightPtr, srec.pdfPtr);
+
+	Ray scattered;
+	scattered = Ray(rec.p, mixedPDF.Generate(), r.GetTime());
+	auto pdf_value = mixedPDF.Value(scattered.GetDirection());
+
+	double scatteringPDF = rec.mat->ScatterPDF(r, rec, scattered);
+
+	color sampleColor = RayColor(scattered, depth - 1, world, lights);
+	color colorFromScatter = 
+		(srec.attenuation * scatteringPDF * sampleColor)
+		/ pdf_value;
+
+	return colorFromEmission + colorFromScatter;
+}
+
+vec3 Camera::SampleSquareStratified(int s_i, int s_j) const {
+	// Returns the vector to a random point in the square sub-pixel specified by grid
+	// indices s_i and s_j, for an idealized unit square pixel [-.5,-.5] to [+.5,+.5].
+
+	auto px = ((s_i + random_double()) * recip_sqrt_spp) - 0.5;
+	auto py = ((s_j + random_double()) * recip_sqrt_spp) - 0.5;
+
+	return vec3(px, py, 0);
 }

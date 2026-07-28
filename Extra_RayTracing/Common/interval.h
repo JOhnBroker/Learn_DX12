@@ -40,4 +40,12 @@ class interval {
 };
 
 
+inline interval operator+(const interval& ival, double displacement) {
+    return interval(ival.min + displacement, ival.max + displacement);
+}
+
+inline interval operator+(double displacement, const interval& ival) {
+    return ival + displacement;
+}
+
 #endif

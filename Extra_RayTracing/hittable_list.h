@@ -9,23 +9,23 @@
 #include <vector>
 
 
-class hittable_list : public hittable {
+class hittable_list : public Hittable {
   public:
     hittable_list() {}
-    hittable_list(shared_ptr<hittable> object) { add(object); }
+    hittable_list(shared_ptr<Hittable> object) { add(object); }
 
     void clear() { objects.clear(); }
 
-    void add(shared_ptr<hittable> object) {
+    void add(shared_ptr<Hittable> object) {
         objects.push_back(object);
         bbox = AABB(bbox, object->BoundingBox());
     }
 
-    bool hit(const Ray& r, interval ray_t, hit_record& rec) const override;
+    bool Hit(const Ray& r, interval ray_t, HitRecord& rec) const override;
     AABB BoundingBox()const override { return bbox; }
 
 public:
-    std::vector<shared_ptr<hittable>> objects;
+    std::vector<shared_ptr<Hittable>> objects;
 
 private:
     AABB bbox;

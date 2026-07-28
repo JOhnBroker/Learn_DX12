@@ -1,7 +1,7 @@
 #include "BVH.h"
 #include <algorithm>
 
-BVHNode::BVHNode(const std::vector<shared_ptr<hittable>>& src_objects, size_t start, size_t end)
+BVHNode::BVHNode(const std::vector<shared_ptr<Hittable>>& src_objects, size_t start, size_t end)
 {
 	// 复制一份
 	auto objects = src_objects;
@@ -41,13 +41,13 @@ BVHNode::BVHNode(const std::vector<shared_ptr<hittable>>& src_objects, size_t st
 
 }
 
-bool BVHNode::hit(const Ray& r, interval ray_t, hit_record& rec) const
+bool BVHNode::Hit(const Ray& r, interval ray_t, HitRecord& rec) const
 {
 	if (!bbox.hit(r, ray_t))
 		return false;
 
-	bool hitLeft = left->hit(r, ray_t, rec);
-	bool hitRight = right->hit(r, 
+	bool hitLeft = left->Hit(r, ray_t, rec);
+	bool hitRight = right->Hit(r, 
 		interval(ray_t.min, hitLeft ? rec.t : ray_t.max),
 		rec);
 

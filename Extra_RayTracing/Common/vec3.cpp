@@ -28,6 +28,20 @@ vec3 random_unit_vector()
 	return unit_vector(random_in_unit_sphere());
 }
 
+// 随机余弦方向点
+vec3 random_cosine_direction()
+{
+	auto r1 = random_double();
+	auto r2 = random_double();
+
+	auto phi = 2 * pi * r1;
+	auto x = std::cos(phi) * std::sqrt(r2);
+	auto y = std::sin(phi) * std::sqrt(r2);
+	auto z = std::sqrt(1 - r2);
+
+	return vec3(x, y, z);
+}
+
 // 半球上随机点
 vec3 random_on_hemisphere(const vec3& normal)
 {
