@@ -4,7 +4,7 @@ bool sphere::Hit(const Ray& r, interval ray_t, HitRecord& rec) const
 {
     bool res = false;
     point3 cen = center.At(r.GetTime());
-    vec3 oc = r.GetOrigin() - cen;
+    vec3 oc = cen - r.GetOrigin();
     // 射线与球体是否相交 可以 转化为射线到球心之间的距离
     // (P(t)-C)·P(t)-C = r^2 ; P(t) = Ori + t*Dir
     // 展开公式可得
